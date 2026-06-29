@@ -1,33 +1,47 @@
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text } from 'react-native';
+
+import FeedScreen from './screens/FeedScreen';
+import UploadScreen from './screens/UploadScreen';
+import StatsScreen from './screens/StatsScreen';
+import ProfileScreen from './screens/ProfileScreen';
+
+const Tab = createBottomTabNavigator();
+
+const icon = (label: string, focused: boolean) => (
+  <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.4 }}>
+    {label === 'Feed' ? '🏠' : label === 'Cargar' ? '➕' : label === 'Stats' ? '📊' : '👤'}
+  </Text>
+);
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>FORE!</Text>
-      <Text style={styles.sub}>Your game. Your story.</Text>
+    <NavigationContainer>
       <StatusBar style="light" />
-    </View>
+      <Tab.Navigator
+        screenOptions={{
+          headerShown: false,
+          headerLargeTitle: false,
+          tabBarStyle: {
+            backgroundColor: '#111',
+            borderTopColor: '#222',
+            borderTopWidth: 0.5,
+            paddingBottom: 20,
+            paddingTop: 8,
+            height: 70,
+          },
+          tabBarActiveTintColor: '#c8e03a',
+          tabBarInactiveTintColor: '#444',
+          tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+        }}
+      >
+        <Tab.Screen name="Feed" component={FeedScreen} options={{ tabBarIcon: ({ focused }) => icon('Feed', focused) }} />
+        <Tab.Screen name="Cargar" component={UploadScreen} options={{ tabBarIcon: ({ focused }) => icon('Cargar', focused) }} />
+        <Tab.Screen name="Stats" component={StatsScreen} options={{ tabBarIcon: ({ focused }) => icon('Stats', focused) }} />
+        <Tab.Screen name="Perfil" component={ProfileScreen} options={{ tabBarIcon: ({ focused }) => icon('Perfil', focused) }} />
+      </Tab.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f0f0f',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: '#c8e03a',
-    letterSpacing: -1,
-  },
-  sub: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 8,
-    letterSpacing: 1,
-  },
-});

@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "Fore!",
+    "slug": "fore-app",
+    "version": "1.0.0",
+    "scheme": "fore",
+    "platforms": ["ios", "android"]
+  }
+}
