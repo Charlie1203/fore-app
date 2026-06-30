@@ -295,13 +295,15 @@ export default function UploadScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        {step > 1 && step < 4 && (
-          <TouchableOpacity onPress={() => setStep(step - 1)}>
-            <Text style={styles.backBtn}>← Atrás</Text>
-          </TouchableOpacity>
-        )}
-        <Text style={styles.headerTitle}>Cargar vuelta</Text>
-        {step < 4 && <StepIndicator step={step} />}
+        <View style={styles.headerInner}>
+          {step > 1 && step < 4 && (
+            <TouchableOpacity onPress={() => setStep(step - 1)}>
+              <Text style={styles.backBtn}>← Atrás</Text>
+            </TouchableOpacity>
+          )}
+          <Text style={styles.headerTitle}>Cargar vuelta</Text>
+        </View>
+        {step < 4 && <View style={{ paddingHorizontal: 18 }}><StepIndicator step={step} /></View>}
       </View>
 
       {step === 1 && <Step1 onNext={handleNext} />}
@@ -314,13 +316,14 @@ export default function UploadScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
-  header: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 8, gap: 8 },
+  header: { paddingTop: 10, paddingBottom: 12, gap: 8 },
+  headerInner: { paddingHorizontal: 18, paddingBottom: 8 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: COLORS.white },
   backBtn: { fontSize: 14, color: COLORS.lime },
-  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  stepRow: { flexDirection: 'row', alignItems: 'center' },
   stepDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.dim },
   stepDotActive: { backgroundColor: COLORS.lime },
-  stepLine: { flex: 1, height: 2, backgroundColor: COLORS.dim, maxWidth: 40 },
+  stepLine: { flex: 1, height: 2, backgroundColor: COLORS.dim },
   stepLineActive: { backgroundColor: COLORS.lime },
   stepContent: { paddingHorizontal: 18, paddingBottom: 40 },
   stepTitle: { fontSize: 18, fontWeight: '700', color: COLORS.white, marginBottom: 20 },

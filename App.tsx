@@ -1,27 +1,28 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import FeedScreen from './screens/FeedScreen';
 import UploadScreen from './screens/UploadScreen';
-import StatsScreen from './screens/StatsScreen';
+import SearchScreen from './screens/SearchScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
-const icon = (label: string, focused: boolean) => (
-  <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.4 }}>
-    {label === 'Feed' ? '🏠' : label === 'Cargar' ? '➕' : label === 'Stats' ? '📊' : '👤'}
-  </Text>
-);
+const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  Inicio: 'home',
+  Cargar: 'card',
+  Grupos: 'people',
+  Perfil: 'person',
+};
 
 export default function App() {
   return (
     <NavigationContainer>
       <StatusBar style="light" />
       <Tab.Navigator
-        screenOptions={{
+        screenOptions={({ route }) => ({
           headerShown: false,
           headerLargeTitle: false,
           tabBarStyle: {
@@ -35,12 +36,15 @@ export default function App() {
           tabBarActiveTintColor: '#c8e03a',
           tabBarInactiveTintColor: '#444',
           tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
-        }}
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? ICONS[route.name] : (`${ICONS[route.name]}-outline` as any)} size={22} color={color} />
+          ),
+        })}
       >
-        <Tab.Screen name="Feed" component={FeedScreen} options={{ tabBarIcon: ({ focused }) => icon('Feed', focused) }} />
-        <Tab.Screen name="Cargar" component={UploadScreen} options={{ tabBarIcon: ({ focused }) => icon('Cargar', focused) }} />
-        <Tab.Screen name="Stats" component={StatsScreen} options={{ tabBarIcon: ({ focused }) => icon('Stats', focused) }} />
-        <Tab.Screen name="Perfil" component={ProfileScreen} options={{ tabBarIcon: ({ focused }) => icon('Perfil', focused) }} />
+        <Tab.Screen name="Inicio" component={FeedScreen} />
+        <Tab.Screen name="Cargar" component={UploadScreen} />
+        <Tab.Screen name="Grupos" component={SearchScreen} />
+        <Tab.Screen name="Perfil" component={ProfileScreen} />
       </Tab.Navigator>
     </NavigationContainer>
   );

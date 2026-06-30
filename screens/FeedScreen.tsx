@@ -2,11 +2,36 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView, Ani
 import { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute } from '@react-navigation/native';
-import Svg, { Ellipse, Line, Polygon } from 'react-native-svg';
+import Svg, { Ellipse, Line, Polygon, Circle, Path } from 'react-native-svg';
+
+function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
+  const d = [
+    'M 11,9.5 a 1.1,0.7 0 0,1 2.2,0',
+    'M 14,9.5 a 1.1,0.7 0 0,1 2.2,0',
+    'M 17,10 a 1.1,0.7 0 0,1 2.2,0',
+    'M 9,12.5 a 1.1,0.7 0 0,1 2.2,0',
+    'M 12,12.5 a 1.1,0.7 0 0,1 2.2,0',
+    'M 15,12.5 a 1.1,0.7 0 0,1 2.2,0',
+    'M 18,13 a 1.1,0.7 0 0,1 2.2,0',
+    'M 8,15.5 a 1.1,0.7 0 0,1 2.2,0',
+    'M 11,15.5 a 1.1,0.7 0 0,1 2.2,0',
+    'M 14,15.5 a 1.1,0.7 0 0,1 2.2,0',
+    'M 17,16 a 1.1,0.7 0 0,1 2.2,0',
+    'M 8,18.5 a 1.1,0.7 0 0,1 2.2,0',
+    'M 11,18.5 a 1.1,0.7 0 0,1 2.2,0',
+    'M 14,18.5 a 1.1,0.7 0 0,1 2.2,0',
+  ].join(' ');
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.6" fill="none" />
+      <Path d={d} stroke={color} strokeWidth="1.3" fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
 
 function GolfFlagIcon({ color, size = 17 }: { color: string; size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Svg width={size} height={size} viewBox="0 2 24 24">
       <Ellipse cx="12" cy="20" rx="7" ry="2.5" stroke={color} strokeWidth="1.8" fill="none" />
       <Line x1="12" y1="20" x2="12" y2="4" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
       <Polygon points="12,4 21,8 12,12" fill={color} />
@@ -141,7 +166,7 @@ function CardFooter({ likes, comments, liked = false }: { likes: number; comment
         <Text style={[styles.actionText, liked && { color: COLORS.lime }]}>{likes}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.action}>
-        <Ionicons name="chatbubble-outline" size={16} color={COLORS.dim} />
+        <GolfBallIcon color={COLORS.dim} size={16} />
         <Text style={styles.actionText}>{comments}</Text>
       </TouchableOpacity>
       <View style={{ flex: 1 }} />
