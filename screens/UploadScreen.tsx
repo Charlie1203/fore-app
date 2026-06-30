@@ -1,5 +1,6 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView, TextInput } from 'react-native';
-import { useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView, TextInput, Animated } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -34,6 +35,8 @@ function StepIndicator({ step }: { step: number }) {
       <View style={[styles.stepDot, step >= 1 && styles.stepDotActive]} />
       <View style={[styles.stepLine, step >= 2 && styles.stepLineActive]} />
       <View style={[styles.stepDot, step >= 2 && styles.stepDotActive]} />
+      <View style={[styles.stepLine, step >= 3 && styles.stepLineActive]} />
+      <View style={[styles.stepDot, step >= 3 && styles.stepDotActive]} />
     </View>
   );
 }
@@ -138,7 +141,7 @@ function HoleRow({ num, par, score, onInc, onDec }: {
   );
 }
 
-function Step2({ club, course, onPublish }: { club: string; course: string; onPublish: () => void }) {
+function Step2({ club, course, onPublish }: { club: string; course: string; onPublish: (scores: number[]) => void }) {
   const [scores, setScores] = useState(DEFAULT_PARS.map(p => p));
 
   const inc = (i: number) => setScores(s => s.map((v, idx) => idx === i ? v + 1 : v));
@@ -189,50 +192,122 @@ function Step2({ club, course, onPublish }: { club: string; course: string; onPu
         ))}
       </View>
 
-      <TouchableOpacity style={styles.nextBtn} onPress={onPublish}>
-        <Text style={styles.nextBtnText}>Publicar vuelta</Text>
+      <TouchableOpacity style={styles.nextBtn} onPress={() => onPublish(scores)}>
+        <Text style={styles.nextBtnText}>Continuar →</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
-function SuccessScreen({ onReset }: { onReset: () => void }) {
+function Step3({ scores, club, course, onDone }: {
+  scores: number[]; club: string; course: string; onDone: () => void;
+}) {
+  const [shareOnFeed, setShareOnFeed] = useState(true);
+  const [comment, setComment] = useState('');
+
+  const totalScore = scores.reduce((a, b) => a + b, 0);
+  const totalPar = DEFAULT_PARS.reduce((a, b) => a + b, 0);
+  const vsPar = totalScore - totalPar;
+  const birdies = scores.filter((s, i) => s - DEFAULT_PARS[i] === -1).length;
+
   return (
-    <View style={styles.successContainer}>
-      <Text style={{ fontSize: 56 }}>🏌️</Text>
-      <Text style={styles.successTitle}>¡Vuelta publicada!</Text>
-      <Text style={styles.successSub}>Ya aparece en el feed de tus amigos</Text>
-      <TouchableOpacity style={styles.nextBtn} onPress={onReset}>
-        <Text style={styles.nextBtnText}>Cargar otra vuelta</Text>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.stepContent}>
+      <Text style={styles.stepTitle}>¿Compartir en el feed?</Text>
+
+      <View style={styles.summaryPill}>
+        <Text style={styles.summaryPillCourse}>📍 {club} · {course}</Text>
+        <View style={styles.summaryPillStats}>
+          <Text style={styles.summaryPillScore}>{totalScore}</Text>
+          <Text style={[styles.summaryPillVsPar, { color: vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
+            {vsPar > 0 ? '+' : ''}{vsPar}
+          </Text>
+          {birdies > 0 && <Text style={styles.summaryPillBirdies}>{birdies} birdie{birdies > 1 ? 's' : ''}</Text>}
+        </View>
+      </View>
+
+      <Text style={styles.label}>Visibilidad</Text>
+      <View style={styles.optionList}>
+        <TouchableOpacity
+          style={[styles.option, shareOnFeed && styles.optionSelected]}
+          onPress={() => setShareOnFeed(true)}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.optionText, shareOnFeed && styles.optionTextSelected]}>Publicar en el feed</Text>
+            <Text style={styles.optionSub}>Tus amigos van a ver esta vuelta</Text>
+          </View>
+          {shareOnFeed && <Text style={styles.checkmark}>✓</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.option, !shareOnFeed && styles.optionSelected]}
+          onPress={() => setShareOnFeed(false)}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.optionText, !shareOnFeed && styles.optionTextSelected]}>Solo guardar</Text>
+            <Text style={styles.optionSub}>Queda en tu historial pero no se publica</Text>
+          </View>
+          {!shareOnFeed && <Text style={styles.checkmark}>✓</Text>}
+        </TouchableOpacity>
+      </View>
+
+      {shareOnFeed && (
+        <>
+          <Text style={[styles.label, { marginTop: 20 }]}>Comentario <Text style={styles.labelOptional}>(opcional)</Text></Text>
+          <View style={styles.commentBox}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="¿Cómo estuvo la vuelta?"
+              placeholderTextColor={COLORS.dim}
+              value={comment}
+              onChangeText={setComment}
+              multiline
+              maxLength={200}
+            />
+            <Text style={styles.commentCount}>{comment.length}/200</Text>
+          </View>
+        </>
+      )}
+
+      <TouchableOpacity style={styles.nextBtn} onPress={onDone}>
+        <Text style={styles.nextBtnText}>{shareOnFeed ? 'Publicar vuelta' : 'Guardar vuelta'}</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 export default function UploadScreen() {
+  const navigation = useNavigation<any>();
   const [step, setStep] = useState(1);
   const [club, setClub] = useState('');
   const [course, setCourse] = useState('');
+  const [scores, setScores] = useState(DEFAULT_PARS.map(p => p));
 
   const handleNext = (c: string, cr: string) => { setClub(c); setCourse(cr); setStep(2); };
-  const handlePublish = () => setStep(3);
-  const handleReset = () => { setStep(1); setClub(''); setCourse(''); };
+  const handleScoresDone = (s: number[]) => { setScores(s); setStep(3); };
+
+  const handleDone = () => {
+    setStep(1);
+    setClub('');
+    setCourse('');
+    setScores(DEFAULT_PARS.map(p => p));
+    navigation.navigate('Inicio', { showSuccess: Date.now() });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        {step > 1 && step < 3 && (
+        {step > 1 && step < 4 && (
           <TouchableOpacity onPress={() => setStep(step - 1)}>
             <Text style={styles.backBtn}>← Atrás</Text>
           </TouchableOpacity>
         )}
         <Text style={styles.headerTitle}>Cargar vuelta</Text>
-        {step < 3 && <StepIndicator step={step} />}
+        {step < 4 && <StepIndicator step={step} />}
       </View>
 
       {step === 1 && <Step1 onNext={handleNext} />}
-      {step === 2 && <Step2 club={club} course={course} onPublish={handlePublish} />}
-      {step === 3 && <SuccessScreen onReset={handleReset} />}
+      {step === 2 && <Step2 club={club} course={course} onPublish={handleScoresDone} />}
+      {step === 3 && <Step3 scores={scores} club={club} course={course} onDone={handleDone} />}
+
     </SafeAreaView>
   );
 }
@@ -278,7 +353,19 @@ const styles = StyleSheet.create({
   scoreBox: { width: 48, alignItems: 'center' },
   scoreText: { fontSize: 20, fontWeight: '800' },
   diffText: { fontSize: 10, fontWeight: '600' },
-  successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 },
-  successTitle: { fontSize: 24, fontWeight: '800', color: COLORS.white },
-  successSub: { fontSize: 14, color: COLORS.muted, textAlign: 'center' },
+  summaryPill: { backgroundColor: COLORS.dark2, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 14, marginBottom: 20, gap: 8 },
+  summaryPillCourse: { fontSize: 12, color: COLORS.muted },
+  summaryPillStats: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  summaryPillScore: { fontSize: 28, fontWeight: '800', color: COLORS.white },
+  summaryPillVsPar: { fontSize: 16, fontWeight: '700' },
+  summaryPillBirdies: { fontSize: 12, color: COLORS.lime, fontWeight: '600' },
+  optionSub: { fontSize: 11, color: COLORS.dim, marginTop: 2 },
+  labelOptional: { color: COLORS.dim, fontWeight: '400', textTransform: 'none' },
+  commentBox: { backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
+  commentInput: { fontSize: 14, color: COLORS.white, minHeight: 80, textAlignVertical: 'top' },
+  commentCount: { fontSize: 10, color: COLORS.dim, textAlign: 'right', marginTop: 4 },
+  toast: { position: 'absolute', bottom: 40, left: 24, right: 24, backgroundColor: '#1e2e0a', borderWidth: 1, borderColor: COLORS.lime, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  toastEmoji: { fontSize: 36 },
+  toastTitle: { fontSize: 16, fontWeight: '800', color: COLORS.white },
+  toastSub: { fontSize: 12, color: COLORS.lime, marginTop: 2 },
 });

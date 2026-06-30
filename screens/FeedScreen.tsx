@@ -1,4 +1,18 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView, Animated } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useRoute } from '@react-navigation/native';
+import Svg, { Ellipse, Line, Polygon } from 'react-native-svg';
+
+function GolfFlagIcon({ color, size = 17 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Ellipse cx="12" cy="20" rx="7" ry="2.5" stroke={color} strokeWidth="1.8" fill="none" />
+      <Line x1="12" y1="20" x2="12" y2="4" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <Polygon points="12,4 21,8 12,12" fill={color} />
+    </Svg>
+  );
+}
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -123,15 +137,15 @@ function CardFooter({ likes, comments, liked = false }: { likes: number; comment
   return (
     <View style={styles.cardFooter}>
       <TouchableOpacity style={styles.action}>
-        <Text style={{ fontSize: 16, color: liked ? COLORS.lime : COLORS.dim }}>👍</Text>
+        <GolfFlagIcon color={liked ? COLORS.lime : COLORS.dim} size={17} />
         <Text style={[styles.actionText, liked && { color: COLORS.lime }]}>{likes}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.action}>
-        <Text style={{ fontSize: 16, color: COLORS.dim }}>💬</Text>
+        <Ionicons name="chatbubble-outline" size={16} color={COLORS.dim} />
         <Text style={styles.actionText}>{comments}</Text>
       </TouchableOpacity>
       <View style={{ flex: 1 }} />
-      <TouchableOpacity><Text style={{ fontSize: 16, color: COLORS.dim }}>↗</Text></TouchableOpacity>
+      <TouchableOpacity><Ionicons name="repeat-outline" size={19} color={COLORS.dim} /></TouchableOpacity>
     </View>
   );
 }
@@ -173,9 +187,66 @@ const JUAN_HOLES = [
   { score: 3, par: 3 }, { score: 4, par: 4 }, { score: 5, par: 5 }, { score: 3, par: 4 }, { score: 4, par: 4 },
 ];
 
+function RoundSummary({ holes, score, vsPar, onExpand }: {
+  holes: { score: number; par: number }[];
+  score: number; vsPar: number;
+  onExpand: () => void;
+}) {
+  const eagles  = holes.filter(h => h.score - h.par <= -2).length;
+  const birdies = holes.filter(h => h.score - h.par === -1).length;
+  const pares   = holes.filter(h => h.score - h.par === 0).length;
+  const bogeys  = holes.filter(h => h.score - h.par === 1).length;
+  const doubles = holes.filter(h => h.score - h.par >= 2).length;
+
+  return (
+    <View style={styles.summaryBox}>
+      <View style={styles.summaryScores}>
+        <View style={styles.summaryMain}>
+          <Text style={styles.summaryBigScore}>{score}</Text>
+          <Text style={[styles.summaryVsPar, { color: vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
+            {vsPar > 0 ? '+' : ''}{vsPar}
+          </Text>
+        </View>
+        <View style={styles.summaryStats}>
+          {eagles > 0 && (
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryVal, { color: COLORS.lime }]}>{eagles}</Text>
+              <Text style={styles.summaryLbl}>Eagles</Text>
+            </View>
+          )}
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryVal, { color: COLORS.lime }]}>{birdies}</Text>
+            <Text style={styles.summaryLbl}>Birdies</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryVal}>{pares}</Text>
+            <Text style={styles.summaryLbl}>Pares</Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryVal, { color: COLORS.red }]}>{bogeys}</Text>
+            <Text style={styles.summaryLbl}>Bogeys</Text>
+          </View>
+          {doubles > 0 && (
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryVal, { color: '#ff6060' }]}>{doubles}</Text>
+              <Text style={styles.summaryLbl}>Dobles+</Text>
+            </View>
+          )}
+        </View>
+      </View>
+      <TouchableOpacity style={styles.expandBtn} onPress={onExpand}>
+        <Text style={styles.expandBtnText}>Ver tarjeta</Text>
+        <Ionicons name="chevron-down" size={13} color={COLORS.lime} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function RoundCard() {
+  const [expanded, setExpanded] = useState(false);
   const score = JUAN_HOLES.reduce((a, h) => a + h.score, 0);
   const totalPar = JUAN_HOLES.reduce((a, h) => a + h.par, 0);
+  const vsPar = score - totalPar;
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -190,7 +261,17 @@ function RoundCard() {
         <View style={styles.courseBadge}>
           <Text style={styles.courseText}>📍 Haras Santa María · 18 hoyos</Text>
         </View>
-        <Scorecard holes={JUAN_HOLES} score={score} vsPar={score - totalPar} />
+        {expanded ? (
+          <>
+            <Scorecard holes={JUAN_HOLES} score={score} vsPar={vsPar} />
+            <TouchableOpacity style={styles.collapseBtn} onPress={() => setExpanded(false)}>
+              <Text style={styles.expandBtnText}>Ocultar tarjeta</Text>
+              <Ionicons name="chevron-up" size={13} color={COLORS.lime} />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <RoundSummary holes={JUAN_HOLES} score={score} vsPar={vsPar} onExpand={() => setExpanded(true)} />
+        )}
       </View>
       <CardFooter likes={8} comments={2} />
     </View>
@@ -223,13 +304,27 @@ function MilestoneCard() {
 }
 
 export default function FeedScreen() {
+  const route = useRoute<any>();
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const [showToast, setShowToast] = useState(false);
+
+  useEffect(() => {
+    if (!route.params?.showSuccess) return;
+    setShowToast(true);
+    Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.delay(2000),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+    ]).start(() => setShowToast(false));
+  }, [route.params?.showSuccess]);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.logo}>FORE<Text style={{ color: COLORS.lime }}>!</Text></Text>
-        <View style={{ flexDirection: 'row', gap: 16 }}>
-          <Text style={styles.headerIcon}>🔍</Text>
-          <Text style={styles.headerIcon}>🔔</Text>
+        <View style={{ flexDirection: 'row', gap: 18 }}>
+          <Ionicons name="search-outline" size={22} color={COLORS.white} />
+          <Ionicons name="notifications-outline" size={22} color={COLORS.white} />
         </View>
       </View>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -250,6 +345,15 @@ export default function FeedScreen() {
           <MilestoneCard />
         </View>
       </ScrollView>
+      {showToast && (
+        <Animated.View style={[styles.toast, { opacity: toastOpacity }]}>
+          <Text style={styles.toastEmoji}>🏌️</Text>
+          <View>
+            <Text style={styles.toastTitle}>¡Vuelta publicada!</Text>
+            <Text style={styles.toastSub}>Ya aparece en el feed</Text>
+          </View>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -299,6 +403,24 @@ const styles = StyleSheet.create({
   scLbl: { fontSize: 9, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
   milestone: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#141414', borderRadius: 10, padding: 10 },
   milestoneIcon: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#1e2e0a', borderWidth: 0.5, borderColor: COLORS.lime, alignItems: 'center', justifyContent: 'center' },
+
+  summaryBox: { backgroundColor: '#141414', borderRadius: 10, padding: 10, gap: 10 },
+  summaryScores: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  summaryMain: { alignItems: 'center', paddingRight: 12, borderRightWidth: 0.5, borderRightColor: '#2a2a2a' },
+  summaryBigScore: { fontSize: 32, fontWeight: '800', color: COLORS.white, lineHeight: 34 },
+  summaryVsPar: { fontSize: 13, fontWeight: '700', marginTop: 2 },
+  summaryStats: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  summaryItem: { alignItems: 'center', minWidth: 40 },
+  summaryVal: { fontSize: 18, fontWeight: '800', color: COLORS.white },
+  summaryLbl: { fontSize: 9, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 1 },
+  expandBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#2a2a2a' },
+  collapseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 8 },
+  expandBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.lime },
+
+  toast: { position: 'absolute', bottom: 24, left: 18, right: 18, backgroundColor: '#1e2e0a', borderWidth: 1, borderColor: COLORS.lime, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  toastEmoji: { fontSize: 36 },
+  toastTitle: { fontSize: 16, fontWeight: '800', color: COLORS.white },
+  toastSub: { fontSize: 12, color: COLORS.lime, marginTop: 2 },
 
   holeWrap: { flex: 1, alignItems: 'center', gap: 2 },
   holeNum: { fontSize: 7, color: COLORS.dim },

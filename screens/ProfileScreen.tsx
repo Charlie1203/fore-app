@@ -1,4 +1,17 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
+import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import Svg, { Ellipse, Line, Polygon } from 'react-native-svg';
+
+function GolfFlagIcon({ color, size = 16 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Ellipse cx="12" cy="20" rx="7" ry="2.5" stroke={color} strokeWidth="1.8" fill="none" />
+      <Line x1="12" y1="20" x2="12" y2="4" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <Polygon points="12,4 21,8 12,12" fill={color} />
+    </Svg>
+  );
+}
 
 const COLORS = {
   bg: '#0f0f0f',
@@ -22,7 +35,85 @@ const USER = {
   bestScore: 74,
   eagles: 0,   // si > 0 muestra Eagles, si no muestra Birdies
   birdies: 34,
+  followers: 142,
+  following: 98,
+  friends: 31,  // seguimiento mutuo
 };
+
+const COURSES = [
+  { name: 'Haras Santa María', rounds: 9, bestScore: 74 },
+  { name: 'Martindale CC', rounds: 5, bestScore: 79 },
+  { name: 'San Andrés GC', rounds: 3, bestScore: 81 },
+  { name: 'Olivos GC', rounds: 1, bestScore: 85 },
+];
+
+const ACHIEVEMENTS = [
+  { icon: '🦅', title: 'Primer eagle', sub: 'Hoyo 14 · Haras Santa María', date: 'Mar 2026' },
+  { icon: '🔥', title: 'Rompió 75', sub: 'Score 74 en Haras Santa María', date: 'Jun 2026' },
+  { icon: '📉', title: 'HCP bajo de 13', sub: 'De 15.2 a 12.4 en 6 meses', date: 'Jun 2026' },
+  { icon: '⛳', title: '10 rondas jugadas', sub: 'Primer hito del año', date: 'May 2026' },
+];
+
+const HCP_HISTORY = [
+  { month: 'Ene', value: 15.2 }, { month: 'Feb', value: 14.8 }, { month: 'Mar', value: 14.1 },
+  { month: 'Abr', value: 13.6 }, { month: 'May', value: 13.9 }, { month: 'Jun', value: 13.2 }, { month: 'Jul', value: 12.4 },
+];
+
+const SCREEN_W = Dimensions.get('window').width;
+const CHART_W = SCREEN_W - 64;
+const CHART_H = 90;
+
+function HcpChart({ thirdKpi }: { thirdKpi: { value: number; label: string } }) {
+  const values = HCP_HISTORY.map(h => h.value);
+  const min = Math.min(...values) - 0.8;
+  const max = Math.max(...values) + 0.8;
+  const range = max - min;
+  const stepX = CHART_W / (values.length - 1);
+  const points = values.map((v, i) => ({ x: i * stepX, y: CHART_H - ((v - min) / range) * CHART_H }));
+
+  return (
+    <View style={styles.chartCard}>
+      <Text style={styles.chartTitle}>Evolución del handicap</Text>
+      <View style={{ height: CHART_H, width: CHART_W, marginTop: 8 }}>
+        {points.slice(0, -1).map((p, i) => {
+          const next = points[i + 1];
+          const dx = next.x - p.x, dy = next.y - p.y;
+          const length = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+          return (
+            <View key={i} style={{
+              position: 'absolute', left: p.x, top: p.y - 1, width: length, height: 2,
+              backgroundColor: COLORS.lime, transform: [{ rotate: `${angle}deg` }], transformOrigin: '0 50%',
+            }} />
+          );
+        })}
+        {points.map((p, i) => (
+          <View key={i} style={{ position: 'absolute', left: p.x - 3, top: p.y - 3, width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.lime }} />
+        ))}
+      </View>
+      <View style={styles.chartLabels}>
+        {HCP_HISTORY.map((h, i) => <Text key={i} style={styles.chartLabel}>{h.month}</Text>)}
+      </View>
+
+      <View style={styles.kpiFooter}>
+        <View style={styles.kpiItem}>
+          <Text style={styles.kpiVal}>{USER.rounds}</Text>
+          <Text style={styles.kpiLabel}>Rondas{'\n'}este año</Text>
+        </View>
+        <View style={styles.kpiDivider} />
+        <View style={styles.kpiItem}>
+          <Text style={styles.kpiVal}>{USER.bestScore}</Text>
+          <Text style={styles.kpiLabel}>Mejor{'\n'}score</Text>
+        </View>
+        <View style={styles.kpiDivider} />
+        <View style={styles.kpiItem}>
+          <Text style={[styles.kpiVal, { color: COLORS.lime }]}>{thirdKpi.value}</Text>
+          <Text style={styles.kpiLabel}>{thirdKpi.label}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
 
 const POSTS = [
   {
@@ -124,29 +215,32 @@ function CardFooter({ likes, comments }: { likes: number; comments: number }) {
   return (
     <View style={styles.cardFooter}>
       <TouchableOpacity style={styles.action}>
-        <Text style={{ fontSize: 15, color: COLORS.dim }}>👍</Text>
+        <GolfFlagIcon color={COLORS.dim} size={16} />
         <Text style={styles.actionText}>{likes}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.action}>
-        <Text style={{ fontSize: 15, color: COLORS.dim }}>💬</Text>
+        <Ionicons name="chatbubble-outline" size={15} color={COLORS.dim} />
         <Text style={styles.actionText}>{comments}</Text>
       </TouchableOpacity>
       <View style={{ flex: 1 }} />
       <TouchableOpacity>
-        <Text style={{ fontSize: 15, color: COLORS.dim }}>↗</Text>
+        <Ionicons name="repeat-outline" size={18} color={COLORS.dim} />
       </TouchableOpacity>
     </View>
   );
 }
 
 function RoundCard({ post }: { post: typeof POSTS[0] }) {
+  const [expanded, setExpanded] = useState(false);
   const score = post.holes.reduce((a, h) => a + h.score, 0);
   const totalPar = post.holes.reduce((a, h) => a + h.par, 0);
   const vsPar = score - totalPar;
   const eagles  = post.holes.filter(h => h.score - h.par <= -2).length;
   const birdies = post.holes.filter(h => h.score - h.par === -1).length;
   const pares   = post.holes.filter(h => h.score - h.par === 0).length;
-  const bogeys  = post.holes.filter(h => h.score - h.par >= 1).length;
+  const bogeys  = post.holes.filter(h => h.score - h.par === 1).length;
+  const doubles = post.holes.filter(h => h.score - h.par >= 2).length;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -156,25 +250,38 @@ function RoundCard({ post }: { post: typeof POSTS[0] }) {
         <Text style={styles.cardTime}>{post.time}</Text>
       </View>
       <View style={styles.cardBody}>
-        <View style={styles.scorecard}>
-          <View style={styles.scHeader}>
-            <Text style={styles.scLabel}>Frente · Vuelta</Text>
-            <Text style={[styles.scTotal, { color: vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
-              {score} · {vsPar > 0 ? '+' : ''}{vsPar}
-            </Text>
+        <View style={styles.summaryBox}>
+          <View style={styles.summaryScores}>
+            <View style={styles.summaryMain}>
+              <Text style={styles.summaryBigScore}>{score}</Text>
+              <Text style={[styles.summaryVsPar, { color: vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
+                {vsPar > 0 ? '+' : ''}{vsPar}
+              </Text>
+            </View>
+            <View style={styles.summaryStats}>
+              {eagles > 0 && <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: COLORS.lime }]}>{eagles}</Text><Text style={styles.summaryLbl}>Eagles</Text></View>}
+              <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: COLORS.lime }]}>{birdies}</Text><Text style={styles.summaryLbl}>Birdies</Text></View>
+              <View style={styles.summaryItem}><Text style={styles.summaryVal}>{pares}</Text><Text style={styles.summaryLbl}>Pares</Text></View>
+              <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: COLORS.red }]}>{bogeys}</Text><Text style={styles.summaryLbl}>Bogeys</Text></View>
+              {doubles > 0 && <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: '#ff6060' }]}>{doubles}</Text><Text style={styles.summaryLbl}>Dobles+</Text></View>}
+            </View>
           </View>
-          <View style={styles.holesRow}>
-            {post.holes.slice(0, 9).map((h, i) => <HoleCell key={i} num={i + 1} score={h.score} par={h.par} />)}
-          </View>
-          <View style={[styles.holesRow, { marginBottom: 6 }]}>
-            {post.holes.slice(9, 18).map((h, i) => <HoleCell key={i} num={i + 10} score={h.score} par={h.par} />)}
-          </View>
-          <View style={styles.scSummary}>
-            {eagles > 0 && <View style={styles.scItem}><Text style={[styles.scVal, { color: COLORS.lime }]}>{eagles}</Text><Text style={styles.scLbl}>Eagles</Text></View>}
-            <View style={styles.scItem}><Text style={[styles.scVal, { color: COLORS.lime }]}>{birdies}</Text><Text style={styles.scLbl}>Birdies</Text></View>
-            <View style={styles.scItem}><Text style={styles.scVal}>{pares}</Text><Text style={styles.scLbl}>Pares</Text></View>
-            <View style={styles.scItem}><Text style={[styles.scVal, { color: COLORS.red }]}>{bogeys}</Text><Text style={styles.scLbl}>Bogeys</Text></View>
-          </View>
+
+          {expanded && (
+            <>
+              <View style={styles.holesRow}>
+                {post.holes.slice(0, 9).map((h, i) => <HoleCell key={i} num={i + 1} score={h.score} par={h.par} />)}
+              </View>
+              <View style={[styles.holesRow, { marginBottom: 4 }]}>
+                {post.holes.slice(9, 18).map((h, i) => <HoleCell key={i} num={i + 10} score={h.score} par={h.par} />)}
+              </View>
+            </>
+          )}
+
+          <TouchableOpacity style={styles.expandBtn} onPress={() => setExpanded(!expanded)}>
+            <Text style={styles.expandBtnText}>{expanded ? 'Ocultar tarjeta' : 'Ver tarjeta'}</Text>
+            <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={13} color={COLORS.lime} />
+          </TouchableOpacity>
         </View>
       </View>
       <CardFooter likes={post.likes} comments={post.comments} />
@@ -182,7 +289,39 @@ function RoundCard({ post }: { post: typeof POSTS[0] }) {
   );
 }
 
+type TabKey = 'historial' | 'canchas' | 'logros';
+
+function CourseRow({ course }: { course: typeof COURSES[0] }) {
+  return (
+    <View style={styles.courseRow}>
+      <View style={styles.courseIcon}><Text style={{ fontSize: 18 }}>⛳</Text></View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.courseName}>{course.name}</Text>
+        <Text style={styles.courseSub}>{course.rounds} {course.rounds === 1 ? 'ronda' : 'rondas'} jugadas</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={styles.courseBest}>{course.bestScore}</Text>
+        <Text style={styles.courseBestLbl}>mejor</Text>
+      </View>
+    </View>
+  );
+}
+
+function AchievementRow({ a }: { a: typeof ACHIEVEMENTS[0] }) {
+  return (
+    <View style={styles.achRow}>
+      <View style={styles.achIcon}><Text style={{ fontSize: 20 }}>{a.icon}</Text></View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.achTitle}>{a.title}</Text>
+        <Text style={styles.achSub}>{a.sub}</Text>
+      </View>
+      <Text style={styles.achDate}>{a.date}</Text>
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
+  const [tab, setTab] = useState<TabKey>('historial');
   const thirdKpi = USER.eagles > 0
     ? { value: USER.eagles, label: 'Eagles' }
     : { value: USER.birdies, label: 'Birdies' };
@@ -196,7 +335,13 @@ export default function ProfileScreen() {
             <Text style={styles.avatarText}>{USER.initials}</Text>
           </View>
           <View style={styles.headerInfo}>
-            <Text style={styles.name}>{USER.name}</Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.name}>{USER.name}</Text>
+              <View style={styles.hcpBadge}>
+                <Text style={styles.hcpBadgeNum}>{USER.handicap}</Text>
+                <Text style={styles.hcpBadgeLabel}>HCP</Text>
+              </View>
+            </View>
             <Text style={styles.username}>{USER.username}</Text>
             <Text style={styles.club}>📍 {USER.club}</Text>
           </View>
@@ -205,34 +350,58 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.hcpBlock}>
-          <Text style={styles.hcpNumber}>{USER.handicap}</Text>
-          <Text style={styles.hcpLabel}>HANDICAP</Text>
+        <View style={styles.socialRow}>
+          <TouchableOpacity style={styles.socialItem}>
+            <Text style={styles.socialVal}>{USER.following}</Text>
+            <Text style={styles.socialLabel}>Siguiendo</Text>
+          </TouchableOpacity>
+          <View style={styles.socialDivider} />
+          <TouchableOpacity style={styles.socialItem}>
+            <Text style={styles.socialVal}>{USER.followers}</Text>
+            <Text style={styles.socialLabel}>Seguidores</Text>
+          </TouchableOpacity>
+          <View style={styles.socialDivider} />
+          <TouchableOpacity style={styles.socialItem}>
+            <Text style={[styles.socialVal, { color: COLORS.lime }]}>{USER.friends}</Text>
+            <Text style={styles.socialLabel}>Amigos</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.kpis}>
-          <View style={styles.kpiItem}>
-            <Text style={styles.kpiVal}>{USER.rounds}</Text>
-            <Text style={styles.kpiLabel}>Rondas{'\n'}este año</Text>
-          </View>
-          <View style={styles.kpiDivider} />
-          <View style={styles.kpiItem}>
-            <Text style={styles.kpiVal}>{USER.bestScore}</Text>
-            <Text style={styles.kpiLabel}>Mejor{'\n'}score</Text>
-          </View>
-          <View style={styles.kpiDivider} />
-          <View style={styles.kpiItem}>
-            <Text style={[styles.kpiVal, { color: COLORS.lime }]}>{thirdKpi.value}</Text>
-            <Text style={styles.kpiLabel}>{thirdKpi.label}</Text>
-          </View>
+        <View style={{ marginHorizontal: 18, marginTop: 4 }}>
+          <HcpChart thirdKpi={thirdKpi} />
         </View>
 
         <View style={styles.divider} />
 
-        <Text style={styles.sectionTitle}>Historial</Text>
-        <View style={styles.feed}>
-          {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
+        <View style={styles.tabBar}>
+          <TouchableOpacity style={[styles.tabBtn, tab === 'historial' && styles.tabBtnActive]} onPress={() => setTab('historial')}>
+            <Text style={[styles.tabBtnText, tab === 'historial' && styles.tabBtnTextActive]}>Historial</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tabBtn, tab === 'canchas' && styles.tabBtnActive]} onPress={() => setTab('canchas')}>
+            <Text style={[styles.tabBtnText, tab === 'canchas' && styles.tabBtnTextActive]}>Canchas</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tabBtn, tab === 'logros' && styles.tabBtnActive]} onPress={() => setTab('logros')}>
+            <Text style={[styles.tabBtnText, tab === 'logros' && styles.tabBtnTextActive]}>Logros</Text>
+          </TouchableOpacity>
         </View>
+
+        {tab === 'historial' && (
+          <View style={styles.feed}>
+            {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
+          </View>
+        )}
+
+        {tab === 'canchas' && (
+          <View style={styles.feed}>
+            {COURSES.map((c, i) => <CourseRow key={i} course={c} />)}
+          </View>
+        )}
+
+        {tab === 'logros' && (
+          <View style={styles.feed}>
+            {ACHIEVEMENTS.map((a, i) => <AchievementRow key={i} a={a} />)}
+          </View>
+        )}
 
       </ScrollView>
     </SafeAreaView>
@@ -246,25 +415,56 @@ const styles = StyleSheet.create({
   avatarLarge: { width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.lime, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 22, fontWeight: '800', color: '#0f0f0f' },
   headerInfo: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontSize: 17, fontWeight: '700', color: COLORS.white },
   username: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
   club: { fontSize: 11, color: COLORS.muted, marginTop: 4 },
   editBtn: { borderWidth: 0.5, borderColor: COLORS.dim, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   editText: { fontSize: 12, color: COLORS.muted },
 
-  hcpBlock: { alignItems: 'center', paddingVertical: 16 },
-  hcpNumber: { fontSize: 52, fontWeight: '800', color: COLORS.lime, lineHeight: 56 },
-  hcpLabel: { fontSize: 11, color: COLORS.muted, letterSpacing: 2, textTransform: 'uppercase', marginTop: 2 },
+  hcpBadge: { backgroundColor: COLORS.lime, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, flexDirection: 'row', alignItems: 'baseline', gap: 3 },
+  hcpBadgeNum: { fontSize: 13, fontWeight: '800', color: '#0f0f0f' },
+  hcpBadgeLabel: { fontSize: 8, fontWeight: '700', color: '#3a5010' },
 
-  kpis: { flexDirection: 'row', marginHorizontal: 18, backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, paddingVertical: 16 },
+  socialRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginHorizontal: 18, marginTop: 14, marginBottom: 16, backgroundColor: '#161616', borderRadius: 10, paddingVertical: 10 },
+  socialItem: { flex: 1, alignItems: 'center' },
+  socialVal: { fontSize: 15, fontWeight: '700', color: COLORS.muted },
+  socialLabel: { fontSize: 9, color: COLORS.dim, marginTop: 1 },
+  socialDivider: { width: 0.5, height: 20, backgroundColor: COLORS.border },
+
+  kpiFooter: { flexDirection: 'row', marginTop: 14, paddingTop: 14, borderTopWidth: 0.5, borderTopColor: COLORS.border },
   kpiItem: { flex: 1, alignItems: 'center' },
   kpiVal: { fontSize: 22, fontWeight: '800', color: COLORS.white },
   kpiLabel: { fontSize: 10, color: COLORS.muted, textAlign: 'center', marginTop: 3, lineHeight: 14 },
   kpiDivider: { width: 0.5, backgroundColor: COLORS.border },
 
+  chartCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, padding: 14 },
+  chartTitle: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  chartLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  chartLabel: { fontSize: 9, color: COLORS.muted },
+
   divider: { height: 0.5, backgroundColor: '#222', marginHorizontal: 18, marginTop: 20, marginBottom: 4 },
   sectionTitle: { fontSize: 13, fontWeight: '600', color: COLORS.muted, paddingHorizontal: 18, paddingVertical: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-  feed: { paddingHorizontal: 12, paddingBottom: 20 },
+  feed: { paddingHorizontal: 12, paddingBottom: 20, gap: 8 },
+
+  tabBar: { flexDirection: 'row', marginHorizontal: 18, marginTop: 4, marginBottom: 12, backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border, padding: 3 },
+  tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
+  tabBtnActive: { backgroundColor: COLORS.dark2 },
+  tabBtnText: { fontSize: 12, color: COLORS.muted, fontWeight: '600' },
+  tabBtnTextActive: { color: COLORS.lime },
+
+  courseRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
+  courseIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: COLORS.dark2, alignItems: 'center', justifyContent: 'center' },
+  courseName: { fontSize: 14, fontWeight: '600', color: COLORS.white },
+  courseSub: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
+  courseBest: { fontSize: 16, fontWeight: '800', color: COLORS.lime },
+  courseBestLbl: { fontSize: 9, color: COLORS.muted },
+
+  achRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
+  achIcon: { width: 42, height: 42, borderRadius: 10, backgroundColor: '#1e2e0a', borderWidth: 0.5, borderColor: COLORS.lime, alignItems: 'center', justifyContent: 'center' },
+  achTitle: { fontSize: 14, fontWeight: '600', color: COLORS.white },
+  achSub: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
+  achDate: { fontSize: 10, color: COLORS.dim },
 
   card: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, overflow: 'hidden', marginBottom: 8 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingBottom: 6 },
@@ -275,16 +475,16 @@ const styles = StyleSheet.create({
   actionText: { fontSize: 12, color: COLORS.dim },
   courseBadge: { backgroundColor: COLORS.dark2, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   courseText: { fontSize: 11, color: COLORS.muted },
-  scorecard: { backgroundColor: '#141414', borderRadius: 10, padding: 10 },
-  scHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  scLabel: { fontSize: 10, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  scTotal: { fontSize: 13, fontWeight: '700' },
   holesRow: { flexDirection: 'row', gap: 3, marginBottom: 6 },
-  hole: { flex: 1, height: 28, borderRadius: 5, alignItems: 'center', justifyContent: 'center' },
-  holeNum: { fontSize: 7 },
-  holeScore: { fontSize: 9, fontWeight: '700' },
-  scSummary: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 7, borderTopWidth: 0.5, borderTopColor: '#222' },
-  scItem: { alignItems: 'center' },
-  scVal: { fontSize: 16, fontWeight: '700', color: COLORS.white },
-  scLbl: { fontSize: 9, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  summaryBox: { backgroundColor: '#141414', borderRadius: 10, padding: 10, gap: 10 },
+  summaryScores: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  summaryMain: { alignItems: 'center', paddingRight: 12, borderRightWidth: 0.5, borderRightColor: '#2a2a2a' },
+  summaryBigScore: { fontSize: 32, fontWeight: '800', color: COLORS.white, lineHeight: 34 },
+  summaryVsPar: { fontSize: 13, fontWeight: '700', marginTop: 2 },
+  summaryStats: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  summaryItem: { alignItems: 'center', minWidth: 40 },
+  summaryVal: { fontSize: 18, fontWeight: '800', color: COLORS.white },
+  summaryLbl: { fontSize: 9, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 1 },
+  expandBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#2a2a2a' },
+  expandBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.lime },
 });
