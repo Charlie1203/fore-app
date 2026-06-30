@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
 		justifyContent: "space-between",
 		alignItems: "center",
 		paddingHorizontal: 18,
-		paddingTop: 50,
+		paddingTop: 10,
 		paddingVertical: 10,
 	},
 	logo: { fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
