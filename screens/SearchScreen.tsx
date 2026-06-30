@@ -192,14 +192,14 @@ export default function SearchScreen() {
 
   if (selectedGroup) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <GroupDetail group={selectedGroup} onBack={() => setSelectedGroup(null)} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       {showCreate && <CreateGroupModal onClose={() => setShowCreate(false)} />}
 
       <View style={styles.header}>

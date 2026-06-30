@@ -353,7 +353,7 @@ export default function ProfileScreen() {
     : { value: USER.birdies, label: 'Birdies' };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
         <View style={styles.header}>

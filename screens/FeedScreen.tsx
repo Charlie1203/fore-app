@@ -577,7 +577,7 @@ export default function FeedScreen() {
 	}, [route.params?.showSuccess]);
 
 	return (
-		<SafeAreaView style={styles.container}>
+		<SafeAreaView style={styles.container} edges={["top"]}>
 			<View style={styles.header}>
 				<Text style={styles.logo}>
 					FORE<Text style={{ color: COLORS.lime }}>!</Text>

@@ -294,7 +294,7 @@ export default function UploadScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <View style={styles.headerInner}>
           {step > 1 && step < 4 && (
