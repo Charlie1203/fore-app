@@ -63,10 +63,18 @@ const ACTIVIDAD_MOCK = [
   { tipo: 'torneo', texto: '📋 Torneo del Club creado para el 12 de julio', tiempo: 'hace 1 semana' },
 ];
 
+const MODALIDADES_INFO = [
+  { key: 'Stroke Play', icon: '🏌️', desc: 'Suma de todos los golpes' },
+  { key: 'Stableford', icon: '⭐', desc: 'Puntos por hoyo vs par' },
+  { key: 'Match Play', icon: '⚔️', desc: 'Hoyo a hoyo entre jugadores' },
+  { key: 'Better Ball', icon: '👥', desc: 'Mejor score de la pareja' },
+  { key: 'Scramble', icon: '🎯', desc: 'Equipo elige el mejor tiro' },
+];
+
 function CreateTorneoModal({ onClose }: { onClose: () => void }) {
   const [nombre, setNombre] = useState('');
   const [modalidad, setModalidad] = useState<string | null>(null);
-  const [fecha, setFecha] = useState('');
+  const [rondas, setRondas] = useState<number | null>(null);
 
   return (
     <View style={styles.modal}>
@@ -91,32 +99,42 @@ function CreateTorneoModal({ onClose }: { onClose: () => void }) {
 
         <Text style={styles.label}>Modalidad</Text>
         <View style={styles.modalidadList}>
-          {MODALIDADES.map(m => (
+          {MODALIDADES_INFO.map(m => (
             <TouchableOpacity
-              key={m}
-              style={[styles.modalidadBtn, modalidad === m && styles.modalidadBtnActive]}
-              onPress={() => setModalidad(m)}
+              key={m.key}
+              style={[styles.modalidadBtn, modalidad === m.key && styles.modalidadBtnActive]}
+              onPress={() => setModalidad(m.key)}
             >
-              <Text style={[styles.modalidadBtnText, modalidad === m && styles.modalidadBtnTextActive]}>{m}</Text>
+              <Text style={styles.modalidadIcon}>{m.icon}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalidadBtnText, modalidad === m.key && styles.modalidadBtnTextActive]}>{m.key}</Text>
+                <Text style={styles.modalidadDesc}>{m.desc}</Text>
+              </View>
+              {modalidad === m.key && <Ionicons name="checkmark-circle" size={18} color={COLORS.lime} />}
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.label}>Fecha</Text>
-        <View style={styles.searchBox}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Ej: 15 Jul 2026"
-            placeholderTextColor={COLORS.dim}
-            value={fecha}
-            onChangeText={setFecha}
-          />
+        <Text style={styles.label}>Cantidad de rondas</Text>
+        <View style={styles.rondasRow}>
+          {[1, 2, 3, 4].map(n => (
+            <TouchableOpacity
+              key={n}
+              style={[styles.rondaBtn, rondas === n && styles.rondaBtnActive]}
+              onPress={() => setRondas(n)}
+            >
+              <Text style={[styles.rondaBtnNum, rondas === n && styles.rondaBtnNumActive]}>{n}</Text>
+              <Text style={[styles.rondaBtnLabel, rondas === n && styles.rondaBtnLabelActive]}>
+                {n === 1 ? 'ronda' : 'rondas'}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         <TouchableOpacity
-          style={[styles.createBtn, (!nombre.trim() || !modalidad) && { opacity: 0.4 }]}
+          style={[styles.createBtn, (!nombre.trim() || !modalidad || !rondas) && { opacity: 0.4 }]}
           onPress={onClose}
-          disabled={!nombre.trim() || !modalidad}
+          disabled={!nombre.trim() || !modalidad || !rondas}
         >
           <Text style={styles.createBtnText}>Crear torneo</Text>
         </TouchableOpacity>
@@ -465,6 +483,20 @@ const styles = StyleSheet.create({
   actividadTorneoText: { fontSize: 13, color: COLORS.white },
   actividadTiempo: { fontSize: 11, color: COLORS.dim, marginTop: 4 },
 
+  modalidadList: { gap: 6 },
+  modalidadBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.dark2, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
+  modalidadBtnActive: { borderColor: COLORS.lime, backgroundColor: '#1a2a0a' },
+  modalidadIcon: { fontSize: 20 },
+  modalidadBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.muted },
+  modalidadBtnTextActive: { color: COLORS.lime },
+  modalidadDesc: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
+  rondasRow: { flexDirection: 'row', gap: 8 },
+  rondaBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, backgroundColor: COLORS.dark2, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border },
+  rondaBtnActive: { borderColor: COLORS.lime, backgroundColor: '#1a2a0a' },
+  rondaBtnNum: { fontSize: 22, fontWeight: '800', color: COLORS.muted },
+  rondaBtnNumActive: { color: COLORS.lime },
+  rondaBtnLabel: { fontSize: 9, color: COLORS.dim, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.3 },
+  rondaBtnLabelActive: { color: COLORS.lime },
   newTorneoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.lime, borderStyle: 'dashed', borderRadius: 12, padding: 14 },
   newTorneoBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.lime },
   torneoCard: { backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 14, gap: 10 },
