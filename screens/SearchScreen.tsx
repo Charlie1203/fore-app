@@ -49,55 +49,186 @@ function Avatar({ initials, bg, color, size = 42 }: { initials: string; bg: stri
   );
 }
 
+const MODALIDADES = ['Stroke Play', 'Stableford', 'Match Play', 'Better Ball', 'Scramble'];
+
+const TORNEOS_MOCK = [
+  { id: '1', nombre: 'Copa Junio', modalidad: 'Stableford', fecha: '28 Jun 2026', estado: 'finalizado', ganador: 'Pepe Noceti', score: 38 },
+  { id: '2', nombre: 'Torneo del Club', modalidad: 'Stroke Play', fecha: '12 Jul 2026', estado: 'próximo', ganador: null, score: null },
+];
+
+const ACTIVIDAD_MOCK = [
+  { tipo: 'torneo', texto: '🏆 Pepe Noceti ganó la Copa Junio con 38 puntos Stableford', tiempo: 'hace 2 días' },
+  { tipo: 'post', autor: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', texto: 'Qué cañazo el hoyo 7 hoy, eagle de 6 metros 🔥', tiempo: 'hace 3 días' },
+  { tipo: 'post', autor: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', texto: 'Se viene el torneo del club, a prepararse', tiempo: 'hace 5 días' },
+  { tipo: 'torneo', texto: '📋 Torneo del Club creado para el 12 de julio', tiempo: 'hace 1 semana' },
+];
+
+function CreateTorneoModal({ onClose }: { onClose: () => void }) {
+  const [nombre, setNombre] = useState('');
+  const [modalidad, setModalidad] = useState<string | null>(null);
+  const [fecha, setFecha] = useState('');
+
+  return (
+    <View style={styles.modal}>
+      <View style={styles.modalCard}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Nuevo torneo</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={20} color={COLORS.muted} />
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.label}>Nombre</Text>
+        <View style={styles.searchBox}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Ej: Copa Julio"
+            placeholderTextColor={COLORS.dim}
+            value={nombre}
+            onChangeText={setNombre}
+          />
+        </View>
+
+        <Text style={styles.label}>Modalidad</Text>
+        <View style={styles.modalidadList}>
+          {MODALIDADES.map(m => (
+            <TouchableOpacity
+              key={m}
+              style={[styles.modalidadBtn, modalidad === m && styles.modalidadBtnActive]}
+              onPress={() => setModalidad(m)}
+            >
+              <Text style={[styles.modalidadBtnText, modalidad === m && styles.modalidadBtnTextActive]}>{m}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Fecha</Text>
+        <View style={styles.searchBox}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Ej: 15 Jul 2026"
+            placeholderTextColor={COLORS.dim}
+            value={fecha}
+            onChangeText={setFecha}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.createBtn, (!nombre.trim() || !modalidad) && { opacity: 0.4 }]}
+          onPress={onClose}
+          disabled={!nombre.trim() || !modalidad}
+        >
+          <Text style={styles.createBtnText}>Crear torneo</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
   const isMember = MY_GROUPS.some(g => g.id === group.id);
   const [joined, setJoined] = useState(isMember);
+  const [tab, setTab] = useState<'actividad' | 'torneos'>('actividad');
+  const [showTorneo, setShowTorneo] = useState(false);
 
   return (
     <View style={{ flex: 1 }}>
+      {showTorneo && <CreateTorneoModal onClose={() => setShowTorneo(false)} />}
+
       <View style={styles.detailHeader}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={20} color={COLORS.white} />
         </TouchableOpacity>
         <Text style={styles.detailTitle}>{group.name}</Text>
+        <TouchableOpacity
+          style={[styles.joinBtnSmall, joined && styles.joinBtnSmallActive]}
+          onPress={() => setJoined(!joined)}
+        >
+          <Text style={[styles.joinBtnSmallText, joined && styles.joinBtnSmallTextActive]}>
+            {joined ? 'En el grupo' : 'Unirse'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Lider del mes */}
+      <View style={styles.leaderCard}>
+        <View style={styles.leaderLeft}>
+          <Text style={styles.leaderLabel}>⭐ Líder del mes</Text>
+          <Text style={styles.leaderName}>Pepe Noceti</Text>
+          <Text style={styles.leaderScore}>Score 71 · −1 vs par</Text>
+        </View>
+        <View style={styles.leaderBadge}>
+          <Avatar initials="PE" bg="#333" color={COLORS.lime} size={48} />
+          <View style={styles.leaderCrown}><Text style={{ fontSize: 10 }}>👑</Text></View>
+        </View>
+      </View>
+
+      {/* Tabs */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabBtn, tab === 'actividad' && styles.tabBtnActive]}
+          onPress={() => setTab('actividad')}
+        >
+          <Text style={[styles.tabBtnText, tab === 'actividad' && styles.tabBtnTextActive]}>Actividad</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, tab === 'torneos' && styles.tabBtnActive]}
+          onPress={() => setTab('torneos')}
+        >
+          <Text style={[styles.tabBtnText, tab === 'torneos' && styles.tabBtnTextActive]}>Torneos</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailScroll}>
-        <View style={styles.detailHero}>
-          <Avatar initials={group.initials} bg={group.bg} color={group.color} size={64} />
-          <View style={{ flex: 1 }}>
-            <View style={styles.detailNameRow}>
-              <Text style={styles.detailName}>{group.name}</Text>
-              <View style={[styles.typeBadge, group.type === 'club' ? styles.typeBadgeClub : styles.typeBadgePrivado]}>
-                <Text style={styles.typeBadgeText}>{group.type === 'club' ? 'Club' : 'Privado'}</Text>
-              </View>
-            </View>
-            <Text style={styles.detailMembers}>{group.members} miembros</Text>
+        {tab === 'actividad' && (
+          <View style={{ gap: 8 }}>
+            {ACTIVIDAD_MOCK.map((a, i) => (
+              a.tipo === 'torneo' ? (
+                <View key={i} style={styles.actividadTorneo}>
+                  <Text style={styles.actividadTorneoText}>{a.texto}</Text>
+                  <Text style={styles.actividadTiempo}>{a.tiempo}</Text>
+                </View>
+              ) : (
+                <View key={i} style={styles.actividadPost}>
+                  <Avatar initials={a.initials!} bg={a.bg!} color={a.color!} size={36} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.actividadAutor}>{a.autor}</Text>
+                    <Text style={styles.actividadTexto}>{a.texto}</Text>
+                    <Text style={styles.actividadTiempo}>{a.tiempo}</Text>
+                  </View>
+                </View>
+              )
+            ))}
           </View>
-        </View>
+        )}
 
-        <TouchableOpacity
-          style={[styles.joinBtn, joined && styles.joinBtnActive]}
-          onPress={() => setJoined(!joined)}
-        >
-          <Text style={[styles.joinBtnText, joined && styles.joinBtnTextActive]}>
-            {joined ? '✓ En el grupo' : 'Unirse al grupo'}
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.sectionTitle}>Miembros destacados</Text>
-        <View style={styles.membersList}>
-          {PLAYERS.slice(0, 4).map((p, i) => (
-            <View key={i} style={styles.memberRow}>
-              <Avatar initials={p.initials} bg={p.bg} color={p.color} size={36} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.memberName}>{p.name}</Text>
-                <Text style={styles.memberSub}>{p.username}</Text>
+        {tab === 'torneos' && (
+          <View style={{ gap: 8 }}>
+            <TouchableOpacity style={styles.newTorneoBtn} onPress={() => setShowTorneo(true)}>
+              <Ionicons name="add-circle-outline" size={18} color={COLORS.lime} />
+              <Text style={styles.newTorneoBtnText}>Crear torneo</Text>
+            </TouchableOpacity>
+            {TORNEOS_MOCK.map(t => (
+              <View key={t.id} style={styles.torneoCard}>
+                <View style={styles.torneoTop}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.torneoNombre}>{t.nombre}</Text>
+                    <Text style={styles.torneoMeta}>{t.modalidad} · {t.fecha}</Text>
+                  </View>
+                  <View style={[styles.torneoBadge, t.estado === 'finalizado' ? styles.torneoBadgeDone : styles.torneoBadgeNext]}>
+                    <Text style={styles.torneoBadgeText}>{t.estado === 'finalizado' ? 'Finalizado' : 'Próximo'}</Text>
+                  </View>
+                </View>
+                {t.ganador && (
+                  <View style={styles.torneoGanador}>
+                    <Text style={styles.torneoGanadorLabel}>🏆 Ganador</Text>
+                    <Text style={styles.torneoGanadorNombre}>{t.ganador} · {t.score} pts</Text>
+                  </View>
+                )}
               </View>
-              <Text style={styles.memberHcp}>HCP {p.hcp}</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -301,18 +432,53 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 40 },
   emptyText: { fontSize: 14, color: COLORS.muted },
 
-  detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 12 },
+  detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 10 },
   backBtn: { padding: 2 },
   detailTitle: { fontSize: 17, fontWeight: '700', color: COLORS.white, flex: 1 },
   detailScroll: { paddingHorizontal: 18, paddingBottom: 32 },
-  detailHero: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, padding: 14, marginBottom: 12 },
   detailNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   detailName: { fontSize: 16, fontWeight: '700', color: COLORS.white },
   detailMembers: { fontSize: 12, color: COLORS.muted },
-  joinBtn: { backgroundColor: COLORS.lime, borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 20 },
-  joinBtnActive: { backgroundColor: COLORS.dark2, borderWidth: 0.5, borderColor: COLORS.border },
-  joinBtnText: { fontSize: 14, fontWeight: '800', color: '#0f0f0f' },
-  joinBtnTextActive: { color: COLORS.muted },
+  joinBtnSmall: { backgroundColor: COLORS.lime, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  joinBtnSmallActive: { backgroundColor: COLORS.dark2, borderWidth: 0.5, borderColor: COLORS.border },
+  joinBtnSmallText: { fontSize: 12, fontWeight: '700', color: '#0f0f0f' },
+  joinBtnSmallTextActive: { color: COLORS.muted },
+
+  leaderCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 18, marginBottom: 10, backgroundColor: '#1a2a0a', borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.lime, padding: 14 },
+  leaderLeft: { gap: 3 },
+  leaderLabel: { fontSize: 10, color: COLORS.lime, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  leaderName: { fontSize: 16, fontWeight: '800', color: COLORS.white },
+  leaderScore: { fontSize: 12, color: COLORS.muted },
+  leaderBadge: { position: 'relative' },
+  leaderCrown: { position: 'absolute', top: -6, right: -4, backgroundColor: COLORS.bg, borderRadius: 10, padding: 2 },
+
+  tabBar: { flexDirection: 'row', marginHorizontal: 18, marginBottom: 12, backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border, padding: 3 },
+  tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
+  tabBtnActive: { backgroundColor: COLORS.dark2 },
+  tabBtnText: { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
+  tabBtnTextActive: { color: COLORS.lime },
+
+  actividadPost: { flexDirection: 'row', gap: 10, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
+  actividadAutor: { fontSize: 13, fontWeight: '700', color: COLORS.white, marginBottom: 3 },
+  actividadTexto: { fontSize: 13, color: '#ccc', lineHeight: 18 },
+  actividadTorneo: { backgroundColor: '#141414', borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
+  actividadTorneoText: { fontSize: 13, color: COLORS.white },
+  actividadTiempo: { fontSize: 11, color: COLORS.dim, marginTop: 4 },
+
+  newTorneoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.lime, borderStyle: 'dashed', borderRadius: 12, padding: 14 },
+  newTorneoBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.lime },
+  torneoCard: { backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 14, gap: 10 },
+  torneoTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  torneoNombre: { fontSize: 15, fontWeight: '700', color: COLORS.white },
+  torneoMeta: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  torneoBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  torneoBadgeDone: { backgroundColor: '#242424' },
+  torneoBadgeNext: { backgroundColor: '#1a2a0a' },
+  torneoBadgeText: { fontSize: 10, fontWeight: '700', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.3 },
+  torneoGanador: { backgroundColor: '#1a2a0a', borderRadius: 8, padding: 10, gap: 2 },
+  torneoGanadorLabel: { fontSize: 10, color: COLORS.lime, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  torneoGanadorNombre: { fontSize: 14, fontWeight: '700', color: COLORS.white },
+
   membersList: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, overflow: 'hidden' },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
   memberName: { fontSize: 13, fontWeight: '600', color: COLORS.white },
