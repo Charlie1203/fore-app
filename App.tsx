@@ -37,7 +37,7 @@ export default function App() {
 					},
 					tabBarActiveTintColor: "#c8e03a",
 					tabBarInactiveTintColor: "#444",
-					tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
+					tabBarShowLabel: false,
 					tabBarIcon: ({ color, focused }) => (
 						<Ionicons
 							name={

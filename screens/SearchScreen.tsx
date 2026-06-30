@@ -352,18 +352,14 @@ export default function SearchScreen() {
       {showCreate && <CreateGroupModal onClose={() => setShowCreate(false)} />}
 
       <View style={styles.header}>
-        <Text style={styles.title}>Grupos</Text>
-        <TouchableOpacity style={styles.newBtn} onPress={() => setShowCreate(true)}>
-          <Ionicons name="add" size={18} color="#0f0f0f" />
-          <Text style={styles.newBtnText}>Nuevo</Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>Buscar</Text>
       </View>
 
       <View style={styles.searchBox}>
         <Ionicons name="search" size={16} color={COLORS.dim} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar grupos o jugadores..."
+          placeholder="Grupos o jugadores..."
           placeholderTextColor={COLORS.dim}
           value={search}
           onChangeText={setSearch}
@@ -376,17 +372,6 @@ export default function SearchScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {!isSearching && (
-          <>
-            <Text style={styles.sectionTitle}>Tus grupos</Text>
-            <View style={styles.list}>
-              {MY_GROUPS.map(g => (
-                <GroupRow key={g.id} group={g} onPress={() => setSelectedGroup(g)} />
-              ))}
-            </View>
-          </>
-        )}
-
         {isSearching && filteredGroups.length > 0 && (
           <>
             <Text style={styles.sectionTitle}>Grupos</Text>
@@ -412,6 +397,18 @@ export default function SearchScreen() {
             <Text style={styles.emptyText}>Sin resultados para "{search}"</Text>
           </View>
         )}
+
+        <TouchableOpacity style={styles.createGroupBtn} onPress={() => setShowCreate(true)}>
+          <Ionicons name="add-circle-outline" size={20} color={COLORS.lime} />
+          <Text style={styles.createGroupBtnText}>Crear grupo</Text>
+        </TouchableOpacity>
+
+        <Text style={[styles.sectionTitle, { marginTop: 4 }]}>Tus grupos</Text>
+        <View style={styles.list}>
+          {MY_GROUPS.map(g => (
+            <GroupRow key={g.id} group={g} onPress={() => setSelectedGroup(g)} />
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -419,10 +416,10 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingTop: 10, paddingBottom: 8 },
+  header: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 8 },
   title: { fontSize: 24, fontWeight: '800', color: COLORS.white },
-  newBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.lime, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
-  newBtnText: { fontSize: 12, fontWeight: '700', color: '#0f0f0f' },
+  createGroupBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.lime, borderStyle: 'dashed', borderRadius: 12, padding: 14, marginBottom: 16 },
+  createGroupBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.lime },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border,
