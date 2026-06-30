@@ -386,11 +386,6 @@ export default function ProfileScreen() {
             <Text style={styles.socialVal}>{USER.followers}</Text>
             <Text style={styles.socialLabel}>Seguidores</Text>
           </TouchableOpacity>
-          <View style={styles.socialDivider} />
-          <TouchableOpacity style={styles.socialItem}>
-            <Text style={[styles.socialVal, { color: COLORS.lime }]}>{USER.friends}</Text>
-            <Text style={styles.socialLabel}>Amigos</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={{ marginHorizontal: 18, marginTop: 4 }}>
