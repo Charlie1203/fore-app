@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
   detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 10 },
   backBtn: { padding: 2 },
   detailTitle: { fontSize: 17, fontWeight: '700', color: COLORS.white, flex: 1 },
-  detailScroll: { paddingHorizontal: 18, paddingBottom: 32 },
+  detailScroll: { paddingHorizontal: 16, paddingBottom: 32 },
   detailNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   detailName: { fontSize: 16, fontWeight: '700', color: COLORS.white },
   detailMembers: { fontSize: 12, color: COLORS.muted },
@@ -473,10 +473,10 @@ const styles = StyleSheet.create({
   tabBtnText: { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
   tabBtnTextActive: { color: COLORS.lime },
 
-  actividadPost: { flexDirection: 'row', gap: 10, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
-  actividadAutor: { fontSize: 13, fontWeight: '700', color: COLORS.white, marginBottom: 3 },
+  actividadPost: { flexDirection: 'row', gap: 10, paddingHorizontal: 0, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#1e1e1e' },
+  actividadAutor: { fontSize: 14, fontWeight: '700', color: COLORS.white, marginBottom: 3 },
   actividadTexto: { fontSize: 13, color: '#ccc', lineHeight: 18 },
-  actividadTorneo: { backgroundColor: '#141414', borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
+  actividadTorneo: { paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#1e1e1e' },
   actividadTorneoText: { fontSize: 13, color: COLORS.white },
   actividadTiempo: { fontSize: 11, color: COLORS.dim, marginTop: 4 },
 
