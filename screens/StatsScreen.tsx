@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, StyleSheet, SafeAreaView, Dimensions } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const COLORS = {
   bg: '#0f0f0f',

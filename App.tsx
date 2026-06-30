@@ -2,6 +2,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import FeedScreen from "./screens/FeedScreen";
 import UploadScreen from "./screens/UploadScreen";
@@ -19,6 +20,7 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 
 export default function App() {
 	return (
+		<SafeAreaProvider>
 		<NavigationContainer>
 			<StatusBar style="light" />
 			<Tab.Navigator
@@ -54,5 +56,6 @@ export default function App() {
 				<Tab.Screen name="Perfil" component={ProfileScreen} />
 			</Tab.Navigator>
 		</NavigationContainer>
+		</SafeAreaProvider>
 	);
 }

@@ -4,13 +4,13 @@ import {
 	ScrollView,
 	StyleSheet,
 	TouchableOpacity,
-	SafeAreaView,
 	Animated,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from "react-native-svg";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
 	const d = [
