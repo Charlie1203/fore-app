@@ -90,6 +90,7 @@ const HCP_HISTORY = [
 ];
 
 const SCREEN_W = Dimensions.get('window').width;
+const SCREEN_H = Dimensions.get('window').height;
 const CHART_W = SCREEN_W - 64;
 const CHART_H = 90;
 const TAB_BAR_H = 44;
@@ -422,7 +423,7 @@ export default function ProfileScreen() {
             ref={r => { scrollViewRefs.current[0] = r as any; }}
             scrollEventThrottle={16}
             onScroll={scrollHandler}
-            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH }]}
+            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
             {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
@@ -433,7 +434,7 @@ export default function ProfileScreen() {
             ref={r => { scrollViewRefs.current[1] = r as any; }}
             scrollEventThrottle={16}
             onScroll={scrollHandler}
-            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH }]}
+            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
             {COURSES.map((c, i) => <CourseRow key={i} course={c} />)}
@@ -444,7 +445,7 @@ export default function ProfileScreen() {
             ref={r => { scrollViewRefs.current[2] = r as any; }}
             scrollEventThrottle={16}
             onScroll={scrollHandler}
-            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH }]}
+            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
             {ACHIEVEMENTS.map((a, i) => <AchievementRow key={i} a={a} />)}
