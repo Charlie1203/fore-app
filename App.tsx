@@ -85,9 +85,9 @@ export default function App() {
           })}
         >
           <Tab.Screen name="Inicio" component={FeedScreen} />
-          <Tab.Screen name="Grupos" component={SearchScreen} />
-          <Tab.Screen name="Cargar" component={UploadScreen} />
           <Tab.Screen name="Ranking" component={RankingScreen} />
+          <Tab.Screen name="Cargar" component={UploadScreen} />
+          <Tab.Screen name="Grupos" component={SearchScreen} />
           <Tab.Screen name="Perfil" component={ProfileScreen} />
         </Tab.Navigator>
       </NavigationContainer>
