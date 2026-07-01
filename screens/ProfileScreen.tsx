@@ -398,13 +398,24 @@ export default function ProfileScreen() {
 
   const handleTabPress = (i: number) => {
     setTab(i);
+    tabRef.current = i;
     pagerRef.current?.setPage(i);
     syncNewTab(i);
   };
 
   const handlePageSelected = (position: number) => {
     setTab(position);
+    tabRef.current = position;
     syncNewTab(position);
+  };
+
+  const tabRef = useRef(0);
+
+  const snapScroll = (y: number) => {
+    if (y > 0 && y < headerHeight) {
+      const snapTo = y < headerHeight / 2 ? 0 : headerHeight;
+      (scrollViewRefs.current[tabRef.current] as any)?.scrollTo({ y: snapTo, animated: true });
+    }
   };
 
   const handlePageScrollStateChanged = (state: string) => {
@@ -435,11 +446,10 @@ export default function ProfileScreen() {
             ref={r => { scrollViewRefs.current[0] = r as any; }}
             scrollEventThrottle={16}
             onScroll={scrollHandler}
+            onScrollEndDrag={e => snapScroll(e.nativeEvent.contentOffset.y)}
+            onMomentumScrollEnd={e => snapScroll(e.nativeEvent.contentOffset.y)}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
-            snapToOffsets={headerHeight > 0 ? [0, headerHeight] : undefined}
-            snapToEnd={false}
-            decelerationRate="fast"
           >
             {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
           </Animated.ScrollView>
@@ -449,11 +459,10 @@ export default function ProfileScreen() {
             ref={r => { scrollViewRefs.current[1] = r as any; }}
             scrollEventThrottle={16}
             onScroll={scrollHandler}
+            onScrollEndDrag={e => snapScroll(e.nativeEvent.contentOffset.y)}
+            onMomentumScrollEnd={e => snapScroll(e.nativeEvent.contentOffset.y)}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
-            snapToOffsets={headerHeight > 0 ? [0, headerHeight] : undefined}
-            snapToEnd={false}
-            decelerationRate="fast"
           >
             {COURSES.map((c, i) => <CourseRow key={i} course={c} />)}
           </Animated.ScrollView>
@@ -463,11 +472,10 @@ export default function ProfileScreen() {
             ref={r => { scrollViewRefs.current[2] = r as any; }}
             scrollEventThrottle={16}
             onScroll={scrollHandler}
+            onScrollEndDrag={e => snapScroll(e.nativeEvent.contentOffset.y)}
+            onMomentumScrollEnd={e => snapScroll(e.nativeEvent.contentOffset.y)}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
-            snapToOffsets={headerHeight > 0 ? [0, headerHeight] : undefined}
-            snapToEnd={false}
-            decelerationRate="fast"
           >
             {ACHIEVEMENTS.map((a, i) => <AchievementRow key={i} a={a} />)}
           </Animated.ScrollView>
