@@ -94,6 +94,7 @@ const SCREEN_H = Dimensions.get('window').height;
 const CHART_W = SCREEN_W - 64;
 const CHART_H = 90;
 const TAB_BAR_H = 44;
+const BOTTOM_TAB_H = 80;
 
 function HcpChart({ thirdKpi }: { thirdKpi: { value: number; label: string } }) {
   const values = HCP_HISTORY.map(h => h.value);
@@ -434,7 +435,7 @@ export default function ProfileScreen() {
             ref={r => { scrollViewRefs.current[0] = r as any; }}
             scrollEventThrottle={16}
             onScroll={scrollHandler}
-            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H + headerHeight }]}
+            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
             {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
@@ -445,7 +446,7 @@ export default function ProfileScreen() {
             ref={r => { scrollViewRefs.current[1] = r as any; }}
             scrollEventThrottle={16}
             onScroll={scrollHandler}
-            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H + headerHeight }]}
+            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
             {COURSES.map((c, i) => <CourseRow key={i} course={c} />)}
@@ -456,7 +457,7 @@ export default function ProfileScreen() {
             ref={r => { scrollViewRefs.current[2] = r as any; }}
             scrollEventThrottle={16}
             onScroll={scrollHandler}
-            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H + headerHeight }]}
+            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
             {ACHIEVEMENTS.map((a, i) => <AchievementRow key={i} a={a} />)}
