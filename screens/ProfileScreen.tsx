@@ -466,13 +466,13 @@ const styles = StyleSheet.create({
 
   divider: { height: 0.5, backgroundColor: '#222', marginHorizontal: 18, marginTop: 20, marginBottom: 4 },
   sectionTitle: { fontSize: 13, fontWeight: '600', color: COLORS.muted, paddingHorizontal: 18, paddingVertical: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-  feed: { paddingHorizontal: 12, paddingBottom: 20, gap: 8 },
+  feed: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 20, gap: 8 },
 
-  tabBar: { flexDirection: 'row', marginHorizontal: 18, marginTop: 4, marginBottom: 12, backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border, padding: 3 },
-  tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-  tabBtnActive: { backgroundColor: COLORS.dark2 },
-  tabBtnText: { fontSize: 12, color: COLORS.muted, fontWeight: '600' },
-  tabBtnTextActive: { color: COLORS.lime },
+  tabBar: { flexDirection: 'row', marginTop: 4, marginBottom: 0, borderBottomWidth: 0.5, borderBottomColor: '#1e1e1e' },
+  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabBtnActive: { borderBottomColor: COLORS.lime },
+  tabBtnText: { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
+  tabBtnTextActive: { color: COLORS.white, fontWeight: '700' },
 
   courseRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
   courseIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: COLORS.dark2, alignItems: 'center', justifyContent: 'center' },
