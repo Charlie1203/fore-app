@@ -40,7 +40,7 @@ function GolfBallTabIcon({ color }: { color: string }) {
   ].join(" ");
   return (
     <View style={{
-      width: 52, height: 52, borderRadius: 26,
+      width: 58, height: 58, borderRadius: 29,
       backgroundColor: "#c8e03a",
       alignItems: "center", justifyContent: "center",
       marginBottom: 8,
