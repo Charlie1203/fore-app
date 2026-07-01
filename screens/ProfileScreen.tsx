@@ -358,7 +358,8 @@ export default function ProfileScreen() {
 
   // Collapsible header
   const scrollY = useRef(new Animated.Value(0)).current;
-  const scrollOffsets = useRef([0, 0, 0]);
+  const currentScrollY = useRef(0);
+  const scrollViewRefs = useRef<(ScrollView | null)[]>([null, null, null]);
   const [headerHeight, setHeaderHeight] = useState(0);
 
   const headerTranslate = scrollY.interpolate({
@@ -373,26 +374,35 @@ export default function ProfileScreen() {
     extrapolate: 'clamp',
   });
 
-  const makeScrollHandler = (index: number) =>
+  const makeScrollHandler = () =>
     Animated.event(
       [{ nativeEvent: { contentOffset: { y: scrollY } } }],
       {
         useNativeDriver: true,
         listener: (e: any) => {
-          scrollOffsets.current[index] = e.nativeEvent.contentOffset.y;
+          currentScrollY.current = e.nativeEvent.contentOffset.y;
         },
       }
     );
 
+  const scrollHandler = makeScrollHandler();
+
+  const syncNewTab = (position: number) => {
+    const ref = scrollViewRefs.current[position];
+    if (ref) {
+      ref.scrollTo({ y: currentScrollY.current, animated: false });
+    }
+  };
+
   const handleTabPress = (i: number) => {
     setTab(i);
     pagerRef.current?.setPage(i);
-    scrollY.setValue(scrollOffsets.current[i]);
+    syncNewTab(i);
   };
 
   const handlePageSelected = (position: number) => {
     setTab(position);
-    scrollY.setValue(scrollOffsets.current[position]);
+    syncNewTab(position);
   };
 
   const totalHeaderH = headerHeight + TAB_BAR_H;
@@ -409,8 +419,9 @@ export default function ProfileScreen() {
         >
           <Animated.ScrollView
             key="0"
+            ref={r => { scrollViewRefs.current[0] = r as any; }}
             scrollEventThrottle={16}
-            onScroll={makeScrollHandler(0)}
+            onScroll={scrollHandler}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH }]}
             showsVerticalScrollIndicator={false}
           >
@@ -419,8 +430,9 @@ export default function ProfileScreen() {
 
           <Animated.ScrollView
             key="1"
+            ref={r => { scrollViewRefs.current[1] = r as any; }}
             scrollEventThrottle={16}
-            onScroll={makeScrollHandler(1)}
+            onScroll={scrollHandler}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH }]}
             showsVerticalScrollIndicator={false}
           >
@@ -429,8 +441,9 @@ export default function ProfileScreen() {
 
           <Animated.ScrollView
             key="2"
+            ref={r => { scrollViewRefs.current[2] = r as any; }}
             scrollEventThrottle={16}
-            onScroll={makeScrollHandler(2)}
+            onScroll={scrollHandler}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH }]}
             showsVerticalScrollIndicator={false}
           >
