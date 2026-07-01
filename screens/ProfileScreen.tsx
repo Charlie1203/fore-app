@@ -1,4 +1,7 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import {
+  View, Text, ScrollView, StyleSheet, TouchableOpacity,
+  Dimensions, Animated,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -60,11 +63,11 @@ const USER = {
   handicap: 12.4,
   rounds: 18,
   bestScore: 74,
-  eagles: 0,   // si > 0 muestra Eagles, si no muestra Birdies
+  eagles: 0,
   birdies: 34,
   followers: 142,
   following: 98,
-  friends: 31,  // seguimiento mutuo
+  friends: 31,
 };
 
 const COURSES = [
@@ -89,6 +92,7 @@ const HCP_HISTORY = [
 const SCREEN_W = Dimensions.get('window').width;
 const CHART_W = SCREEN_W - 64;
 const CHART_H = 90;
+const TAB_BAR_H = 44;
 
 function HcpChart({ thirdKpi }: { thirdKpi: { value: number; label: string } }) {
   const values = HCP_HISTORY.map(h => h.value);
@@ -316,7 +320,6 @@ function RoundCard({ post }: { post: typeof POSTS[0] }) {
   );
 }
 
-
 function CourseRow({ course }: { course: typeof COURSES[0] }) {
   return (
     <View style={styles.courseRow}>
@@ -353,82 +356,170 @@ export default function ProfileScreen() {
     ? { value: USER.eagles, label: 'Eagles' }
     : { value: USER.birdies, label: 'Birdies' };
 
+  // Collapsible header
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollOffsets = useRef([0, 0, 0]);
+  const [headerHeight, setHeaderHeight] = useState(0);
+
+  const headerTranslate = scrollY.interpolate({
+    inputRange: [0, headerHeight || 1],
+    outputRange: [0, -(headerHeight || 1)],
+    extrapolate: 'clamp',
+  });
+
+  const tabBarTranslate = scrollY.interpolate({
+    inputRange: [0, headerHeight || 1],
+    outputRange: [0, -(headerHeight || 1)],
+    extrapolate: 'clamp',
+  });
+
+  const makeScrollHandler = (index: number) =>
+    Animated.event(
+      [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+      {
+        useNativeDriver: true,
+        listener: (e: any) => {
+          scrollOffsets.current[index] = e.nativeEvent.contentOffset.y;
+        },
+      }
+    );
+
+  const handleTabPress = (i: number) => {
+    setTab(i);
+    pagerRef.current?.setPage(i);
+    scrollY.setValue(scrollOffsets.current[i]);
+  };
+
+  const handlePageSelected = (position: number) => {
+    setTab(position);
+    scrollY.setValue(scrollOffsets.current[position]);
+  };
+
+  const totalHeaderH = headerHeight + TAB_BAR_H;
+
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <View>
-        <View style={styles.header}>
-          <View style={styles.avatarLarge}>
-            <Text style={styles.avatarText}>{USER.initials}</Text>
-          </View>
-          <View style={styles.headerInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name}>{USER.name}</Text>
-              <View style={styles.hcpBadge}>
-                <Text style={styles.hcpBadgeNum}>{USER.handicap}</Text>
-                <Text style={styles.hcpBadgeLabel}>HCP</Text>
-              </View>
-            </View>
-            <Text style={styles.username}>{USER.username}</Text>
-            <Text style={styles.club}>📍 {USER.club}</Text>
-          </View>
-          <TouchableOpacity style={styles.editBtn}>
-            <Text style={styles.editText}>Editar</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.socialRow}>
-          <TouchableOpacity style={styles.socialItem}>
-            <Text style={styles.socialVal}>{USER.following}</Text>
-            <Text style={styles.socialLabel}>Siguiendo</Text>
-          </TouchableOpacity>
-          <View style={styles.socialDivider} />
-          <TouchableOpacity style={styles.socialItem}>
-            <Text style={styles.socialVal}>{USER.followers}</Text>
-            <Text style={styles.socialLabel}>Seguidores</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ marginHorizontal: 18, marginTop: 4 }}>
-          <HcpChart thirdKpi={thirdKpi} />
-        </View>
-
-        <View style={styles.divider} />
-      </View>
-
-      <View style={styles.tabBar}>
-        {['Historial', 'Canchas', 'Logros'].map((label, i) => (
-          <TouchableOpacity
-            key={label}
-            style={[styles.tabBtn, tab === i && styles.tabBtnActive]}
-            onPress={() => { setTab(i); pagerRef.current?.setPage(i); }}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={{ flex: 1 }}>
+        {/* Scrollable pages — PagerView takes full space */}
+        <PagerView
+          ref={pagerRef}
+          style={{ flex: 1 }}
+          initialPage={0}
+          onPageSelected={e => handlePageSelected(e.nativeEvent.position)}
+        >
+          <Animated.ScrollView
+            key="0"
+            scrollEventThrottle={16}
+            onScroll={makeScrollHandler(0)}
+            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH }]}
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={[styles.tabBtnText, tab === i && styles.tabBtnTextActive]}>{label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+            {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
+          </Animated.ScrollView>
 
-      <PagerView
-        ref={pagerRef}
-        style={{ flex: 1 }}
-        initialPage={0}
-        onPageSelected={e => setTab(e.nativeEvent.position)}
-      >
-        <ScrollView key="0" contentContainerStyle={styles.feed}>
-          {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
-        </ScrollView>
-        <ScrollView key="1" contentContainerStyle={styles.feed}>
-          {COURSES.map((c, i) => <CourseRow key={i} course={c} />)}
-        </ScrollView>
-        <ScrollView key="2" contentContainerStyle={styles.feed}>
-          {ACHIEVEMENTS.map((a, i) => <AchievementRow key={i} a={a} />)}
-        </ScrollView>
-      </PagerView>
+          <Animated.ScrollView
+            key="1"
+            scrollEventThrottle={16}
+            onScroll={makeScrollHandler(1)}
+            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {COURSES.map((c, i) => <CourseRow key={i} course={c} />)}
+          </Animated.ScrollView>
+
+          <Animated.ScrollView
+            key="2"
+            scrollEventThrottle={16}
+            onScroll={makeScrollHandler(2)}
+            contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {ACHIEVEMENTS.map((a, i) => <AchievementRow key={i} a={a} />)}
+          </Animated.ScrollView>
+        </PagerView>
+
+        {/* Floating header — scrolls up and disappears */}
+        <Animated.View
+          style={[styles.floatingHeader, { transform: [{ translateY: headerTranslate }] }]}
+          onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)}
+          pointerEvents="box-none"
+        >
+          <View style={styles.header}>
+            <View style={styles.avatarLarge}>
+              <Text style={styles.avatarText}>{USER.initials}</Text>
+            </View>
+            <View style={styles.headerInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{USER.name}</Text>
+                <View style={styles.hcpBadge}>
+                  <Text style={styles.hcpBadgeNum}>{USER.handicap}</Text>
+                  <Text style={styles.hcpBadgeLabel}>HCP</Text>
+                </View>
+              </View>
+              <Text style={styles.username}>{USER.username}</Text>
+              <Text style={styles.club}>📍 {USER.club}</Text>
+            </View>
+            <TouchableOpacity style={styles.editBtn}>
+              <Text style={styles.editText}>Editar</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.socialRow}>
+            <TouchableOpacity style={styles.socialItem}>
+              <Text style={styles.socialVal}>{USER.following}</Text>
+              <Text style={styles.socialLabel}>Siguiendo</Text>
+            </TouchableOpacity>
+            <View style={styles.socialDivider} />
+            <TouchableOpacity style={styles.socialItem}>
+              <Text style={styles.socialVal}>{USER.followers}</Text>
+              <Text style={styles.socialLabel}>Seguidores</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ marginHorizontal: 18, marginTop: 4 }}>
+            <HcpChart thirdKpi={thirdKpi} />
+          </View>
+
+          <View style={styles.divider} />
+        </Animated.View>
+
+        {/* Sticky tab bar — sticks at top when header scrolls away */}
+        <Animated.View
+          style={[
+            styles.tabBar,
+            {
+              top: headerHeight,
+              transform: [{ translateY: tabBarTranslate }],
+            },
+          ]}
+          pointerEvents="box-none"
+        >
+          {['Historial', 'Canchas', 'Logros'].map((label, i) => (
+            <TouchableOpacity
+              key={label}
+              style={[styles.tabBtn, tab === i && styles.tabBtnActive]}
+              onPress={() => handleTabPress(i)}
+            >
+              <Text style={[styles.tabBtnText, tab === i && styles.tabBtnTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </Animated.View>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
+
+  floatingHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    backgroundColor: COLORS.bg,
+  },
 
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, paddingBottom: 12 },
   avatarLarge: { width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.lime, alignItems: 'center', justifyContent: 'center' },
@@ -463,10 +554,19 @@ const styles = StyleSheet.create({
   chartLabel: { fontSize: 9, color: COLORS.muted },
 
   divider: { height: 0.5, backgroundColor: '#222', marginHorizontal: 18, marginTop: 20, marginBottom: 4 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: COLORS.muted, paddingHorizontal: 18, paddingVertical: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-  feed: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 20, gap: 8 },
+  feed: { paddingHorizontal: 12, paddingBottom: 20, gap: 8 },
 
-  tabBar: { flexDirection: 'row', marginTop: 4, marginBottom: 0, borderBottomWidth: 0.5, borderBottomColor: '#1e1e1e' },
+  tabBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: TAB_BAR_H,
+    flexDirection: 'row',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#1e1e1e',
+    backgroundColor: COLORS.bg,
+    zIndex: 10,
+  },
   tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabBtnActive: { borderBottomColor: COLORS.lime },
   tabBtnText: { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
