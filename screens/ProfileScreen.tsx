@@ -355,8 +355,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-
+      <View>
         <View style={styles.header}>
           <View style={styles.avatarLarge}>
             <Text style={styles.avatarText}>{USER.initials}</Text>
@@ -394,7 +393,7 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.divider} />
-      </ScrollView>
+      </View>
 
       <View style={styles.tabBar}>
         {['Historial', 'Canchas', 'Logros'].map((label, i) => (
