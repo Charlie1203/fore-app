@@ -406,7 +406,17 @@ export default function ProfileScreen() {
     syncNewTab(position);
   };
 
-  const totalHeaderH = headerHeight + TAB_BAR_H;
+  const handlePageScrollStateChanged = (state: string) => {
+    if (state === 'dragging') {
+      scrollViewRefs.current.forEach((ref, i) => {
+        if (i !== tab && ref) {
+          (ref as any).scrollTo({ y: currentScrollY.current, animated: false });
+        }
+      });
+    }
+  };
+
+  const totalHeaderH = headerHeight + TAB_BAR_H + 12;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -417,6 +427,7 @@ export default function ProfileScreen() {
           style={{ flex: 1 }}
           initialPage={0}
           onPageSelected={e => handlePageSelected(e.nativeEvent.position)}
+          onPageScrollStateChanged={e => handlePageScrollStateChanged(e.nativeEvent.pageScrollState)}
         >
           <Animated.ScrollView
             key="0"
