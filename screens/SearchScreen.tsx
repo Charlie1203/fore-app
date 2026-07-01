@@ -1,7 +1,8 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import PagerView from 'react-native-pager-view';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -40,6 +41,10 @@ const PLAYERS = [
 
 type Group = typeof MY_GROUPS[0];
 type Player = typeof PLAYERS[0];
+
+const SCREEN_H = Dimensions.get('window').height;
+const GROUP_TAB_BAR_H = 44;
+const BOTTOM_TAB_H = 80;
 
 function Avatar({ initials, bg, color, size = 42 }: { initials: string; bg: string; color: string; size?: number }) {
   return (
@@ -146,13 +151,60 @@ function CreateTorneoModal({ onClose }: { onClose: () => void }) {
 function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
   const isMember = MY_GROUPS.some(g => g.id === group.id);
   const [joined, setJoined] = useState(isMember);
-  const [tab, setTab] = useState<'actividad' | 'torneos'>('actividad');
+  const [tab, setTab] = useState(0);
   const [showTorneo, setShowTorneo] = useState(false);
+
+  const pagerRef = useRef<PagerView>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const currentScrollY = useRef(0);
+  const scrollViewRefs = useRef<(ScrollView | null)[]>([null, null]);
+  const tabRef = useRef(0);
+  const [leaderHeight, setLeaderHeight] = useState(0);
+
+  const leaderTranslate = scrollY.interpolate({
+    inputRange: [0, leaderHeight || 1],
+    outputRange: [0, -(leaderHeight || 1)],
+    extrapolate: 'clamp',
+  });
+  const tabBarTranslate = leaderTranslate;
+
+  const scrollHandler = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: true, listener: (e: any) => { currentScrollY.current = e.nativeEvent.contentOffset.y; } }
+  );
+
+  const syncNewTab = (pos: number) => {
+    (scrollViewRefs.current[pos] as any)?.scrollTo({ y: currentScrollY.current, animated: false });
+  };
+
+  const handleTabPress = (i: number) => {
+    setTab(i); tabRef.current = i;
+    pagerRef.current?.setPage(i);
+    syncNewTab(i);
+  };
+
+  const handlePageSelected = (pos: number) => {
+    setTab(pos); tabRef.current = pos;
+    syncNewTab(pos);
+  };
+
+  const handlePageScrollStateChanged = (state: string) => {
+    if (state === 'dragging') {
+      scrollViewRefs.current.forEach((ref, i) => {
+        if (i !== tabRef.current) (ref as any)?.scrollTo({ y: currentScrollY.current, animated: false });
+      });
+    }
+  };
+
+  const totalHeaderH = leaderHeight + GROUP_TAB_BAR_H + 12;
+
+  const TABS = ['Actividad', 'Torneos'];
 
   return (
     <View style={{ flex: 1 }}>
       {showTorneo && <CreateTorneoModal onClose={() => setShowTorneo(false)} />}
 
+      {/* Barra de navegación fija siempre */}
       <View style={styles.detailHeader}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={20} color={COLORS.white} />
@@ -168,38 +220,24 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
         </TouchableOpacity>
       </View>
 
-      {/* Lider del mes */}
-      <View style={styles.leaderCard}>
-        <View style={styles.leaderLeft}>
-          <Text style={styles.leaderLabel}>⭐ Líder del mes</Text>
-          <Text style={styles.leaderName}>Pepe Noceti</Text>
-          <Text style={styles.leaderScore}>Score 71 · −1 vs par</Text>
-        </View>
-        <View style={styles.leaderBadge}>
-          <Avatar initials="PE" bg="#333" color={COLORS.lime} size={48} />
-          <View style={styles.leaderCrown}><Text style={{ fontSize: 10 }}>👑</Text></View>
-        </View>
-      </View>
-
-      {/* Tabs */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tabBtn, tab === 'actividad' && styles.tabBtnActive]}
-          onPress={() => setTab('actividad')}
+      <View style={{ flex: 1 }}>
+        {/* PagerView ocupa todo */}
+        <PagerView
+          ref={pagerRef}
+          style={{ flex: 1 }}
+          initialPage={0}
+          onPageSelected={e => handlePageSelected(e.nativeEvent.position)}
+          onPageScrollStateChanged={e => handlePageScrollStateChanged(e.nativeEvent.pageScrollState)}
         >
-          <Text style={[styles.tabBtnText, tab === 'actividad' && styles.tabBtnTextActive]}>Actividad</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabBtn, tab === 'torneos' && styles.tabBtnActive]}
-          onPress={() => setTab('torneos')}
-        >
-          <Text style={[styles.tabBtnText, tab === 'torneos' && styles.tabBtnTextActive]}>Torneos</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailScroll}>
-        {tab === 'actividad' && (
-          <View style={{ gap: 8 }}>
+          {/* Actividad */}
+          <Animated.ScrollView
+            key="0"
+            ref={r => { scrollViewRefs.current[0] = r as any; }}
+            scrollEventThrottle={16}
+            onScroll={scrollHandler}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingTop: totalHeaderH, paddingHorizontal: 16, paddingBottom: 32, gap: 0, minHeight: SCREEN_H - BOTTOM_TAB_H + leaderHeight }}
+          >
             {ACTIVIDAD_MOCK.map((a, i) => (
               a.tipo === 'torneo' ? (
                 <View key={i} style={styles.actividadTorneo}>
@@ -217,12 +255,18 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
                 </View>
               )
             ))}
-          </View>
-        )}
+          </Animated.ScrollView>
 
-        {tab === 'torneos' && (
-          <View style={{ gap: 8 }}>
-            <TouchableOpacity style={styles.newTorneoBtn} onPress={() => setShowTorneo(true)}>
+          {/* Torneos */}
+          <Animated.ScrollView
+            key="1"
+            ref={r => { scrollViewRefs.current[1] = r as any; }}
+            scrollEventThrottle={16}
+            onScroll={scrollHandler}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingTop: totalHeaderH, paddingHorizontal: 16, paddingBottom: 32, gap: 8, minHeight: SCREEN_H - BOTTOM_TAB_H + leaderHeight }}
+          >
+            <TouchableOpacity style={[styles.newTorneoBtn, { marginBottom: 4 }]} onPress={() => setShowTorneo(true)}>
               <Ionicons name="add-circle-outline" size={18} color={COLORS.lime} />
               <Text style={styles.newTorneoBtnText}>Crear torneo</Text>
             </TouchableOpacity>
@@ -245,9 +289,44 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
                 )}
               </View>
             ))}
+          </Animated.ScrollView>
+        </PagerView>
+
+        {/* Leader card collapsible */}
+        <Animated.View
+          style={[styles.floatingLeader, { transform: [{ translateY: leaderTranslate }] }]}
+          onLayout={e => setLeaderHeight(e.nativeEvent.layout.height)}
+          pointerEvents="box-none"
+        >
+          <View style={styles.leaderCard}>
+            <View style={styles.leaderLeft}>
+              <Text style={styles.leaderLabel}>⭐ Líder del mes</Text>
+              <Text style={styles.leaderName}>Pepe Noceti</Text>
+              <Text style={styles.leaderScore}>Score 71 · −1 vs par</Text>
+            </View>
+            <View style={styles.leaderBadge}>
+              <Avatar initials="PE" bg="#333" color={COLORS.lime} size={48} />
+              <View style={styles.leaderCrown}><Text style={{ fontSize: 10 }}>👑</Text></View>
+            </View>
           </View>
-        )}
-      </ScrollView>
+        </Animated.View>
+
+        {/* Tab bar sticky */}
+        <Animated.View
+          style={[styles.groupTabBar, { top: leaderHeight, transform: [{ translateY: tabBarTranslate }] }]}
+          pointerEvents="box-none"
+        >
+          {TABS.map((label, i) => (
+            <TouchableOpacity
+              key={label}
+              style={[styles.groupTabBtn, tab === i && styles.groupTabBtnActive]}
+              onPress={() => handleTabPress(i)}
+            >
+              <Text style={[styles.groupTabBtnText, tab === i && styles.groupTabBtnTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </Animated.View>
+      </View>
     </View>
   );
 }
@@ -459,7 +538,13 @@ const styles = StyleSheet.create({
   joinBtnSmallText: { fontSize: 12, fontWeight: '700', color: '#0f0f0f' },
   joinBtnSmallTextActive: { color: COLORS.muted },
 
-  leaderCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 18, marginBottom: 10, backgroundColor: '#1a2a0a', borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.lime, padding: 14 },
+  floatingLeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: COLORS.bg },
+  groupTabBar: { position: 'absolute', left: 0, right: 0, height: GROUP_TAB_BAR_H, flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#1e1e1e', backgroundColor: COLORS.bg, zIndex: 10 },
+  groupTabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  groupTabBtnActive: { borderBottomColor: COLORS.lime },
+  groupTabBtnText: { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
+  groupTabBtnTextActive: { color: COLORS.white, fontWeight: '700' },
+  leaderCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 18, marginVertical: 10, backgroundColor: '#1a2a0a', borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.lime, padding: 14 },
   leaderLeft: { gap: 3 },
   leaderLabel: { fontSize: 10, color: COLORS.lime, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   leaderName: { fontSize: 16, fontWeight: '800', color: COLORS.white },
