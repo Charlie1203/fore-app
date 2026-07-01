@@ -414,7 +414,9 @@ export default function ProfileScreen() {
   const snapScroll = (y: number) => {
     if (y > 0 && y < headerHeight) {
       const snapTo = y < headerHeight / 2 ? 0 : headerHeight;
-      (scrollViewRefs.current[tabRef.current] as any)?.scrollTo({ y: snapTo, animated: true });
+      setTimeout(() => {
+        (scrollViewRefs.current[tabRef.current] as any)?.scrollTo({ y: snapTo, animated: true });
+      }, 50);
     }
   };
 
@@ -447,7 +449,6 @@ export default function ProfileScreen() {
             scrollEventThrottle={16}
             onScroll={scrollHandler}
             onScrollEndDrag={e => snapScroll(e.nativeEvent.contentOffset.y)}
-            onMomentumScrollEnd={e => snapScroll(e.nativeEvent.contentOffset.y)}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
@@ -460,7 +461,6 @@ export default function ProfileScreen() {
             scrollEventThrottle={16}
             onScroll={scrollHandler}
             onScrollEndDrag={e => snapScroll(e.nativeEvent.contentOffset.y)}
-            onMomentumScrollEnd={e => snapScroll(e.nativeEvent.contentOffset.y)}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
@@ -473,7 +473,6 @@ export default function ProfileScreen() {
             scrollEventThrottle={16}
             onScroll={scrollHandler}
             onScrollEndDrag={e => snapScroll(e.nativeEvent.contentOffset.y)}
-            onMomentumScrollEnd={e => snapScroll(e.nativeEvent.contentOffset.y)}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
