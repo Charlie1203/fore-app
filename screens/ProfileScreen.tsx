@@ -437,6 +437,9 @@ export default function ProfileScreen() {
             onScroll={scrollHandler}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
+            snapToOffsets={headerHeight > 0 ? [0, headerHeight] : undefined}
+            snapToEnd={false}
+            decelerationRate="fast"
           >
             {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
           </Animated.ScrollView>
@@ -448,6 +451,9 @@ export default function ProfileScreen() {
             onScroll={scrollHandler}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
+            snapToOffsets={headerHeight > 0 ? [0, headerHeight] : undefined}
+            snapToEnd={false}
+            decelerationRate="fast"
           >
             {COURSES.map((c, i) => <CourseRow key={i} course={c} />)}
           </Animated.ScrollView>
@@ -459,6 +465,9 @@ export default function ProfileScreen() {
             onScroll={scrollHandler}
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
+            snapToOffsets={headerHeight > 0 ? [0, headerHeight] : undefined}
+            snapToEnd={false}
+            decelerationRate="fast"
           >
             {ACHIEVEMENTS.map((a, i) => <AchievementRow key={i} a={a} />)}
           </Animated.ScrollView>
