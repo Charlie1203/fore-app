@@ -1,7 +1,8 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import PagerView from 'react-native-pager-view';
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from 'react-native-svg';
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
@@ -315,7 +316,6 @@ function RoundCard({ post }: { post: typeof POSTS[0] }) {
   );
 }
 
-type TabKey = 'historial' | 'canchas' | 'logros';
 
 function CourseRow({ course }: { course: typeof COURSES[0] }) {
   return (
@@ -347,7 +347,8 @@ function AchievementRow({ a }: { a: typeof ACHIEVEMENTS[0] }) {
 }
 
 export default function ProfileScreen() {
-  const [tab, setTab] = useState<TabKey>('historial');
+  const [tab, setTab] = useState(0);
+  const pagerRef = useRef<PagerView>(null);
   const thirdKpi = USER.eagles > 0
     ? { value: USER.eagles, label: 'Eagles' }
     : { value: USER.birdies, label: 'Birdies' };
@@ -393,38 +394,36 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.divider} />
-
-        <View style={styles.tabBar}>
-          <TouchableOpacity style={[styles.tabBtn, tab === 'historial' && styles.tabBtnActive]} onPress={() => setTab('historial')}>
-            <Text style={[styles.tabBtnText, tab === 'historial' && styles.tabBtnTextActive]}>Historial</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tabBtn, tab === 'canchas' && styles.tabBtnActive]} onPress={() => setTab('canchas')}>
-            <Text style={[styles.tabBtnText, tab === 'canchas' && styles.tabBtnTextActive]}>Canchas</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tabBtn, tab === 'logros' && styles.tabBtnActive]} onPress={() => setTab('logros')}>
-            <Text style={[styles.tabBtnText, tab === 'logros' && styles.tabBtnTextActive]}>Logros</Text>
-          </TouchableOpacity>
-        </View>
-
-        {tab === 'historial' && (
-          <View style={styles.feed}>
-            {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
-          </View>
-        )}
-
-        {tab === 'canchas' && (
-          <View style={styles.feed}>
-            {COURSES.map((c, i) => <CourseRow key={i} course={c} />)}
-          </View>
-        )}
-
-        {tab === 'logros' && (
-          <View style={styles.feed}>
-            {ACHIEVEMENTS.map((a, i) => <AchievementRow key={i} a={a} />)}
-          </View>
-        )}
-
       </ScrollView>
+
+      <View style={styles.tabBar}>
+        {['Historial', 'Canchas', 'Logros'].map((label, i) => (
+          <TouchableOpacity
+            key={label}
+            style={[styles.tabBtn, tab === i && styles.tabBtnActive]}
+            onPress={() => { setTab(i); pagerRef.current?.setPage(i); }}
+          >
+            <Text style={[styles.tabBtnText, tab === i && styles.tabBtnTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <PagerView
+        ref={pagerRef}
+        style={{ flex: 1 }}
+        initialPage={0}
+        onPageSelected={e => setTab(e.nativeEvent.position)}
+      >
+        <ScrollView key="0" contentContainerStyle={styles.feed}>
+          {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
+        </ScrollView>
+        <ScrollView key="1" contentContainerStyle={styles.feed}>
+          {COURSES.map((c, i) => <CourseRow key={i} course={c} />)}
+        </ScrollView>
+        <ScrollView key="2" contentContainerStyle={styles.feed}>
+          {ACHIEVEMENTS.map((a, i) => <AchievementRow key={i} a={a} />)}
+        </ScrollView>
+      </PagerView>
     </SafeAreaView>
   );
 }
