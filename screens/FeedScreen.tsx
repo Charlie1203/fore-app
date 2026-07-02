@@ -7,12 +7,15 @@ import {
 	Animated,
 	Image,
 	Dimensions,
+	Modal,
+	StatusBar,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as ImagePicker from "expo-image-picker";
 
 const SCREEN_W = Dimensions.get("window").width;
 
@@ -92,30 +95,38 @@ const COLORS = {
 	dark2: "#242424",
 };
 
-const stories = [
-	{
-		initials: "JN",
-		bg: "#c8e03a",
-		color: "#0f0f0f",
-		name: "Vos",
-		active: true,
-	},
-	{ initials: "PE", bg: "#333", color: "#aaa", name: "Pepe", active: false },
-	{
-		initials: "CA",
-		bg: "#2a3a1a",
-		color: "#c8e03a",
-		name: "Carlitos",
-		active: true,
-	},
-	{
-		initials: "MR",
-		bg: "#3a2a1a",
-		color: "#e0a03a",
-		name: "Manu R.",
-		active: false,
-	},
+const STORIES_OTHERS = [
+	{ initials: "PE", bg: "#333", color: "#aaa", name: "Pepe", photo: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800", seen: false },
+	{ initials: "CA", bg: "#2a3a1a", color: "#c8e03a", name: "Carlitos", photo: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800", seen: false },
+	{ initials: "MR", bg: "#3a2a1a", color: "#e0a03a", name: "Manu R.", photo: null, seen: false },
 ];
+
+function StoryViewer({ story, onClose }: { story: typeof STORIES_OTHERS[0]; onClose: () => void }) {
+	return (
+		<Modal visible animationType="fade" statusBarTranslucent>
+			<View style={styles.storyModal}>
+				{story.photo
+					? <Image source={{ uri: story.photo }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+					: <View style={[StyleSheet.absoluteFill, { backgroundColor: story.bg, alignItems: 'center', justifyContent: 'center' }]}>
+						<Text style={{ fontSize: 64, fontWeight: '800', color: story.color }}>{story.initials}</Text>
+					</View>
+				}
+				<View style={styles.storyOverlay}>
+					<View style={styles.storyBar} />
+					<View style={styles.storyHeader}>
+						<View style={[styles.storyAvatarSmall, { backgroundColor: story.bg }]}>
+							<Text style={[styles.storyAvatarText, { color: story.color }]}>{story.initials}</Text>
+						</View>
+						<Text style={styles.storyName}>{story.name}</Text>
+						<TouchableOpacity onPress={onClose} style={{ marginLeft: 'auto' }}>
+							<Ionicons name="close" size={26} color="#fff" />
+						</TouchableOpacity>
+					</View>
+				</View>
+			</View>
+		</Modal>
+	);
+}
 
 function Avatar({
 	initials,
@@ -614,6 +625,9 @@ export default function FeedScreen() {
 	const toastOpacity = useRef(new Animated.Value(0)).current;
 	const [showToast, setShowToast] = useState(false);
 	const [newPostPhotos, setNewPostPhotos] = useState<string[]>([]);
+	const [myStory, setMyStory] = useState<string | null>(null);
+	const [viewingStory, setViewingStory] = useState<typeof STORIES_OTHERS[0] | null>(null);
+	const [seenStories, setSeenStories] = useState<Set<string>>(new Set());
 
 	useEffect(() => {
 		if (!route.params?.showSuccess) return;
@@ -626,8 +640,33 @@ export default function FeedScreen() {
 		]).start(() => setShowToast(false));
 	}, [route.params?.showSuccess]);
 
+	const addMyStory = async () => {
+		const { status } = await ImagePicker.requestCameraPermissionsAsync();
+		const options = { quality: 0.8 as const };
+		let result;
+		if (status === 'granted') {
+			result = await ImagePicker.launchCameraAsync(options);
+		} else {
+			result = await ImagePicker.launchImageLibraryAsync({ ...options, mediaTypes: ImagePicker.MediaTypeOptions.Images });
+		}
+		if (!result.canceled) setMyStory(result.assets[0].uri);
+	};
+
+	const openStory = (s: typeof STORIES_OTHERS[0]) => {
+		setSeenStories(prev => new Set(prev).add(s.name));
+		setViewingStory(s);
+	};
+
 	return (
 		<SafeAreaView style={styles.container} edges={["top"]}>
+			{viewingStory && <StoryViewer story={viewingStory} onClose={() => setViewingStory(null)} />}
+			{myStory && (
+				<StoryViewer
+					story={{ initials: 'JN', bg: '#c8e03a', color: '#0f0f0f', name: 'Tu historia', photo: myStory, seen: false }}
+					onClose={() => setViewingStory(null)}
+				/>
+			)}
+
 			<View style={styles.header}>
 				<Text style={styles.logo}>
 					FORE<Text style={{ color: COLORS.lime }}>!</Text>
@@ -638,23 +677,34 @@ export default function FeedScreen() {
 				</View>
 			</View>
 			<ScrollView showsVerticalScrollIndicator={false}>
-				<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stories}>
-					{stories.map((s, i) => (
-						<View key={i} style={styles.storyItem}>
-							<View style={[styles.storyRing, { borderColor: s.active ? COLORS.lime : "#333" }]}>
+				<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesRow} contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+					{/* Vos */}
+					<TouchableOpacity style={styles.storyItem} onPress={myStory ? () => setViewingStory({ initials: 'JN', bg: '#c8e03a', color: '#0f0f0f', name: 'Tu historia', photo: myStory, seen: false }) : addMyStory}>
+						<View style={[styles.storyRing, { borderColor: myStory ? COLORS.lime : '#333' }]}>
+							<Avatar initials="JN" bg={COLORS.lime} color="#0f0f0f" size={42} />
+							{!myStory && (
+								<View style={styles.storyPlus}>
+									<Text style={styles.storyPlusText}>+</Text>
+								</View>
+							)}
+						</View>
+						<Text style={styles.storyLabel}>Vos</Text>
+					</TouchableOpacity>
+
+					{/* Otros */}
+					{STORIES_OTHERS.filter(s => s.photo).map((s, i) => (
+						<TouchableOpacity key={i} style={styles.storyItem} onPress={() => openStory(s)}>
+							<View style={[styles.storyRing, { borderColor: seenStories.has(s.name) ? '#444' : COLORS.lime }]}>
 								<Avatar initials={s.initials} bg={s.bg} color={s.color} size={42} />
 							</View>
-							<Text style={styles.storyName}>{s.name}</Text>
-						</View>
+							<Text style={styles.storyLabel}>{s.name}</Text>
+						</TouchableOpacity>
 					))}
 				</ScrollView>
 				<View style={styles.divider} />
 				<View style={styles.feed}>
 					<HcpCard />
-					{newPostPhotos.length > 0
-						? <RoundCard photos={newPostPhotos} />
-						: <RoundCard />
-					}
+					{newPostPhotos.length > 0 ? <RoundCard photos={newPostPhotos} /> : <RoundCard />}
 					<RoundCard photos={MOCK_PHOTOS} />
 					<MilestoneCard />
 				</View>
@@ -686,17 +736,19 @@ const styles = StyleSheet.create({
 	},
 	logo: { fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
 	headerIcon: { fontSize: 20 },
-	stories: { paddingHorizontal: 14, paddingBottom: 12 },
+	storiesRow: {},
 	storyItem: { alignItems: "center", marginRight: 12, gap: 4 },
-	storyRing: {
-		width: 50,
-		height: 50,
-		borderRadius: 25,
-		borderWidth: 2,
-		alignItems: "center",
-		justifyContent: "center",
-	},
-	storyName: { fontSize: 10, color: COLORS.muted },
+	storyRing: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+	storyLabel: { fontSize: 10, color: COLORS.muted },
+	storyPlus: { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: COLORS.lime, borderWidth: 1.5, borderColor: COLORS.bg, alignItems: 'center', justifyContent: 'center' },
+	storyPlusText: { fontSize: 13, fontWeight: '800', color: '#0f0f0f', lineHeight: 16 },
+	storyModal: { flex: 1, backgroundColor: '#000' },
+	storyOverlay: { position: 'absolute', top: 0, left: 0, right: 0 },
+	storyBar: { height: 3, backgroundColor: COLORS.lime, marginHorizontal: 12, marginTop: 50, borderRadius: 2 },
+	storyHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 12 },
+	storyAvatarSmall: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+	storyAvatarText: { fontSize: 12, fontWeight: '800' },
+	storyName: { fontSize: 14, fontWeight: '700', color: '#fff' },
 	divider: {
 		height: 0.5,
 		backgroundColor: "#1e1e1e",
