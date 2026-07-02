@@ -91,41 +91,73 @@ const HCP_HISTORY = [
 
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
-const CHART_W = SCREEN_W - 64;
-const CHART_H = 90;
+const CHART_W = SCREEN_W - 80;
+const CHART_H = 110;
+const Y_AXIS_W = 32;
 const TAB_BAR_H = 44;
 const BOTTOM_TAB_H = 80;
 
 function HcpChart({ thirdKpi }: { thirdKpi: { value: number; label: string } }) {
   const values = HCP_HISTORY.map(h => h.value);
-  const min = Math.min(...values) - 0.8;
-  const max = Math.max(...values) + 0.8;
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const min = rawMin - 0.5;
+  const max = rawMax + 0.5;
   const range = max - min;
-  const stepX = CHART_W / (values.length - 1);
-  const points = values.map((v, i) => ({ x: i * stepX, y: CHART_H - ((v - min) / range) * CHART_H }));
+
+  // Plot area: leave Y_AXIS_W on left, DOT_PAD on right so dots don't clip
+  const DOT_PAD = 8;
+  const plotX0 = Y_AXIS_W;
+  const plotX1 = CHART_W - DOT_PAD;
+  const plotW = plotX1 - plotX0;
+  const VPAD = 8;
+  const stepX = plotW / (values.length - 1);
+
+  const toY = (v: number) => VPAD + (1 - (v - min) / range) * (CHART_H - VPAD * 2);
+  const points = values.map((v, i) => ({ x: plotX0 + i * stepX, y: toY(v) }));
+
+  const yLabels = [rawMax, (rawMax + rawMin) / 2, rawMin].map(v => ({
+    v: v.toFixed(1),
+    y: toY(v),
+  }));
 
   return (
     <View style={styles.chartCard}>
       <Text style={styles.chartTitle}>Evolución del handicap</Text>
-      <View style={{ height: CHART_H, width: CHART_W, marginTop: 8 }}>
-        {points.slice(0, -1).map((p, i) => {
-          const next = points[i + 1];
-          const dx = next.x - p.x, dy = next.y - p.y;
-          const length = Math.sqrt(dx * dx + dy * dy);
-          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-          return (
-            <View key={i} style={{
-              position: 'absolute', left: p.x, top: p.y - 1, width: length, height: 2,
-              backgroundColor: COLORS.lime, transform: [{ rotate: `${angle}deg` }], transformOrigin: '0 50%',
-            }} />
-          );
-        })}
-        {points.map((p, i) => (
-          <View key={i} style={{ position: 'absolute', left: p.x - 3, top: p.y - 3, width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.lime }} />
-        ))}
+      <View style={{ marginTop: 10 }}>
+        <Svg width={CHART_W} height={CHART_H}>
+          {/* Grid lines */}
+          {yLabels.map((l, i) => (
+            <Path key={i} d={`M ${plotX0} ${l.y} H ${CHART_W}`} stroke="#2a2a2a" strokeWidth="1" />
+          ))}
+          {/* Curve */}
+          <Path
+            d={`M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`}
+            stroke={COLORS.lime}
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Dots */}
+          {points.map((p, i) => (
+            <Circle key={i} cx={p.x} cy={p.y} r="3.5" fill={COLORS.lime} />
+          ))}
+        </Svg>
+        {/* Y axis labels — absolute over SVG */}
+        <View style={{ position: 'absolute', left: 0, top: 0, height: CHART_H, width: Y_AXIS_W }}>
+          {yLabels.map((l, i) => (
+            <Text key={i} style={[styles.chartLabel, { position: 'absolute', top: l.y - 6, right: 4, textAlign: 'right' }]}>
+              {l.v}
+            </Text>
+          ))}
+        </View>
       </View>
-      <View style={styles.chartLabels}>
-        {HCP_HISTORY.map((h, i) => <Text key={i} style={styles.chartLabel}>{h.month}</Text>)}
+      {/* X labels centered under each dot */}
+      <View style={{ flexDirection: 'row', marginTop: 4, paddingLeft: plotX0 - stepX / 2, paddingRight: DOT_PAD }}>
+        {HCP_HISTORY.map((h, i) => (
+          <Text key={i} style={[styles.chartLabel, { width: stepX, textAlign: 'center' }]}>{h.month}</Text>
+        ))}
       </View>
 
       <View style={styles.kpiFooter}>
@@ -449,7 +481,9 @@ export default function ProfileScreen() {
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
-            {COURSES.map((c, i) => <CourseRow key={i} course={c} />)}
+            <View style={{ marginHorizontal: 18, marginTop: 8, marginBottom: 8 }}>
+              <HcpChart thirdKpi={thirdKpi} />
+            </View>
           </Animated.ScrollView>
 
           <Animated.ScrollView
@@ -502,10 +536,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={{ marginHorizontal: 18, marginTop: 4 }}>
-            <HcpChart thirdKpi={thirdKpi} />
-          </View>
-
           <View style={styles.divider} />
         </Animated.View>
 
@@ -520,7 +550,7 @@ export default function ProfileScreen() {
           ]}
           pointerEvents="box-none"
         >
-          {['Historial', 'Canchas', 'Logros'].map((label, i) => (
+          {['Historial', 'Stats', 'Logros'].map((label, i) => (
             <TouchableOpacity
               key={label}
               style={[styles.tabBtn, tab === i && styles.tabBtnActive]}
