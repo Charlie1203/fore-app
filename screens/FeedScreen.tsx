@@ -527,6 +527,7 @@ function RoundCard({ photos = [] }: { photos?: string[] }) {
 				<Avatar initials="JN" bg={COLORS.lime} color="#0f0f0f" />
 				<View style={styles.cardMeta}>
 					<Text style={styles.cardName}>Juan Noceti</Text>
+					<Text style={styles.cardCourse}>📍 Haras Santa María · 18 hoyos</Text>
 					<Text style={styles.cardTime}>hace 5 horas</Text>
 				</View>
 				<Text style={styles.dots}>···</Text>
@@ -536,9 +537,6 @@ function RoundCard({ photos = [] }: { photos?: string[] }) {
 				<>
 					<PhotoCarousel photos={photos} />
 					<View style={styles.cardBody}>
-						<View style={styles.courseBadge}>
-							<Text style={styles.courseText}>📍 Haras Santa María · 18 hoyos</Text>
-						</View>
 						<View style={styles.photoScoreRow}>
 							<View style={styles.photoScoreMain}>
 								<Text style={styles.photoScore}>{score}</Text>
@@ -556,9 +554,6 @@ function RoundCard({ photos = [] }: { photos?: string[] }) {
 				</>
 			) : (
 				<View style={styles.cardBody}>
-					<View style={styles.courseBadge}>
-						<Text style={styles.courseText}>📍 Haras Santa María · 18 hoyos</Text>
-					</View>
 					{expanded ? (
 						<>
 							<Scorecard holes={JUAN_HOLES} score={score} vsPar={vsPar} />
@@ -727,7 +722,8 @@ const styles = StyleSheet.create({
 	avatarText: { fontWeight: "700" },
 	cardMeta: { flex: 1 },
 	cardName: { fontSize: 14, fontWeight: "700", color: COLORS.white },
-	cardTime: { fontSize: 11, color: COLORS.muted },
+	cardCourse: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
+	cardTime: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
 	dots: { fontSize: 18, color: COLORS.dim },
 	cardBody: { paddingHorizontal: 16, paddingBottom: 12 },
 	cardFooter: {
