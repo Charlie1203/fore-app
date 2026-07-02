@@ -1,7 +1,8 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -201,15 +202,30 @@ function Step2({ club, course, onPublish }: { club: string; course: string; onPu
 }
 
 function Step3({ scores, club, course, onDone }: {
-  scores: number[]; club: string; course: string; onDone: () => void;
+  scores: number[]; club: string; course: string; onDone: (photos: string[]) => void;
 }) {
   const [shareOnFeed, setShareOnFeed] = useState(true);
   const [comment, setComment] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
 
   const totalScore = scores.reduce((a, b) => a + b, 0);
   const totalPar = DEFAULT_PARS.reduce((a, b) => a + b, 0);
   const vsPar = totalScore - totalPar;
   const birdies = scores.filter((s, i) => s - DEFAULT_PARS[i] === -1).length;
+
+  const pickPhotos = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: 4 - photos.length,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      setPhotos(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 4));
+    }
+  };
+
+  const removePhoto = (i: number) => setPhotos(prev => prev.filter((_, idx) => idx !== i));
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.stepContent}>
@@ -265,10 +281,28 @@ function Step3({ scores, club, course, onDone }: {
             />
             <Text style={styles.commentCount}>{comment.length}/200</Text>
           </View>
+
+          <Text style={[styles.label, { marginTop: 20 }]}>Fotos <Text style={styles.labelOptional}>(opcional · hasta 4)</Text></Text>
+          <View style={styles.photosRow}>
+            {photos.map((uri, i) => (
+              <View key={i} style={styles.photoThumb}>
+                <Image source={{ uri }} style={styles.photoThumbImg} />
+                <TouchableOpacity style={styles.photoRemove} onPress={() => removePhoto(i)}>
+                  <Text style={styles.photoRemoveText}>×</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            {photos.length < 4 && (
+              <TouchableOpacity style={styles.photoAdd} onPress={pickPhotos}>
+                <Text style={styles.photoAddIcon}>+</Text>
+                <Text style={styles.photoAddText}>Agregar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </>
       )}
 
-      <TouchableOpacity style={styles.nextBtn} onPress={onDone}>
+      <TouchableOpacity style={styles.nextBtn} onPress={() => onDone(shareOnFeed ? photos : [])}>
         <Text style={styles.nextBtnText}>{shareOnFeed ? 'Publicar vuelta' : 'Guardar vuelta'}</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -285,12 +319,12 @@ export default function UploadScreen() {
   const handleNext = (c: string, cr: string) => { setClub(c); setCourse(cr); setStep(2); };
   const handleScoresDone = (s: number[]) => { setScores(s); setStep(3); };
 
-  const handleDone = () => {
+  const handleDone = (photos: string[]) => {
     setStep(1);
     setClub('');
     setCourse('');
     setScores(DEFAULT_PARS.map(p => p));
-    navigation.navigate('Inicio', { showSuccess: Date.now() });
+    navigation.navigate('Inicio', { showSuccess: Date.now(), photos });
   };
 
   return (
@@ -372,4 +406,13 @@ const styles = StyleSheet.create({
   toastEmoji: { fontSize: 36 },
   toastTitle: { fontSize: 16, fontWeight: '800', color: COLORS.white },
   toastSub: { fontSize: 12, color: COLORS.lime, marginTop: 2 },
+
+  photosRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  photoThumb: { width: 72, height: 72, borderRadius: 10, overflow: 'hidden' },
+  photoThumbImg: { width: 72, height: 72 },
+  photoRemove: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  photoRemoveText: { color: '#fff', fontSize: 14, lineHeight: 18, fontWeight: '700' },
+  photoAdd: { width: 72, height: 72, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  photoAddIcon: { fontSize: 22, color: COLORS.muted, lineHeight: 26 },
+  photoAddText: { fontSize: 10, color: COLORS.dim },
 });

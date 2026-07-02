@@ -5,12 +5,16 @@ import {
 	StyleSheet,
 	TouchableOpacity,
 	Animated,
+	Image,
+	Dimensions,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const SCREEN_W = Dimensions.get("window").width;
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
 	const d = [
@@ -478,11 +482,45 @@ function RoundSummary({
 	);
 }
 
-function RoundCard() {
+function PhotoCarousel({ photos }: { photos: string[] }) {
+	const [index, setIndex] = useState(0);
+	return (
+		<View>
+			<ScrollView
+				horizontal
+				pagingEnabled
+				showsHorizontalScrollIndicator={false}
+				onMomentumScrollEnd={e => {
+					setIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W));
+				}}
+			>
+				{photos.map((uri, i) => (
+					<Image
+						key={i}
+						source={{ uri }}
+						style={{ width: SCREEN_W, height: SCREEN_W * 0.65 }}
+						resizeMode="cover"
+					/>
+				))}
+			</ScrollView>
+			{photos.length > 1 && (
+				<View style={styles.photoDots}>
+					{photos.map((_, i) => (
+						<View key={i} style={[styles.photoDot, i === index && styles.photoDotActive]} />
+					))}
+				</View>
+			)}
+		</View>
+	);
+}
+
+function RoundCard({ photos = [] }: { photos?: string[] }) {
 	const [expanded, setExpanded] = useState(false);
 	const score = JUAN_HOLES.reduce((a, h) => a + h.score, 0);
 	const totalPar = JUAN_HOLES.reduce((a, h) => a + h.par, 0);
 	const vsPar = score - totalPar;
+	const hasPhotos = photos.length > 0;
+
 	return (
 		<View style={styles.card}>
 			<View style={styles.cardHeader}>
@@ -493,30 +531,48 @@ function RoundCard() {
 				</View>
 				<Text style={styles.dots}>···</Text>
 			</View>
-			<View style={styles.cardBody}>
-				<View style={styles.courseBadge}>
-					<Text style={styles.courseText}>📍 Haras Santa María · 18 hoyos</Text>
+
+			{hasPhotos ? (
+				<>
+					<PhotoCarousel photos={photos} />
+					<View style={styles.cardBody}>
+						<View style={styles.courseBadge}>
+							<Text style={styles.courseText}>📍 Haras Santa María · 18 hoyos</Text>
+						</View>
+						<View style={styles.photoScoreRow}>
+							<View style={styles.photoScoreMain}>
+								<Text style={styles.photoScore}>{score}</Text>
+								<Text style={[styles.photoVsPar, { color: vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
+									{vsPar > 0 ? '+' : ''}{vsPar}
+								</Text>
+							</View>
+							<TouchableOpacity style={styles.verTarjetaBtn} onPress={() => setExpanded(!expanded)}>
+								<Text style={styles.verTarjetaBtnText}>{expanded ? 'Ocultar' : 'Ver tarjeta'}</Text>
+								<Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={13} color={COLORS.lime} />
+							</TouchableOpacity>
+						</View>
+						{expanded && <Scorecard holes={JUAN_HOLES} score={score} vsPar={vsPar} />}
+					</View>
+				</>
+			) : (
+				<View style={styles.cardBody}>
+					<View style={styles.courseBadge}>
+						<Text style={styles.courseText}>📍 Haras Santa María · 18 hoyos</Text>
+					</View>
+					{expanded ? (
+						<>
+							<Scorecard holes={JUAN_HOLES} score={score} vsPar={vsPar} />
+							<TouchableOpacity style={styles.collapseBtn} onPress={() => setExpanded(false)}>
+								<Text style={styles.expandBtnText}>Ocultar tarjeta</Text>
+								<Ionicons name="chevron-up" size={13} color={COLORS.lime} />
+							</TouchableOpacity>
+						</>
+					) : (
+						<RoundSummary holes={JUAN_HOLES} score={score} vsPar={vsPar} onExpand={() => setExpanded(true)} />
+					)}
 				</View>
-				{expanded ? (
-					<>
-						<Scorecard holes={JUAN_HOLES} score={score} vsPar={vsPar} />
-						<TouchableOpacity
-							style={styles.collapseBtn}
-							onPress={() => setExpanded(false)}
-						>
-							<Text style={styles.expandBtnText}>Ocultar tarjeta</Text>
-							<Ionicons name="chevron-up" size={13} color={COLORS.lime} />
-						</TouchableOpacity>
-					</>
-				) : (
-					<RoundSummary
-						holes={JUAN_HOLES}
-						score={score}
-						vsPar={vsPar}
-						onExpand={() => setExpanded(true)}
-					/>
-				)}
-			</View>
+			)}
+
 			<CardFooter likes={8} comments={2} />
 		</View>
 	);
@@ -553,26 +609,25 @@ function MilestoneCard() {
 	);
 }
 
+const MOCK_PHOTOS = [
+	'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800',
+	'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800',
+];
+
 export default function FeedScreen() {
 	const route = useRoute<any>();
 	const toastOpacity = useRef(new Animated.Value(0)).current;
 	const [showToast, setShowToast] = useState(false);
+	const [newPostPhotos, setNewPostPhotos] = useState<string[]>([]);
 
 	useEffect(() => {
 		if (!route.params?.showSuccess) return;
+		setNewPostPhotos(route.params?.photos ?? []);
 		setShowToast(true);
 		Animated.sequence([
-			Animated.timing(toastOpacity, {
-				toValue: 1,
-				duration: 300,
-				useNativeDriver: true,
-			}),
+			Animated.timing(toastOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
 			Animated.delay(2000),
-			Animated.timing(toastOpacity, {
-				toValue: 0,
-				duration: 400,
-				useNativeDriver: true,
-			}),
+			Animated.timing(toastOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
 		]).start(() => setShowToast(false));
 	}, [route.params?.showSuccess]);
 
@@ -584,33 +639,15 @@ export default function FeedScreen() {
 				</Text>
 				<View style={{ flexDirection: "row", gap: 18 }}>
 					<Ionicons name="search-outline" size={22} color={COLORS.white} />
-					<Ionicons
-						name="notifications-outline"
-						size={22}
-						color={COLORS.white}
-					/>
+					<Ionicons name="notifications-outline" size={22} color={COLORS.white} />
 				</View>
 			</View>
 			<ScrollView showsVerticalScrollIndicator={false}>
-				<ScrollView
-					horizontal
-					showsHorizontalScrollIndicator={false}
-					style={styles.stories}
-				>
+				<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stories}>
 					{stories.map((s, i) => (
 						<View key={i} style={styles.storyItem}>
-							<View
-								style={[
-									styles.storyRing,
-									{ borderColor: s.active ? COLORS.lime : "#333" },
-								]}
-							>
-								<Avatar
-									initials={s.initials}
-									bg={s.bg}
-									color={s.color}
-									size={42}
-								/>
+							<View style={[styles.storyRing, { borderColor: s.active ? COLORS.lime : "#333" }]}>
+								<Avatar initials={s.initials} bg={s.bg} color={s.color} size={42} />
 							</View>
 							<Text style={styles.storyName}>{s.name}</Text>
 						</View>
@@ -619,7 +656,11 @@ export default function FeedScreen() {
 				<View style={styles.divider} />
 				<View style={styles.feed}>
 					<HcpCard />
-					<RoundCard />
+					{newPostPhotos.length > 0
+						? <RoundCard photos={newPostPhotos} />
+						: <RoundCard />
+					}
+					<RoundCard photos={MOCK_PHOTOS} />
 					<MilestoneCard />
 				</View>
 			</ScrollView>
@@ -885,6 +926,16 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 	},
+	photoDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, paddingTop: 8 },
+	photoDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: COLORS.dim },
+	photoDotActive: { backgroundColor: COLORS.lime, width: 14 },
+	photoScoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+	photoScoreMain: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+	photoScore: { fontSize: 28, fontWeight: '800', color: COLORS.white },
+	photoVsPar: { fontSize: 14, fontWeight: '700' },
+	verTarjetaBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 0.5, borderColor: COLORS.lime, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+	verTarjetaBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.lime },
+
 	holeTriangleWrap: {
 		width: HOLE_SIZE,
 		height: HOLE_SIZE,
