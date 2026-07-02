@@ -1,4 +1,4 @@
-import {
+﻿import {
 	View,
 	Text,
 	ScrollView,
@@ -9,6 +9,9 @@ import {
 	Dimensions,
 	Modal,
 	StatusBar,
+	TextInput,
+	KeyboardAvoidingView,
+	Platform,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -337,6 +340,61 @@ function Scorecard({
 	);
 }
 
+const MOCK_COMMENTS = [
+	{ id: '1', autor: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', texto: 'Joya vuelta!', tiempo: 'hace 1 h' },
+	{ id: '2', autor: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', texto: 'Crack, cuándo repetimos?', tiempo: 'hace 30 min' },
+];
+
+function CommentsSheet({ visible, count, onClose }: { visible: boolean; count: number; onClose: () => void }) {
+	const [text, setText] = useState('');
+	return (
+		<Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+			<View style={{ flex: 1, justifyContent: 'flex-end' }}>
+				<TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
+				<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+				<View style={styles.commentsSheet}>
+					<View style={styles.commentsHandle} />
+					<Text style={styles.commentsTitle}>{count} comentarios</Text>
+					<ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+						{MOCK_COMMENTS.map(c => (
+							<View key={c.id} style={styles.commentRow}>
+								<View style={[styles.commentAvatar, { backgroundColor: c.bg }]}>
+									<Text style={[styles.commentAvatarText, { color: c.color }]}>{c.initials}</Text>
+								</View>
+								<View style={styles.commentBubble}>
+									<View style={styles.commentMeta}>
+										<Text style={styles.commentAutor}>{c.autor}</Text>
+										<Text style={styles.commentTiempo}>{c.tiempo}</Text>
+									</View>
+									<Text style={styles.commentTexto}>{c.texto}</Text>
+								</View>
+							</View>
+						))}
+					</ScrollView>
+					<View style={styles.commentInput}>
+						<View style={[styles.commentAvatar, { backgroundColor: '#2a1a3a' }]}>
+							<Text style={[styles.commentAvatarText, { color: '#b070e0' }]}>JN</Text>
+						</View>
+						<TextInput
+							style={styles.commentTextInput}
+							placeholder="Comentar..."
+							placeholderTextColor="#444"
+							value={text}
+							onChangeText={setText}
+						/>
+						{text.length > 0 && (
+							<TouchableOpacity onPress={() => setText('')}>
+								<Ionicons name="send" size={18} color={COLORS.lime} />
+							</TouchableOpacity>
+						)}
+					</View>
+				</View>
+			</KeyboardAvoidingView>
+		</View>
+		</Modal>
+	);
+}
+
 function CardFooter({
 	likes,
 	comments,
@@ -346,23 +404,28 @@ function CardFooter({
 	comments: number;
 	liked?: boolean;
 }) {
+	const [isLiked, setIsLiked] = useState(liked);
+	const [showComments, setShowComments] = useState(false);
 	return (
-		<View style={styles.cardFooter}>
-			<TouchableOpacity style={styles.action}>
-				<GolfFlagIcon color={liked ? COLORS.lime : COLORS.dim} size={17} />
-				<Text style={[styles.actionText, liked && { color: COLORS.lime }]}>
-					{likes}
-				</Text>
-			</TouchableOpacity>
-			<TouchableOpacity style={styles.action}>
-				<GolfBallIcon color={COLORS.dim} size={16} />
-				<Text style={styles.actionText}>{comments}</Text>
-			</TouchableOpacity>
-			<View style={{ flex: 1 }} />
-			<TouchableOpacity>
-				<Ionicons name="repeat-outline" size={19} color={COLORS.dim} />
-			</TouchableOpacity>
-		</View>
+		<>
+			<CommentsSheet visible={showComments} count={comments} onClose={() => setShowComments(false)} />
+			<View style={styles.cardFooter}>
+				<TouchableOpacity style={styles.action} onPress={() => setIsLiked(l => !l)}>
+					<GolfFlagIcon color={isLiked ? COLORS.lime : COLORS.dim} size={17} />
+					<Text style={[styles.actionText, isLiked && { color: COLORS.lime }]}>
+						{isLiked ? likes : likes}
+					</Text>
+				</TouchableOpacity>
+				<TouchableOpacity style={styles.action} onPress={() => setShowComments(true)}>
+					<GolfBallIcon color={COLORS.dim} size={16} />
+					<Text style={styles.actionText}>{comments}</Text>
+				</TouchableOpacity>
+				<View style={{ flex: 1 }} />
+				<TouchableOpacity>
+					<Ionicons name="repeat-outline" size={19} color={COLORS.dim} />
+				</TouchableOpacity>
+			</View>
+		</>
 	);
 }
 
@@ -778,6 +841,20 @@ const styles = StyleSheet.create({
 	cardTime: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
 	dots: { fontSize: 18, color: COLORS.dim },
 	cardBody: { paddingHorizontal: 16, paddingBottom: 12 },
+	commentsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+	commentsSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
+	commentsHandle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 12 },
+	commentsTitle: { fontSize: 15, fontWeight: '700', color: '#f0f0f0', paddingHorizontal: 20, marginBottom: 12 },
+	commentRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: '#1e1e1e' },
+	commentAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+	commentAvatarText: { fontSize: 10, fontWeight: '700' },
+	commentBubble: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 12, padding: 10 },
+	commentMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+	commentAutor: { fontSize: 13, fontWeight: '700', color: '#f0f0f0' },
+	commentTiempo: { fontSize: 11, color: '#444' },
+	commentTexto: { fontSize: 13, color: '#ddd', lineHeight: 18 },
+	commentInput: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 0.5, borderTopColor: '#1e1e1e' },
+	commentTextInput: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, color: '#f0f0f0' },
 	cardFooter: {
 		flexDirection: "row",
 		alignItems: "center",

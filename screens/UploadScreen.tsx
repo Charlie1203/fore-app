@@ -37,79 +37,89 @@ function StepIndicator({ step }: { step: number }) {
       <View style={[styles.stepDot, step >= 1 && styles.stepDotActive]} />
       <View style={[styles.stepLine, step >= 2 && styles.stepLineActive]} />
       <View style={[styles.stepDot, step >= 2 && styles.stepDotActive]} />
-      <View style={[styles.stepLine, step >= 3 && styles.stepLineActive]} />
-      <View style={[styles.stepDot, step >= 3 && styles.stepDotActive]} />
     </View>
   );
 }
 
-function Step1({ onNext }: { onNext: (club: string, course: string) => void }) {
-  const [selectedClub, setSelectedClub] = useState<string | null>(null);
-  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
+function ClubPickerModal({ club, course, onSelect, onClose }: {
+  club: string; course: string;
+  onSelect: (club: string, course: string) => void;
+  onClose: () => void;
+}) {
+  const [selectedClub, setSelectedClub] = useState<string | null>(club || null);
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(course || null);
   const [search, setSearch] = useState('');
 
   const filtered = CLUBS.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
   const clubData = CLUBS.find(c => c.name === selectedClub);
 
+  const canConfirm = selectedClub && (clubData && clubData.courses.length === 1 ? true : !!selectedCourse);
+
+  const handleConfirm = () => {
+    const finalCourse = selectedCourse || (clubData?.courses[0] ?? '');
+    onSelect(selectedClub!, finalCourse);
+    onClose();
+  };
+
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.stepContent}>
-      <Text style={styles.stepTitle}>¿Dónde jugaste?</Text>
-
-      <Text style={styles.label}>Club</Text>
-      <View style={styles.searchBox}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar club..."
-          placeholderTextColor={COLORS.dim}
-          value={search}
-          onChangeText={setSearch}
-        />
-      </View>
-
-      <View style={styles.optionList}>
-        {filtered.map(c => (
-          <TouchableOpacity
-            key={c.name}
-            style={[styles.option, selectedClub === c.name && styles.optionSelected]}
-            onPress={() => { setSelectedClub(c.name); setSelectedCourse(null); }}
-          >
-            <Text style={[styles.optionText, selectedClub === c.name && styles.optionTextSelected]}>
-              {c.name}
-            </Text>
-            {selectedClub === c.name && <Text style={styles.checkmark}>✓</Text>}
+    <View style={styles.modalOverlay}>
+      <View style={styles.pickerSheet}>
+        <View style={styles.pickerHandle} />
+        <View style={styles.pickerHeader}>
+          <Text style={styles.pickerTitle}>¿Dónde jugaste?</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={styles.pickerClose}>✕</Text>
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
 
-      {clubData && (
-        <>
-          <Text style={[styles.label, { marginTop: 20 }]}>Cancha</Text>
-          <View style={styles.optionList}>
-            {clubData.courses.map(course => (
-              <TouchableOpacity
-                key={course}
-                style={[styles.option, selectedCourse === course && styles.optionSelected]}
-                onPress={() => setSelectedCourse(course)}
-              >
-                <Text style={[styles.optionText, selectedCourse === course && styles.optionTextSelected]}>
-                  {course}
-                </Text>
-                {selectedCourse === course && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-            ))}
+        <View style={[styles.searchBox, { marginHorizontal: 18, marginBottom: 12 }]}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar club..."
+            placeholderTextColor={COLORS.dim}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 20, gap: 6 }}>
+          {filtered.map(c => (
+            <TouchableOpacity
+              key={c.name}
+              style={[styles.option, selectedClub === c.name && styles.optionSelected]}
+              onPress={() => { setSelectedClub(c.name); setSelectedCourse(null); }}
+            >
+              <Text style={[styles.optionText, selectedClub === c.name && styles.optionTextSelected]}>{c.name}</Text>
+              {selectedClub === c.name && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+          ))}
+
+          {clubData && clubData.courses.length > 1 && (
+            <>
+              <Text style={[styles.label, { marginTop: 16 }]}>Cancha</Text>
+              {clubData.courses.map(cr => (
+                <TouchableOpacity
+                  key={cr}
+                  style={[styles.option, selectedCourse === cr && styles.optionSelected]}
+                  onPress={() => setSelectedCourse(cr)}
+                >
+                  <Text style={[styles.optionText, selectedCourse === cr && styles.optionTextSelected]}>{cr}</Text>
+                  {selectedCourse === cr && <Text style={styles.checkmark}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+        </ScrollView>
+
+        {canConfirm && (
+          <View style={{ paddingHorizontal: 18, paddingBottom: 24, paddingTop: 8 }}>
+            <TouchableOpacity style={styles.nextBtn} onPress={handleConfirm}>
+              <Text style={styles.nextBtnText}>Confirmar</Text>
+            </TouchableOpacity>
           </View>
-        </>
-      )}
-
-      {selectedClub && selectedCourse && (
-        <TouchableOpacity
-          style={styles.nextBtn}
-          onPress={() => onNext(selectedClub, selectedCourse)}
-        >
-          <Text style={styles.nextBtnText}>Cargar tarjeta →</Text>
-        </TouchableOpacity>
-      )}
-    </ScrollView>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -143,8 +153,13 @@ function HoleRow({ num, par, score, onInc, onDec }: {
   );
 }
 
-function Step2({ club, course, onPublish }: { club: string; course: string; onPublish: (scores: number[]) => void }) {
+function Step2({ club, course, onClubChange, onPublish }: {
+  club: string; course: string;
+  onClubChange: (club: string, course: string) => void;
+  onPublish: (scores: number[]) => void;
+}) {
   const [scores, setScores] = useState(DEFAULT_PARS.map(p => p));
+  const [showPicker, setShowPicker] = useState(false);
 
   const inc = (i: number) => setScores(s => s.map((v, idx) => idx === i ? v + 1 : v));
   const dec = (i: number) => setScores(s => s.map((v, idx) => idx === i ? Math.max(1, v - 1) : v));
@@ -154,10 +169,21 @@ function Step2({ club, course, onPublish }: { club: string; course: string; onPu
   const vsPar = totalScore - totalPar;
 
   return (
+    <>
+      {showPicker && (
+        <ClubPickerModal
+          club={club} course={course}
+          onSelect={(c, cr) => onClubChange(c, cr)}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.stepContent}>
-      <View style={styles.coursePill}>
-        <Text style={styles.coursePillText}>📍 {club} · {course}</Text>
-      </View>
+      <TouchableOpacity style={styles.coursePill} onPress={() => setShowPicker(true)}>
+        <Text style={styles.coursePillText}>
+          {club ? `📍 ${club}${course ? ` · ${course}` : ''}` : '📍 Elegir cancha...'}
+        </Text>
+        <Text style={styles.coursePillEdit}>✏️</Text>
+      </TouchableOpacity>
 
       <View style={styles.totalBox}>
         <View style={styles.totalItem}>
@@ -198,6 +224,7 @@ function Step2({ club, course, onPublish }: { club: string; course: string; onPu
         <Text style={styles.nextBtnText}>Continuar →</Text>
       </TouchableOpacity>
     </ScrollView>
+    </>
   );
 }
 
@@ -331,8 +358,7 @@ export default function UploadScreen() {
   const [course, setCourse] = useState('');
   const [scores, setScores] = useState(DEFAULT_PARS.map(p => p));
 
-  const handleNext = (c: string, cr: string) => { setClub(c); setCourse(cr); setStep(2); };
-  const handleScoresDone = (s: number[]) => { setScores(s); setStep(3); };
+  const handleScoresDone = (s: number[]) => { setScores(s); setStep(2); };
 
   const handleDone = (photos: string[]) => {
     setStep(1);
@@ -346,20 +372,24 @@ export default function UploadScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <View style={styles.headerInner}>
-          {step > 1 && step < 4 && (
+          {step > 1 && (
             <TouchableOpacity onPress={() => setStep(step - 1)}>
               <Text style={styles.backBtn}>← Atrás</Text>
             </TouchableOpacity>
           )}
           <Text style={styles.headerTitle}>Cargar vuelta</Text>
         </View>
-        {step < 4 && <View style={{ paddingHorizontal: 18 }}><StepIndicator step={step} /></View>}
+        <View style={{ paddingHorizontal: 18 }}><StepIndicator step={step} /></View>
       </View>
 
-      {step === 1 && <Step1 onNext={handleNext} />}
-      {step === 2 && <Step2 club={club} course={course} onPublish={handleScoresDone} />}
-      {step === 3 && <Step3 scores={scores} club={club} course={course} onDone={handleDone} />}
-
+      {step === 1 && (
+        <Step2
+          club={club} course={course}
+          onClubChange={(c, cr) => { setClub(c); setCourse(cr); }}
+          onPublish={handleScoresDone}
+        />
+      )}
+      {step === 2 && <Step3 scores={scores} club={club} course={course} onDone={handleDone} />}
     </SafeAreaView>
   );
 }
@@ -388,8 +418,15 @@ const styles = StyleSheet.create({
   checkmark: { color: COLORS.lime, fontSize: 16, fontWeight: '700' },
   nextBtn: { backgroundColor: COLORS.lime, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 },
   nextBtnText: { fontSize: 15, fontWeight: '800', color: '#0f0f0f' },
-  coursePill: { backgroundColor: COLORS.dark2, borderRadius: 8, padding: 10, marginBottom: 16, alignSelf: 'flex-start' },
-  coursePillText: { fontSize: 12, color: COLORS.muted },
+  coursePill: { backgroundColor: COLORS.dark2, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', borderWidth: 0.5, borderColor: COLORS.border },
+  coursePillText: { fontSize: 13, color: COLORS.white, fontWeight: '600' },
+  coursePillEdit: { fontSize: 12 },
+  modalOverlay: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end', zIndex: 100 },
+  pickerSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', paddingTop: 12 },
+  pickerHandle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  pickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, marginBottom: 12 },
+  pickerTitle: { fontSize: 18, fontWeight: '800', color: COLORS.white },
+  pickerClose: { fontSize: 16, color: COLORS.muted, padding: 4 },
   totalBox: { flexDirection: 'row', backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, padding: 16, marginBottom: 20 },
   totalItem: { flex: 1, alignItems: 'center' },
   totalVal: { fontSize: 26, fontWeight: '800', color: COLORS.white },

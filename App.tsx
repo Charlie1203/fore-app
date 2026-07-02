@@ -10,14 +10,14 @@ import FeedScreen from "./screens/FeedScreen";
 import UploadScreen from "./screens/UploadScreen";
 import SearchScreen from "./screens/SearchScreen";
 import ProfileScreen from "./screens/ProfileScreen";
-import RankingScreen from "./screens/RankingScreen";
+import TorneosScreen from "./screens/TorneosScreen";
 
 const Tab = createBottomTabNavigator();
 
 const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   Inicio: "home",
   Grupos: "people",
-  Ranking: "trophy",
+  Torneos: "trophy",
   Perfil: "person",
 };
 
@@ -85,7 +85,7 @@ export default function App() {
           })}
         >
           <Tab.Screen name="Inicio" component={FeedScreen} />
-          <Tab.Screen name="Ranking" component={RankingScreen} />
+          <Tab.Screen name="Torneos" component={TorneosScreen} />
           <Tab.Screen name="Cargar" component={UploadScreen} />
           <Tab.Screen name="Grupos" component={SearchScreen} />
           <Tab.Screen name="Perfil" component={ProfileScreen} />

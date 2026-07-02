@@ -1,27 +1,55 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Dimensions } from 'react-native';
+﻿import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Dimensions, Image, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from 'react-native-pager-view';
+import { TorneoProximoDetail, TorneoEnCursoDetail, TorneoFinalizadoDetail } from './TorneosScreen';
+import type { Torneo } from './TorneosScreen';
+import Svg, { Circle, Path, Ellipse, Line, Polygon } from 'react-native-svg';
+import * as ImagePicker from 'expo-image-picker';
+
+function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
+  const d = [
+    "M 11,9.5 a 1.1,0.7 0 0,1 2.2,0", "M 14,9.5 a 1.1,0.7 0 0,1 2.2,0",
+    "M 17,10 a 1.1,0.7 0 0,1 2.2,0", "M 9,12.5 a 1.1,0.7 0 0,1 2.2,0",
+    "M 12,12.5 a 1.1,0.7 0 0,1 2.2,0", "M 15,12.5 a 1.1,0.7 0 0,1 2.2,0",
+    "M 18,13 a 1.1,0.7 0 0,1 2.2,0", "M 8,15.5 a 1.1,0.7 0 0,1 2.2,0",
+    "M 11,15.5 a 1.1,0.7 0 0,1 2.2,0", "M 14,15.5 a 1.1,0.7 0 0,1 2.2,0",
+    "M 17,16 a 1.1,0.7 0 0,1 2.2,0", "M 8,18.5 a 1.1,0.7 0 0,1 2.2,0",
+    "M 11,18.5 a 1.1,0.7 0 0,1 2.2,0", "M 14,18.5 a 1.1,0.7 0 0,1 2.2,0",
+  ].join(" ");
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.6" fill="none" />
+      <Path d={d} stroke={color} strokeWidth="1.3" fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function GolfFlagIcon({ color, size = 17 }: { color: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 2 24 24">
+      <Ellipse cx="12" cy="20" rx="7" ry="2.5" stroke={color} strokeWidth="1.8" fill="none" />
+      <Line x1="12" y1="20" x2="12" y2="4" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <Polygon points="12,4 21,8 12,12" fill={color} />
+    </Svg>
+  );
+}
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
   lime: '#c8e03a', white: '#f0f0f0', muted: '#666', dim: '#444', dark2: '#242424',
 };
 
+const SCREEN_W = Dimensions.get('window').width;
+const SCREEN_H = Dimensions.get('window').height;
+const GROUP_TAB_BAR_H = 44;
+const BOTTOM_TAB_H = 80;
+
 const MY_GROUPS = [
-  {
-    id: '1', name: 'Haras Santa María', type: 'club', members: 142,
-    initials: 'HS', bg: '#1a2a0a', color: '#c8e03a', lastActivity: 'hace 2 horas',
-  },
-  {
-    id: '2', name: 'Los del Jueves', type: 'privado', members: 6,
-    initials: 'LJ', bg: '#2a1a3a', color: '#b070e0', lastActivity: 'hace 1 día',
-  },
-  {
-    id: '3', name: 'Martindale CC', type: 'club', members: 89,
-    initials: 'MC', bg: '#1a2a3a', color: '#5fa0e0', lastActivity: 'hace 3 días',
-  },
+  { id: '1', name: 'Haras Santa María', type: 'club', members: 142, initials: 'HS', bg: '#1a2a0a', color: '#c8e03a', lastActivity: 'hace 2 horas' },
+  { id: '2', name: 'Los del Jueves', type: 'privado', members: 6, initials: 'LJ', bg: '#2a1a3a', color: '#b070e0', lastActivity: 'hace 1 día' },
+  { id: '3', name: 'Martindale CC', type: 'club', members: 89, initials: 'MC', bg: '#1a2a3a', color: '#5fa0e0', lastActivity: 'hace 3 días' },
 ];
 
 const ALL_GROUPS = [
@@ -42,30 +70,96 @@ const PLAYERS = [
 type Group = typeof MY_GROUPS[0];
 type Player = typeof PLAYERS[0];
 
-const SCREEN_H = Dimensions.get('window').height;
-const GROUP_TAB_BAR_H = 44;
-const BOTTOM_TAB_H = 80;
+type PostType = 'texto' | 'fotos' | 'sistema';
 
-function Avatar({ initials, bg, color, size = 42 }: { initials: string; bg: string; color: string; size?: number }) {
-  return (
-    <View style={[styles.avatar, { backgroundColor: bg, width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={[styles.avatarText, { color, fontSize: size * 0.32 }]}>{initials}</Text>
-    </View>
-  );
+interface Post {
+  id: string;
+  tipo: PostType;
+  autor?: string;
+  initials?: string;
+  bg?: string;
+  color?: string;
+  tiempo: string;
+  texto?: string;
+  fotos?: string[];
+  precio?: string;
+  eventoFecha?: string;
+  eventoHora?: string;
+  asistentes?: number;
+  voy?: boolean;
+  likes: number;
+  liked: boolean;
+  comentarios: number;
+  pinned?: boolean;
 }
 
-const MODALIDADES = ['Stroke Play', 'Stableford', 'Match Play', 'Better Ball', 'Scramble'];
-
-const TORNEOS_MOCK = [
-  { id: '1', nombre: 'Copa Junio', modalidad: 'Stableford', fecha: '28 Jun 2026', estado: 'finalizado', ganador: 'Pepe Noceti', score: 38 },
-  { id: '2', nombre: 'Torneo del Club', modalidad: 'Stroke Play', fecha: '12 Jul 2026', estado: 'próximo', ganador: null, score: null },
+const ACTIVIDAD_POSTS: Post[] = [
+  {
+    id: '0', tipo: 'texto', pinned: true,
+    autor: 'Haras Santa María', initials: 'HS', bg: '#1a2a0a', color: '#c8e03a',
+    tiempo: 'hace 1 día',
+    texto: 'Recordatorio: el torneo del club es el 12 de julio. Inscripción cierra el viernes, hablar con la proshop para confirmar.',
+    likes: 18, liked: false, comentarios: 3,
+  },
+  {
+    id: '1', tipo: 'fotos',
+    autor: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a',
+    tiempo: 'hace 3 horas',
+    texto: 'Día perfecto en Haras. El hoyo 7 nos mató a todos 😂',
+    fotos: [
+      'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800',
+      'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800',
+    ],
+    likes: 12, liked: true, comentarios: 4,
+  },
+  {
+    id: '2', tipo: 'texto',
+    autor: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a',
+    tiempo: 'hace 6 horas',
+    texto: 'Alguien para el jueves? Yo estoy confirmado a las 8.',
+    likes: 4, liked: false, comentarios: 5,
+  },
+  {
+    id: '3', tipo: 'fotos',
+    autor: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a',
+    tiempo: 'hace 1 día',
+    texto: 'Primera vez que bajo de 80 en Haras 🙌',
+    fotos: ['https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=800'],
+    likes: 21, liked: false, comentarios: 7,
+  },
+  {
+    id: '4', tipo: 'texto',
+    autor: 'Sofía Lagos', initials: 'SL', bg: '#1a2a3a', color: '#5fa0e0',
+    tiempo: 'hace 3 días',
+    texto: 'Alguien tiene recomendación de profesor para trabajo de corto? Quiero mejorar el pitching antes del torneo.',
+    likes: 6, liked: false, comentarios: 8,
+  },
+  {
+    id: '5', tipo: 'sistema',
+    tiempo: 'hace 5 días',
+    texto: '🏆 Pepe Noceti ganó la Copa Junio con 38 puntos Stableford',
+    likes: 0, liked: false, comentarios: 0,
+  },
 ];
 
-const ACTIVIDAD_MOCK = [
-  { tipo: 'torneo', texto: '🏆 Pepe Noceti ganó la Copa Junio con 38 puntos Stableford', tiempo: 'hace 2 días' },
-  { tipo: 'post', autor: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', texto: 'Qué cañazo el hoyo 7 hoy, eagle de 6 metros 🔥', tiempo: 'hace 3 días' },
-  { tipo: 'post', autor: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', texto: 'Se viene el torneo del club, a prepararse', tiempo: 'hace 5 días' },
-  { tipo: 'torneo', texto: '📋 Torneo del Club creado para el 12 de julio', tiempo: 'hace 1 semana' },
+const TORNEOS_MOCK: Torneo[] = [
+  {
+    id: '1', nombre: 'Copa Junio', modalidad: 'Stableford', fecha: 'Jun 2026', estado: 'finalizado', grupo: 'Haras Santa María',
+    participantes: [],
+    leaderboard: [
+      { pos: 1, nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', score: 38, diff: 0 },
+      { pos: 2, nombre: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', score: 35, diff: 0 },
+      { pos: 3, nombre: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', score: 32, diff: 0 },
+    ],
+  },
+  {
+    id: '2', nombre: 'Torneo del Club', modalidad: 'Stroke Play', fecha: 'Jul 2026', estado: 'próximo', grupo: 'Haras Santa María',
+    participantes: [
+      { nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', hcp: 7.3 },
+      { nombre: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', hcp: 15.1 },
+      { nombre: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', hcp: 9.8 },
+    ],
+  },
 ];
 
 const MODALIDADES_INFO = [
@@ -76,14 +170,508 @@ const MODALIDADES_INFO = [
   { key: 'Scramble', icon: '🎯', desc: 'Equipo elige el mejor tiro' },
 ];
 
-function CreateTorneoModal({ onClose }: { onClose: () => void }) {
+function Avatar({ initials, bg, color, size = 42 }: { initials: string; bg: string; color: string; size?: number }) {
+  return (
+    <View style={[styles.avatar, { backgroundColor: bg, width: size, height: size, borderRadius: size / 2 }]}>
+      <Text style={[styles.avatarText, { color, fontSize: size * 0.32 }]}>{initials}</Text>
+    </View>
+  );
+}
+
+// ─── Comments Sheet ───────────────────────────────────────────────────────────
+
+const MOCK_COMMENTS = [
+  { id: '1', autor: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', texto: 'Joya! Me apunto', tiempo: 'hace 1 h' },
+  { id: '2', autor: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', texto: 'Yo también voy', tiempo: 'hace 45 min' },
+  { id: '3', autor: 'Sofía Lagos', initials: 'SL', bg: '#1a2a3a', color: '#5fa0e0', texto: 'No puedo esta semana 😢', tiempo: 'hace 20 min' },
+];
+
+function CommentsSheet({ visible, onClose, count }: { visible: boolean; onClose: () => void; count: number }) {
+  const [text, setText] = useState('');
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <View style={styles.commentsSheet}>
+        <View style={styles.commentsHandle} />
+        <Text style={styles.commentsTitle}>{count} comentarios</Text>
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          {MOCK_COMMENTS.map(c => (
+            <View key={c.id} style={styles.commentRow}>
+              <Avatar initials={c.initials} bg={c.bg} color={c.color} size={32} />
+              <View style={styles.commentBubble}>
+                <View style={styles.commentMeta}>
+                  <Text style={styles.commentAutor}>{c.autor}</Text>
+                  <Text style={styles.commentTiempo}>{c.tiempo}</Text>
+                </View>
+                <Text style={styles.commentTexto}>{c.texto}</Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+        <View style={styles.commentInput}>
+          <Avatar initials="JU" bg="#2a1a3a" color="#b070e0" size={32} />
+          <TextInput
+            style={styles.commentTextInput}
+            placeholder="Comentar..."
+            placeholderTextColor={COLORS.dim}
+            value={text}
+            onChangeText={setText}
+          />
+          {text.length > 0 && (
+            <TouchableOpacity onPress={() => setText('')}>
+              <Ionicons name="send" size={18} color={COLORS.lime} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+      </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Post Cards ───────────────────────────────────────────────────────────────
+
+function PostActions({ post, onLike, onComment }: { post: Post; onLike: () => void; onComment: () => void }) {
+  return (
+    <View style={styles.postActions}>
+      <TouchableOpacity style={styles.postAction} onPress={onLike}>
+        <GolfFlagIcon color={post.liked ? COLORS.lime : COLORS.dim} size={17} />
+        {post.likes > 0 && <Text style={[styles.postActionText, post.liked && { color: COLORS.lime }]}>{post.likes}</Text>}
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.postAction} onPress={onComment}>
+        <GolfBallIcon color={COLORS.dim} size={16} />
+        {post.comentarios > 0 && <Text style={styles.postActionText}>{post.comentarios}</Text>}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function PostHeader({ post }: { post: Post }) {
+  return (
+    <View style={styles.postHeader}>
+      <Avatar initials={post.initials!} bg={post.bg!} color={post.color!} size={36} />
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={styles.postAutor}>{post.autor}</Text>
+          {post.pinned && (
+            <View style={styles.pinnedBadge}>
+              <Ionicons name="pin" size={10} color={COLORS.lime} />
+              <Text style={styles.pinnedText}>Fijado</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.postTiempo}>{post.tiempo}</Text>
+      </View>
+    </View>
+  );
+}
+
+function TextPost({ post, onLike, onComment }: { post: Post; onLike: () => void; onComment: () => void }) {
+  return (
+    <View style={[styles.postCard, post.pinned && styles.postCardPinned]}>
+      <PostHeader post={post} />
+      <Text style={styles.postTexto}>{post.texto}</Text>
+      <PostActions post={post} onLike={onLike} onComment={onComment} />
+    </View>
+  );
+}
+
+function FotosPost({ post, onLike, onComment }: { post: Post; onLike: () => void; onComment: () => void }) {
+  const [page, setPage] = useState(0);
+  const fotos = post.fotos || [];
+  return (
+    <View style={styles.postCard}>
+      <PostHeader post={post} />
+      {post.texto ? <Text style={[styles.postTexto, { marginBottom: 10 }]}>{post.texto}</Text> : null}
+      <View style={{ borderRadius: 12, overflow: 'hidden', marginHorizontal: -16 }}>
+        <ScrollView
+          horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={e => setPage(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))}
+        >
+          {fotos.map((uri, i) => (
+            <Image key={i} source={{ uri }} style={{ width: SCREEN_W, height: SCREEN_W * 0.65 }} resizeMode="cover" />
+          ))}
+        </ScrollView>
+        {fotos.length > 1 && (
+          <View style={styles.photoDots}>
+            {fotos.map((_, i) => <View key={i} style={[styles.photoDot, i === page && styles.photoDotActive]} />)}
+          </View>
+        )}
+      </View>
+      <PostActions post={post} onLike={onLike} onComment={onComment} />
+    </View>
+  );
+}
+
+function RondaPost({ post, onLike, onComment }: { post: Post; onLike: () => void; onComment: () => void }) {
+  return (
+    <View style={styles.postCard}>
+      <PostHeader post={post} />
+      {post.texto ? <Text style={[styles.postTexto, { marginBottom: 10 }]}>{post.texto}</Text> : null}
+      <View style={styles.rondaCard}>
+        <View style={styles.rondaRow}>
+          <Text style={styles.rondaScore}>79</Text>
+          <View>
+            <Text style={styles.rondaCourse}>Haras Santa María</Text>
+            <Text style={styles.rondaMeta}>-1 vs par · 28 Jun</Text>
+          </View>
+          <TouchableOpacity style={styles.verTarjetaBtn}>
+            <Text style={styles.verTarjetaText}>Ver tarjeta</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      <PostActions post={post} onLike={onLike} onComment={onComment} />
+    </View>
+  );
+}
+
+function VentaPost({ post, onLike, onComment }: { post: Post; onLike: () => void; onComment: () => void }) {
+  const fotos = post.fotos || [];
+  return (
+    <View style={styles.postCard}>
+      <PostHeader post={post} />
+      <View style={styles.ventaContent}>
+        {fotos.length > 0 && (
+          <Image source={{ uri: fotos[0] }} style={styles.ventaImg} resizeMode="cover" />
+        )}
+        <View style={{ flex: 1, gap: 4 }}>
+          <View style={styles.ventaBadge}>
+            <Text style={styles.ventaBadgeText}>En venta</Text>
+          </View>
+          <Text style={styles.postTexto}>{post.texto}</Text>
+          <Text style={styles.ventaPrecio}>{post.precio}</Text>
+          <TouchableOpacity style={styles.contactarBtn}>
+            <Ionicons name="chatbubble-ellipses-outline" size={14} color="#0f0f0f" />
+            <Text style={styles.contactarText}>Contactar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      <PostActions post={post} onLike={onLike} onComment={onComment} />
+    </View>
+  );
+}
+
+function EventoPost({ post, onLike, onComment, onVoy }: { post: Post; onLike: () => void; onComment: () => void; onVoy: () => void }) {
+  return (
+    <View style={styles.postCard}>
+      <PostHeader post={post} />
+      {post.texto ? <Text style={[styles.postTexto, { marginBottom: 10 }]}>{post.texto}</Text> : null}
+      <View style={styles.eventoCard}>
+        <View style={styles.eventoInfo}>
+          <View style={styles.eventoFechaBlock}>
+            <Text style={styles.eventoFecha}>{post.eventoFecha}</Text>
+            <Text style={styles.eventoHora}>{post.eventoHora}</Text>
+          </View>
+          <View style={styles.eventoSep} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.eventoAsistentes}>{post.asistentes} van a ir</Text>
+            <Text style={styles.eventoAsistentesSub}>Pepe, Carlitos y otro más</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.voyBtn, post.voy && styles.voyBtnActive]}
+            onPress={onVoy}
+          >
+            <Text style={[styles.voyBtnText, post.voy && styles.voyBtnTextActive]}>
+              {post.voy ? '✓ Voy' : 'Voy'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      <PostActions post={post} onLike={onLike} onComment={onComment} />
+    </View>
+  );
+}
+
+function SistemaPost({ post }: { post: Post }) {
+  return (
+    <View style={styles.sistemaPost}>
+      <Text style={styles.sistemaTexto}>{post.texto}</Text>
+      <Text style={styles.sistemaTiempo}>{post.tiempo}</Text>
+    </View>
+  );
+}
+
+// ─── Post Composer ────────────────────────────────────────────────────────────
+
+function PostComposer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const [text, setText] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+
+  const canPost = text.trim().length > 0 || photos.length > 0;
+
+  const pickFromGallery = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: 4 - photos.length,
+      quality: 0.8,
+    });
+    if (!result.canceled) setPhotos(p => [...p, ...result.assets.map(a => a.uri)].slice(0, 4));
+  };
+
+  const pickFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    if (!result.canceled) setPhotos(p => [...p, result.assets[0].uri].slice(0, 4));
+  };
+
+  const handleClose = () => { setText(''); setPhotos([]); onClose(); };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={handleClose} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View style={styles.composerSheet}>
+          <View style={styles.composerHeader}>
+            <TouchableOpacity onPress={handleClose}>
+              <Text style={styles.composerCancel}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.composerPostBtn, !canPost && { opacity: 0.4 }]}
+              onPress={handleClose}
+              disabled={!canPost}
+            >
+              <Text style={styles.composerPostBtnText}>Publicar</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.composerBody}>
+            <Avatar initials="JU" bg="#2a1a3a" color="#b070e0" size={38} />
+            <TextInput
+              style={styles.composerInput}
+              placeholder="¿Qué pasó en la cancha?"
+              placeholderTextColor={COLORS.dim}
+              value={text}
+              onChangeText={setText}
+              multiline
+              autoFocus
+            />
+          </View>
+
+          {photos.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.composerPhotos} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+              {photos.map((uri, i) => (
+                <View key={i} style={styles.composerThumb}>
+                  <Image source={{ uri }} style={styles.composerThumbImg} />
+                  <TouchableOpacity style={styles.composerThumbRemove} onPress={() => setPhotos(p => p.filter((_, idx) => idx !== i))}>
+                    <Ionicons name="close" size={12} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          <View style={styles.composerFooter}>
+            <TouchableOpacity onPress={pickFromCamera} style={styles.composerAction}>
+              <Ionicons name="camera-outline" size={22} color={COLORS.lime} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={pickFromGallery} style={styles.composerAction} disabled={photos.length >= 4}>
+              <Ionicons name="image-outline" size={22} color={photos.length >= 4 ? COLORS.dim : COLORS.lime} />
+            </TouchableOpacity>
+            {text.length > 0 && <Text style={styles.composerCount}>{text.length}/500</Text>}
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── GroupDetail ──────────────────────────────────────────────────────────────
+
+function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
+  const isMember = MY_GROUPS.some(g => g.id === group.id);
+  const [joined, setJoined] = useState(isMember);
+  const [tab, setTab] = useState(0);
+  const [showTorneo, setShowTorneo] = useState(false);
+  const [showComposer, setShowComposer] = useState(false);
+  const [selectedTorneo, setSelectedTorneo] = useState<Torneo | null>(null);
+  const [posts, setPosts] = useState<Post[]>(ACTIVIDAD_POSTS);
+  const [commentsPost, setCommentsPost] = useState<Post | null>(null);
+
+  const pagerRef = useRef<PagerView>(null);
+  const tabRef = useRef(0);
+
+  const handleTabPress = (i: number) => {
+    setTab(i); tabRef.current = i;
+    pagerRef.current?.setPage(i);
+  };
+
+  const toggleLike = (id: string) => {
+    setPosts(prev => prev.map(p => p.id === id
+      ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
+      : p
+    ));
+  };
+
+  const TABS = ['Actividad', 'Torneos', 'Participantes'];
+
+  const renderPost = (post: Post) => {
+    const onLike = () => toggleLike(post.id);
+    const onComment = () => setCommentsPost(post);
+    switch (post.tipo) {
+      case 'fotos': return <FotosPost key={post.id} post={post} onLike={onLike} onComment={onComment} />;
+      case 'sistema': return <SistemaPost key={post.id} post={post} />;
+      default: return <TextPost key={post.id} post={post} onLike={onLike} onComment={onComment} />;
+    }
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      {showTorneo && <CreateTorneoModal onClose={() => setShowTorneo(false)} grupoDefault={group.name} />}
+      <PostComposer visible={showComposer} onClose={() => setShowComposer(false)} />
+      {selectedTorneo?.estado === 'próximo' && <TorneoProximoDetail torneo={selectedTorneo} onClose={() => setSelectedTorneo(null)} />}
+      {selectedTorneo?.estado === 'en curso' && <TorneoEnCursoDetail torneo={selectedTorneo} onClose={() => setSelectedTorneo(null)} />}
+      {selectedTorneo?.estado === 'finalizado' && <TorneoFinalizadoDetail torneo={selectedTorneo} onClose={() => setSelectedTorneo(null)} />}
+      {commentsPost && (
+        <CommentsSheet
+          visible={!!commentsPost}
+          onClose={() => setCommentsPost(null)}
+          count={commentsPost.comentarios}
+        />
+      )}
+
+      {/* Nav fija */}
+      <View style={styles.detailHeader}>
+        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={20} color={COLORS.white} />
+        </TouchableOpacity>
+        <Text style={styles.detailTitle}>{group.name}</Text>
+        {tab === 1 && (
+          <TouchableOpacity style={styles.headerAddBtn} onPress={() => setShowTorneo(true)}>
+            <Ionicons name="add" size={24} color={COLORS.lime} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Líder fijo */}
+      <View style={styles.leaderCard}>
+        <View style={styles.leaderAccent} />
+        <Avatar initials="PE" bg="#222" color={COLORS.lime} size={40} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.leaderLabel}>Líder del mes</Text>
+          <Text style={styles.leaderName}>Pepe Noceti</Text>
+        </View>
+        <View style={styles.leaderScoreBlock}>
+          <Text style={styles.leaderScoreNum}>71</Text>
+          <Text style={styles.leaderScoreSub}>-1 vs par</Text>
+        </View>
+      </View>
+
+      {/* Tabs fijos */}
+      <View style={styles.groupTabBar}>
+        {TABS.map((label, i) => (
+          <TouchableOpacity
+            key={label}
+            style={[styles.groupTabBtn, tab === i && styles.groupTabBtnActive]}
+            onPress={() => handleTabPress(i)}
+          >
+            <Text style={[styles.groupTabBtnText, tab === i && styles.groupTabBtnTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Contenido scrolleable */}
+      <View style={{ flex: 1 }}>
+        <PagerView
+          ref={pagerRef}
+          style={{ flex: 1 }}
+          initialPage={0}
+          onPageSelected={e => { setTab(e.nativeEvent.position); tabRef.current = e.nativeEvent.position; }}
+        >
+          <ScrollView key="0" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            {posts.map(renderPost)}
+          </ScrollView>
+
+          <ScrollView key="1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            {TORNEOS_MOCK.map(t => (
+              <TouchableOpacity key={t.id} style={styles.torneoRow} onPress={() => setSelectedTorneo(t)}>
+                <View style={[styles.torneoEstadoDot, t.estado === 'próximo' ? styles.torneoEstadoDotNext : styles.torneoEstadoDotDone]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.torneoNombre}>{t.nombre}</Text>
+                  <Text style={styles.torneoMeta}>{t.modalidad} · {t.fecha}</Text>
+                </View>
+                {t.estado === 'finalizado'
+                  ? <Text style={styles.torneoGanadorInline}>🏆 {t.leaderboard?.[0]?.nombre}</Text>
+                  : <View style={styles.torneoBadgeNext}><Text style={styles.torneoBadgeNextText}>Próximo</Text></View>
+                }
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <ScrollView key="2" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            {PLAYERS.map((p, i) => (
+              <View key={i} style={styles.row}>
+                <Avatar initials={p.initials} bg={p.bg} color={p.color} size={46} />
+                <View style={styles.rowInfo}>
+                  <Text style={styles.rowName}>{p.name}</Text>
+                  <Text style={styles.rowSub}>{p.username} · HCP {p.hcp}</Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </PagerView>
+
+        {tab === 0 && (
+          <TouchableOpacity style={styles.fab} onPress={() => setShowComposer(true)}>
+            <Ionicons name="add" size={26} color="#0f0f0f" />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ─── Modales ──────────────────────────────────────────────────────────────────
+
+function ModalidadDropdown({ value, onChange }: { value: string | null; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.dropdown}>
+      <TouchableOpacity style={styles.dropdownBtn} onPress={() => setOpen(o => !o)}>
+        <Text style={[styles.dropdownBtnText, !value && { color: COLORS.dim }]}>
+          {value ?? 'Elegir modalidad...'}
+        </Text>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.muted} />
+      </TouchableOpacity>
+      {open && (
+        <View style={styles.dropdownList}>
+          {MODALIDADES_INFO.map((m, i) => (
+            <TouchableOpacity
+              key={m.key}
+              style={[styles.dropdownItem, i < MODALIDADES_INFO.length - 1 && styles.dropdownItemBorder, value === m.key && styles.dropdownItemActive]}
+              onPress={() => { onChange(m.key); setOpen(false); }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.dropdownItemText, value === m.key && styles.dropdownItemTextActive]}>{m.key}</Text>
+                <Text style={styles.dropdownItemDesc}>{m.desc}</Text>
+              </View>
+              {value === m.key && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function CreateTorneoModal({ onClose, grupoDefault }: { onClose: () => void; grupoDefault?: string }) {
   const [nombre, setNombre] = useState('');
   const [modalidad, setModalidad] = useState<string | null>(null);
-  const [rondas, setRondas] = useState<number | null>(null);
+  const [rondas, setRondas] = useState('');
+  const [visibilidad, setVisibilidad] = useState<'grupo' | 'publico'>(grupoDefault ? 'grupo' : 'publico');
+
+  const canCreate = nombre.trim() && modalidad && rondas.trim();
 
   return (
     <View style={styles.modal}>
       <View style={styles.modalCard}>
+        <View style={styles.modalHandle} />
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Nuevo torneo</Text>
           <TouchableOpacity onPress={onClose}>
@@ -91,283 +679,52 @@ function CreateTorneoModal({ onClose }: { onClose: () => void }) {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.label}>Nombre</Text>
-        <View style={styles.searchBox}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Ej: Copa Julio"
-            placeholderTextColor={COLORS.dim}
-            value={nombre}
-            onChangeText={setNombre}
-          />
-        </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24, gap: 12 }}>
+          <Text style={styles.label}>Nombre</Text>
+          <View style={styles.inputBox}>
+            <TextInput
+              style={styles.inputText}
+              placeholder="Ej: Copa Julio"
+              placeholderTextColor={COLORS.dim}
+              value={nombre}
+              onChangeText={setNombre}
+            />
+          </View>
 
-        <Text style={styles.label}>Modalidad</Text>
-        <View style={styles.modalidadList}>
-          {MODALIDADES_INFO.map(m => (
-            <TouchableOpacity
-              key={m.key}
-              style={[styles.modalidadBtn, modalidad === m.key && styles.modalidadBtnActive]}
-              onPress={() => setModalidad(m.key)}
-            >
-              <Text style={styles.modalidadIcon}>{m.icon}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.modalidadBtnText, modalidad === m.key && styles.modalidadBtnTextActive]}>{m.key}</Text>
-                <Text style={styles.modalidadDesc}>{m.desc}</Text>
-              </View>
-              {modalidad === m.key && <Ionicons name="checkmark-circle" size={18} color={COLORS.lime} />}
-            </TouchableOpacity>
-          ))}
-        </View>
+          <Text style={styles.label}>Modalidad</Text>
+          <ModalidadDropdown value={modalidad} onChange={setModalidad} />
 
-        <Text style={styles.label}>Cantidad de rondas</Text>
-        <View style={styles.rondasRow}>
-          {[1, 2, 3, 4].map(n => (
-            <TouchableOpacity
-              key={n}
-              style={[styles.rondaBtn, rondas === n && styles.rondaBtnActive]}
-              onPress={() => setRondas(n)}
-            >
-              <Text style={[styles.rondaBtnNum, rondas === n && styles.rondaBtnNumActive]}>{n}</Text>
-              <Text style={[styles.rondaBtnLabel, rondas === n && styles.rondaBtnLabelActive]}>
-                {n === 1 ? 'ronda' : 'rondas'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+          <Text style={styles.label}>Rondas</Text>
+          <View style={styles.inputBox}>
+            <TextInput
+              style={styles.inputText}
+              placeholder="Ej: 2"
+              placeholderTextColor={COLORS.dim}
+              value={rondas}
+              onChangeText={t => setRondas(t.replace(/[^0-9]/g, ''))}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+          </View>
 
-        <TouchableOpacity
-          style={[styles.createBtn, (!nombre.trim() || !modalidad || !rondas) && { opacity: 0.4 }]}
-          onPress={onClose}
-          disabled={!nombre.trim() || !modalidad || !rondas}
-        >
-          <Text style={styles.createBtnText}>Crear torneo</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
-  const isMember = MY_GROUPS.some(g => g.id === group.id);
-  const [joined, setJoined] = useState(isMember);
-  const [tab, setTab] = useState(0);
-  const [showTorneo, setShowTorneo] = useState(false);
-
-  const pagerRef = useRef<PagerView>(null);
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const currentScrollY = useRef(0);
-  const scrollViewRefs = useRef<(ScrollView | null)[]>([null, null]);
-  const tabRef = useRef(0);
-  const [leaderHeight, setLeaderHeight] = useState(0);
-
-  const leaderTranslate = scrollY.interpolate({
-    inputRange: [0, leaderHeight || 1],
-    outputRange: [0, -(leaderHeight || 1)],
-    extrapolate: 'clamp',
-  });
-  const tabBarTranslate = leaderTranslate;
-
-  const scrollHandler = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: true, listener: (e: any) => { currentScrollY.current = e.nativeEvent.contentOffset.y; } }
-  );
-
-  const syncNewTab = (pos: number) => {
-    (scrollViewRefs.current[pos] as any)?.scrollTo({ y: currentScrollY.current, animated: false });
-  };
-
-  const handleTabPress = (i: number) => {
-    setTab(i); tabRef.current = i;
-    pagerRef.current?.setPage(i);
-    syncNewTab(i);
-  };
-
-  const handlePageSelected = (pos: number) => {
-    setTab(pos); tabRef.current = pos;
-    syncNewTab(pos);
-  };
-
-  const handlePageScrollStateChanged = (state: string) => {
-    if (state === 'dragging') {
-      scrollViewRefs.current.forEach((ref, i) => {
-        if (i !== tabRef.current) (ref as any)?.scrollTo({ y: currentScrollY.current, animated: false });
-      });
-    }
-  };
-
-  const totalHeaderH = leaderHeight + GROUP_TAB_BAR_H + 12;
-
-  const TABS = ['Actividad', 'Torneos'];
-
-  return (
-    <View style={{ flex: 1 }}>
-      {showTorneo && <CreateTorneoModal onClose={() => setShowTorneo(false)} />}
-
-      {/* Barra de navegación fija siempre */}
-      <View style={styles.detailHeader}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={20} color={COLORS.white} />
-        </TouchableOpacity>
-        <Text style={styles.detailTitle}>{group.name}</Text>
-        <TouchableOpacity
-          style={[styles.joinBtnSmall, joined && styles.joinBtnSmallActive]}
-          onPress={() => setJoined(!joined)}
-        >
-          <Text style={[styles.joinBtnSmallText, joined && styles.joinBtnSmallTextActive]}>
-            {joined ? 'En el grupo' : 'Unirse'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={{ flex: 1 }}>
-        {/* PagerView ocupa todo */}
-        <PagerView
-          ref={pagerRef}
-          style={{ flex: 1 }}
-          initialPage={0}
-          onPageSelected={e => handlePageSelected(e.nativeEvent.position)}
-          onPageScrollStateChanged={e => handlePageScrollStateChanged(e.nativeEvent.pageScrollState)}
-        >
-          {/* Actividad */}
-          <Animated.ScrollView
-            key="0"
-            ref={r => { scrollViewRefs.current[0] = r as any; }}
-            scrollEventThrottle={16}
-            onScroll={scrollHandler}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingTop: totalHeaderH, paddingHorizontal: 16, paddingBottom: 32, gap: 0, minHeight: SCREEN_H - BOTTOM_TAB_H + leaderHeight }}
-          >
-            {ACTIVIDAD_MOCK.map((a, i) => (
-              a.tipo === 'torneo' ? (
-                <View key={i} style={styles.actividadTorneo}>
-                  <Text style={styles.actividadTorneoText}>{a.texto}</Text>
-                  <Text style={styles.actividadTiempo}>{a.tiempo}</Text>
-                </View>
-              ) : (
-                <View key={i} style={styles.actividadPost}>
-                  <Avatar initials={a.initials!} bg={a.bg!} color={a.color!} size={36} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.actividadAutor}>{a.autor}</Text>
-                    <Text style={styles.actividadTexto}>{a.texto}</Text>
-                    <Text style={styles.actividadTiempo}>{a.tiempo}</Text>
-                  </View>
-                </View>
-              )
-            ))}
-          </Animated.ScrollView>
-
-          {/* Torneos */}
-          <Animated.ScrollView
-            key="1"
-            ref={r => { scrollViewRefs.current[1] = r as any; }}
-            scrollEventThrottle={16}
-            onScroll={scrollHandler}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingTop: totalHeaderH, paddingHorizontal: 16, paddingBottom: 32, gap: 8, minHeight: SCREEN_H - BOTTOM_TAB_H + leaderHeight }}
-          >
-            <TouchableOpacity style={[styles.newTorneoBtn, { marginBottom: 4 }]} onPress={() => setShowTorneo(true)}>
-              <Ionicons name="add-circle-outline" size={18} color={COLORS.lime} />
-              <Text style={styles.newTorneoBtnText}>Crear torneo</Text>
-            </TouchableOpacity>
-            {TORNEOS_MOCK.map(t => (
-              <View key={t.id} style={styles.torneoCard}>
-                <View style={styles.torneoTop}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.torneoNombre}>{t.nombre}</Text>
-                    <Text style={styles.torneoMeta}>{t.modalidad} · {t.fecha}</Text>
-                  </View>
-                  <View style={[styles.torneoBadge, t.estado === 'finalizado' ? styles.torneoBadgeDone : styles.torneoBadgeNext]}>
-                    <Text style={styles.torneoBadgeText}>{t.estado === 'finalizado' ? 'Finalizado' : 'Próximo'}</Text>
-                  </View>
-                </View>
-                {t.ganador && (
-                  <View style={styles.torneoGanador}>
-                    <Text style={styles.torneoGanadorLabel}>🏆 Ganador</Text>
-                    <Text style={styles.torneoGanadorNombre}>{t.ganador} · {t.score} pts</Text>
-                  </View>
-                )}
-              </View>
-            ))}
-          </Animated.ScrollView>
-        </PagerView>
-
-        {/* Leader card collapsible */}
-        <Animated.View
-          style={[styles.floatingLeader, { transform: [{ translateY: leaderTranslate }] }]}
-          onLayout={e => setLeaderHeight(e.nativeEvent.layout.height)}
-          pointerEvents="box-none"
-        >
-          <View style={styles.leaderCard}>
-            <View style={styles.leaderLeft}>
-              <Text style={styles.leaderLabel}>⭐ Líder del mes</Text>
-              <Text style={styles.leaderName}>Pepe Noceti</Text>
-              <Text style={styles.leaderScore}>Score 71 · −1 vs par</Text>
-            </View>
-            <View style={styles.leaderBadge}>
-              <Avatar initials="PE" bg="#333" color={COLORS.lime} size={48} />
-              <View style={styles.leaderCrown}><Text style={{ fontSize: 10 }}>👑</Text></View>
+          <Text style={styles.label}>Grupo <Text style={{ color: COLORS.dim, fontWeight: '400', textTransform: 'none' }}>(opcional)</Text></Text>
+          <View style={styles.dropdown}>
+            <View style={[styles.dropdownBtn, { backgroundColor: '#1a2a0a' }]}>
+              <Text style={[styles.dropdownBtnText, { color: COLORS.lime }]}>{grupoDefault}</Text>
             </View>
           </View>
-        </Animated.View>
+        </ScrollView>
 
-        {/* Tab bar sticky */}
-        <Animated.View
-          style={[styles.groupTabBar, { top: leaderHeight, transform: [{ translateY: tabBarTranslate }] }]}
-          pointerEvents="box-none"
-        >
-          {TABS.map((label, i) => (
-            <TouchableOpacity
-              key={label}
-              style={[styles.groupTabBtn, tab === i && styles.groupTabBtnActive]}
-              onPress={() => handleTabPress(i)}
-            >
-              <Text style={[styles.groupTabBtnText, tab === i && styles.groupTabBtnTextActive]}>{label}</Text>
-            </TouchableOpacity>
-          ))}
-        </Animated.View>
-      </View>
-    </View>
-  );
-}
-
-function GroupRow({ group, onPress }: { group: Group; onPress: () => void }) {
-  const isMember = MY_GROUPS.some(g => g.id === group.id);
-  return (
-    <TouchableOpacity style={styles.row} onPress={onPress}>
-      <Avatar initials={group.initials} bg={group.bg} color={group.color} />
-      <View style={styles.rowInfo}>
-        <View style={styles.rowNameRow}>
-          <Text style={styles.rowName}>{group.name}</Text>
-          <View style={[styles.typeBadge, group.type === 'club' ? styles.typeBadgeClub : styles.typeBadgePrivado]}>
-            <Text style={styles.typeBadgeText}>{group.type === 'club' ? 'Club' : 'Privado'}</Text>
-          </View>
+        <View style={styles.modalFooter}>
+          <TouchableOpacity
+            style={[styles.createBtn, !canCreate && { opacity: 0.4 }]}
+            onPress={onClose}
+            disabled={!canCreate}
+          >
+            <Text style={styles.createBtnText}>Crear torneo</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={styles.rowSub}>{group.members} miembros · {group.lastActivity}</Text>
       </View>
-      {isMember && <Ionicons name="checkmark-circle" size={18} color={COLORS.lime} />}
-      <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
-    </TouchableOpacity>
-  );
-}
-
-function PlayerRow({ player }: { player: Player }) {
-  const [following, setFollowing] = useState(false);
-  return (
-    <View style={styles.row}>
-      <Avatar initials={player.initials} bg={player.bg} color={player.color} />
-      <View style={styles.rowInfo}>
-        <Text style={styles.rowName}>{player.name}</Text>
-        <Text style={styles.rowSub}>{player.username} · HCP {player.hcp}</Text>
-      </View>
-      <TouchableOpacity
-        style={[styles.followBtn, following && styles.followBtnActive]}
-        onPress={() => setFollowing(!following)}
-      >
-        <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
-          {following ? 'Siguiendo' : 'Seguir'}
-        </Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -384,9 +741,9 @@ function CreateGroupModal({ onClose }: { onClose: () => void }) {
           </TouchableOpacity>
         </View>
         <Text style={styles.label}>Nombre del grupo</Text>
-        <View style={styles.searchBox}>
+        <View style={styles.inputBox}>
           <TextInput
-            style={styles.searchInput}
+            style={styles.inputText}
             placeholder="Ej: Los del Jueves"
             placeholderTextColor={COLORS.dim}
             value={name}
@@ -405,6 +762,48 @@ function CreateGroupModal({ onClose }: { onClose: () => void }) {
     </View>
   );
 }
+
+// ─── Rows ─────────────────────────────────────────────────────────────────────
+
+function GroupRow({ group, onPress }: { group: Group; onPress: () => void }) {
+  const isMember = MY_GROUPS.some(g => g.id === group.id);
+  return (
+    <TouchableOpacity style={styles.row} onPress={onPress}>
+      <Avatar initials={group.initials} bg={group.bg} color={group.color} size={46} />
+      <View style={styles.rowInfo}>
+        <View style={styles.rowNameRow}>
+          <Text style={styles.rowName}>{group.name}</Text>
+          {isMember && <Ionicons name="checkmark-circle" size={15} color={COLORS.lime} />}
+        </View>
+        <Text style={styles.rowSub}>{group.members} miembros · {group.type === 'club' ? 'Club' : 'Privado'} · {group.lastActivity}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
+    </TouchableOpacity>
+  );
+}
+
+function PlayerRow({ player }: { player: Player }) {
+  const [following, setFollowing] = useState(false);
+  return (
+    <View style={styles.row}>
+      <Avatar initials={player.initials} bg={player.bg} color={player.color} size={46} />
+      <View style={styles.rowInfo}>
+        <Text style={styles.rowName}>{player.name}</Text>
+        <Text style={styles.rowSub}>{player.username} · HCP {player.hcp}</Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.followBtn, following && styles.followBtnActive]}
+        onPress={() => setFollowing(!following)}
+      >
+        <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
+          {following ? 'Siguiendo' : 'Seguir'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── Screen principal ─────────────────────────────────────────────────────────
 
 export default function SearchScreen() {
   const [search, setSearch] = useState('');
@@ -478,11 +877,13 @@ export default function SearchScreen() {
         )}
 
         <TouchableOpacity style={styles.createGroupBtn} onPress={() => setShowCreate(true)}>
-          <Ionicons name="add-circle-outline" size={20} color={COLORS.lime} />
+          <View style={styles.createGroupIcon}>
+            <Ionicons name="add" size={20} color={COLORS.lime} />
+          </View>
           <Text style={styles.createGroupBtnText}>Crear grupo</Text>
         </TouchableOpacity>
 
-        <Text style={[styles.sectionTitle, { marginTop: 4 }]}>Tus grupos</Text>
+        <Text style={styles.sectionTitle}>Tus grupos</Text>
         <View style={styles.list}>
           {MY_GROUPS.map(g => (
             <GroupRow key={g.id} group={g} onPress={() => setSelectedGroup(g)} />
@@ -493,117 +894,188 @@ export default function SearchScreen() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
   header: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 8 },
   title: { fontSize: 24, fontWeight: '800', color: COLORS.white },
-  createGroupBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.lime, borderStyle: 'dashed', borderRadius: 12, padding: 14, marginBottom: 16 },
-  createGroupBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.lime },
+  createGroupBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 18, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  createGroupBtnText: { fontSize: 15, fontWeight: '600', color: COLORS.lime },
+  createGroupIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#1a2a0a', alignItems: 'center', justifyContent: 'center' },
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border,
+    backgroundColor: '#161616', borderRadius: 10, borderWidth: 0.5, borderColor: '#222',
     marginHorizontal: 18, paddingHorizontal: 12, marginBottom: 10,
   },
   searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: COLORS.white },
-  scroll: { paddingHorizontal: 18, paddingBottom: 24 },
-  sectionTitle: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  list: { gap: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 10 },
+  scroll: { paddingBottom: 24 },
+  sectionTitle: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 8 },
+  list: {},
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 13, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   rowNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rowInfo: { flex: 1 },
-  rowName: { fontSize: 14, fontWeight: '600', color: COLORS.white },
-  rowSub: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
+  rowName: { fontSize: 15, fontWeight: '600', color: COLORS.white },
+  rowSub: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
   avatar: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontWeight: '700' },
-  typeBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-  typeBadgeClub: { backgroundColor: '#1a2a0a' },
-  typeBadgePrivado: { backgroundColor: '#2a1a3a' },
-  typeBadgeText: { fontSize: 9, fontWeight: '700', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.3 },
-  followBtn: { borderWidth: 0.5, borderColor: COLORS.lime, backgroundColor: COLORS.lime, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
-  followBtnActive: { borderColor: COLORS.border, backgroundColor: COLORS.dark2 },
-  followBtnText: { fontSize: 11, fontWeight: '700', color: '#0f0f0f' },
+  followBtn: { borderWidth: 0.5, borderColor: COLORS.lime, backgroundColor: COLORS.lime, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
+  followBtnActive: { borderColor: '#333', backgroundColor: 'transparent' },
+  followBtnText: { fontSize: 12, fontWeight: '700', color: '#0f0f0f' },
   followBtnTextActive: { color: COLORS.muted },
   empty: { alignItems: 'center', paddingTop: 40 },
   emptyText: { fontSize: 14, color: COLORS.muted },
 
-  detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 10 },
+  // Detail
+  detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 10, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  headerAddBtn: { padding: 2 },
   backBtn: { padding: 2 },
   detailTitle: { fontSize: 17, fontWeight: '700', color: COLORS.white, flex: 1 },
-  detailScroll: { paddingHorizontal: 16, paddingBottom: 32 },
-  detailNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  detailName: { fontSize: 16, fontWeight: '700', color: COLORS.white },
-  detailMembers: { fontSize: 12, color: COLORS.muted },
   joinBtnSmall: { backgroundColor: COLORS.lime, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   joinBtnSmallActive: { backgroundColor: COLORS.dark2, borderWidth: 0.5, borderColor: COLORS.border },
   joinBtnSmallText: { fontSize: 12, fontWeight: '700', color: '#0f0f0f' },
   joinBtnSmallTextActive: { color: COLORS.muted },
 
-  floatingLeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: COLORS.bg },
-  groupTabBar: { position: 'absolute', left: 0, right: 0, height: GROUP_TAB_BAR_H, flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#1e1e1e', backgroundColor: COLORS.bg, zIndex: 10 },
+  // Floating / sticky
+  groupTabBar: { height: GROUP_TAB_BAR_H, flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#1e1e1e', backgroundColor: COLORS.bg },
   groupTabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   groupTabBtnActive: { borderBottomColor: COLORS.lime },
   groupTabBtnText: { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
   groupTabBtnTextActive: { color: COLORS.white, fontWeight: '700' },
-  leaderCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 18, marginVertical: 10, backgroundColor: '#1a2a0a', borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.lime, padding: 14 },
-  leaderLeft: { gap: 3 },
-  leaderLabel: { fontSize: 10, color: COLORS.lime, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  leaderName: { fontSize: 16, fontWeight: '800', color: COLORS.white },
-  leaderScore: { fontSize: 12, color: COLORS.muted },
-  leaderBadge: { position: 'relative' },
-  leaderCrown: { position: 'absolute', top: -6, right: -4, backgroundColor: COLORS.bg, borderRadius: 10, padding: 2 },
+  leaderCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 18, marginVertical: 10, backgroundColor: '#141414', borderRadius: 12, borderWidth: 0.5, borderColor: '#222', paddingVertical: 12, paddingRight: 14, overflow: 'hidden' },
+  leaderAccent: { width: 3, height: '100%', backgroundColor: COLORS.lime, borderRadius: 2, marginLeft: -1 },
+  leaderLabel: { fontSize: 10, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  leaderName: { fontSize: 15, fontWeight: '700', color: COLORS.white },
+  leaderScoreBlock: { alignItems: 'flex-end' },
+  leaderScoreNum: { fontSize: 20, fontWeight: '900', color: COLORS.lime },
+  leaderScoreSub: { fontSize: 10, color: COLORS.muted, marginTop: 1 },
 
-  tabBar: { flexDirection: 'row', marginHorizontal: 18, marginBottom: 12, backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border, padding: 3 },
-  tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-  tabBtnActive: { backgroundColor: COLORS.dark2 },
-  tabBtnText: { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
-  tabBtnTextActive: { color: COLORS.lime },
+  // FAB
+  fab: { position: 'absolute', bottom: 20, right: 18, width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.lime, alignItems: 'center', justifyContent: 'center', zIndex: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
 
-  actividadPost: { flexDirection: 'row', gap: 10, paddingHorizontal: 0, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#1e1e1e' },
-  actividadAutor: { fontSize: 14, fontWeight: '700', color: COLORS.white, marginBottom: 3 },
-  actividadTexto: { fontSize: 13, color: '#ccc', lineHeight: 18 },
-  actividadTorneo: { paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#1e1e1e' },
-  actividadTorneoText: { fontSize: 13, color: COLORS.white },
-  actividadTiempo: { fontSize: 11, color: COLORS.dim, marginTop: 4 },
+  // Post cards
+  postCard: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  postCardPinned: { backgroundColor: '#0f1a09' },
+  postHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  postAutor: { fontSize: 14, fontWeight: '700', color: COLORS.white },
+  postTiempo: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
+  postTexto: { fontSize: 14, color: '#ddd', lineHeight: 20 },
+  pinnedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#1a2a0a', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  pinnedText: { fontSize: 10, color: COLORS.lime, fontWeight: '700' },
+  postActions: { flexDirection: 'row', gap: 20, marginTop: 12 },
+  postAction: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  postActionText: { fontSize: 13, color: COLORS.muted },
 
-  modalidadList: { gap: 6 },
-  modalidadBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.dark2, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
-  modalidadBtnActive: { borderColor: COLORS.lime, backgroundColor: '#1a2a0a' },
-  modalidadIcon: { fontSize: 20 },
-  modalidadBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.muted },
-  modalidadBtnTextActive: { color: COLORS.lime },
-  modalidadDesc: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
-  rondasRow: { flexDirection: 'row', gap: 8 },
-  rondaBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, backgroundColor: COLORS.dark2, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border },
-  rondaBtnActive: { borderColor: COLORS.lime, backgroundColor: '#1a2a0a' },
-  rondaBtnNum: { fontSize: 22, fontWeight: '800', color: COLORS.muted },
-  rondaBtnNumActive: { color: COLORS.lime },
-  rondaBtnLabel: { fontSize: 9, color: COLORS.dim, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.3 },
-  rondaBtnLabelActive: { color: COLORS.lime },
-  newTorneoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: COLORS.lime, borderStyle: 'dashed', borderRadius: 12, padding: 14 },
-  newTorneoBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.lime },
-  torneoCard: { backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 14, gap: 10 },
-  torneoTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  torneoNombre: { fontSize: 15, fontWeight: '700', color: COLORS.white },
+  // Fotos
+  photoDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, paddingVertical: 8, backgroundColor: '#000' },
+  photoDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#444' },
+  photoDotActive: { backgroundColor: COLORS.lime, width: 14 },
+
+  // Ronda
+  rondaCard: { backgroundColor: '#161616', borderRadius: 12, borderWidth: 0.5, borderColor: '#222', padding: 12 },
+  rondaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rondaScore: { fontSize: 28, fontWeight: '900', color: COLORS.white, width: 50 },
+  rondaCourse: { fontSize: 13, fontWeight: '600', color: COLORS.white },
+  rondaMeta: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
+  verTarjetaBtn: { marginLeft: 'auto', borderWidth: 0.5, borderColor: '#444', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  verTarjetaText: { fontSize: 11, color: COLORS.muted, fontWeight: '600' },
+
+  // Venta
+  ventaContent: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  ventaImg: { width: 80, height: 80, borderRadius: 10 },
+  ventaBadge: { backgroundColor: '#2a1a0a', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' },
+  ventaBadgeText: { fontSize: 10, color: '#e0903a', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
+  ventaPrecio: { fontSize: 16, fontWeight: '800', color: COLORS.white },
+  contactarBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: COLORS.lime, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start', marginTop: 4 },
+  contactarText: { fontSize: 12, fontWeight: '700', color: '#0f0f0f' },
+
+  // Evento
+  eventoCard: { backgroundColor: '#161616', borderRadius: 12, borderWidth: 0.5, borderColor: '#222', padding: 12 },
+  eventoInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  eventoFechaBlock: { alignItems: 'center', minWidth: 48 },
+  eventoFecha: { fontSize: 12, fontWeight: '700', color: COLORS.lime },
+  eventoHora: { fontSize: 16, fontWeight: '900', color: COLORS.white },
+  eventoSep: { width: 0.5, height: 36, backgroundColor: '#333' },
+  eventoAsistentes: { fontSize: 13, fontWeight: '700', color: COLORS.white },
+  eventoAsistentesSub: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
+  voyBtn: { marginLeft: 'auto', borderWidth: 0.5, borderColor: COLORS.lime, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  voyBtnActive: { backgroundColor: COLORS.lime },
+  voyBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.lime },
+  voyBtnTextActive: { color: '#0f0f0f' },
+
+  // Sistema
+  sistemaPost: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  sistemaTexto: { fontSize: 13, color: COLORS.muted, textAlign: 'center' },
+  sistemaTiempo: { fontSize: 11, color: COLORS.dim, textAlign: 'center', marginTop: 3 },
+
+  // Composer
+  composerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  composerSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 34 },
+  composerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#222' },
+  composerCancel: { fontSize: 15, color: COLORS.muted },
+  composerPostBtn: { backgroundColor: COLORS.lime, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 7 },
+  composerPostBtnText: { fontSize: 14, fontWeight: '800', color: '#0f0f0f' },
+  composerBody: { flexDirection: 'row', gap: 12, padding: 16, minHeight: 120 },
+  composerInput: { flex: 1, fontSize: 16, color: COLORS.white, lineHeight: 22 },
+  composerPhotos: { marginBottom: 8 },
+  composerThumb: { width: 80, height: 80, borderRadius: 10, overflow: 'hidden' },
+  composerThumbImg: { width: 80, height: 80 },
+  composerThumbRemove: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: 3 },
+  composerFooter: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#1e1e1e' },
+  composerAction: { padding: 8 },
+  composerCount: { marginLeft: 'auto', fontSize: 12, color: COLORS.dim },
+
+  // Comments
+  commentsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  commentsSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: SCREEN_H * 0.65, paddingTop: 12 },
+  commentsHandle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
+  commentsTitle: { fontSize: 15, fontWeight: '700', color: COLORS.white, paddingHorizontal: 20, marginBottom: 12 },
+  commentRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: '#1e1e1e' },
+  commentBubble: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 12, padding: 10 },
+  commentMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  commentAutor: { fontSize: 13, fontWeight: '700', color: COLORS.white },
+  commentTiempo: { fontSize: 11, color: COLORS.dim },
+  commentTexto: { fontSize: 13, color: '#ddd', lineHeight: 18 },
+  commentInput: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 0.5, borderTopColor: '#1e1e1e' },
+  commentTextInput: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, color: COLORS.white },
+
+  // Torneos
+  torneoRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  torneoEstadoDot: { width: 8, height: 8, borderRadius: 4 },
+  torneoEstadoDotNext: { backgroundColor: COLORS.lime },
+  torneoEstadoDotDone: { backgroundColor: COLORS.dim },
+  torneoNombre: { fontSize: 15, fontWeight: '600', color: COLORS.white },
   torneoMeta: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
-  torneoBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
-  torneoBadgeDone: { backgroundColor: '#242424' },
-  torneoBadgeNext: { backgroundColor: '#1a2a0a' },
-  torneoBadgeText: { fontSize: 10, fontWeight: '700', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.3 },
-  torneoGanador: { backgroundColor: '#1a2a0a', borderRadius: 8, padding: 10, gap: 2 },
-  torneoGanadorLabel: { fontSize: 10, color: COLORS.lime, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-  torneoGanadorNombre: { fontSize: 14, fontWeight: '700', color: COLORS.white },
+  torneoGanadorInline: { fontSize: 12, color: COLORS.muted },
+  torneoBadgeNext: { backgroundColor: '#1a2a0a', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  torneoBadgeNextText: { fontSize: 11, fontWeight: '700', color: COLORS.lime },
 
-  membersList: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, overflow: 'hidden' },
-  memberRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  memberName: { fontSize: 13, fontWeight: '600', color: COLORS.white },
-  memberSub: { fontSize: 11, color: COLORS.muted },
-  memberHcp: { fontSize: 12, fontWeight: '700', color: COLORS.lime },
-
-  modal: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end', zIndex: 10 },
-  modalCard: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, gap: 12 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  // Modales
+  modal: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end', zIndex: 100 },
+  modalCard: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '90%', paddingTop: 12 },
+  modalHandle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 4 },
+  modalFooter: { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 12, borderTopWidth: 0.5, borderTopColor: '#222' },
   modalTitle: { fontSize: 18, fontWeight: '800', color: COLORS.white },
   label: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   createBtn: { backgroundColor: COLORS.lime, borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 4 },
   createBtnText: { fontSize: 14, fontWeight: '800', color: '#0f0f0f' },
+  inputBox: { backgroundColor: '#1a1a1a', borderRadius: 10, borderWidth: 0.5, borderColor: '#2a2a2a', paddingHorizontal: 14 },
+  inputText: { fontSize: 14, color: COLORS.white, paddingVertical: 12 },
+  dropdown: { borderRadius: 10, borderWidth: 0.5, borderColor: '#2a2a2a', overflow: 'hidden' },
+  dropdownBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#1a1a1a' },
+  dropdownBtnText: { fontSize: 14, color: COLORS.white, fontWeight: '500' },
+  dropdownList: { borderTopWidth: 0.5, borderTopColor: '#2a2a2a' },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#161616' },
+  dropdownItemBorder: { borderBottomWidth: 0.5, borderBottomColor: '#222' },
+  dropdownItemActive: { backgroundColor: '#1a2a0a' },
+  dropdownItemText: { fontSize: 14, color: COLORS.muted, fontWeight: '500' },
+  dropdownItemTextActive: { color: COLORS.lime, fontWeight: '600' },
+  dropdownItemDesc: { fontSize: 11, color: COLORS.dim, marginTop: 2 },
+  visibilidadRow: { gap: 8 },
+  visibilidadBtn: { borderWidth: 0.5, borderColor: '#2a2a2a', borderRadius: 10, padding: 14, backgroundColor: '#1a1a1a' },
+  visibilidadBtnActive: { borderColor: COLORS.lime, backgroundColor: '#1a2a0a' },
+  visibilidadBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.muted },
+  visibilidadBtnTextActive: { color: COLORS.lime },
+  visibilidadGrupoNombre: { fontSize: 11, color: COLORS.dim, marginTop: 3 },
 });
