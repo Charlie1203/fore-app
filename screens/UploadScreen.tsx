@@ -213,7 +213,7 @@ function Step3({ scores, club, course, onDone }: {
   const vsPar = totalScore - totalPar;
   const birdies = scores.filter((s, i) => s - DEFAULT_PARS[i] === -1).length;
 
-  const pickPhotos = async () => {
+  const pickFromGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
@@ -222,6 +222,15 @@ function Step3({ scores, club, course, onDone }: {
     });
     if (!result.canceled) {
       setPhotos(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 4));
+    }
+  };
+
+  const pickFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    if (!result.canceled) {
+      setPhotos(prev => [...prev, result.assets[0].uri].slice(0, 4));
     }
   };
 
@@ -293,10 +302,16 @@ function Step3({ scores, club, course, onDone }: {
               </View>
             ))}
             {photos.length < 4 && (
-              <TouchableOpacity style={styles.photoAdd} onPress={pickPhotos}>
-                <Text style={styles.photoAddIcon}>+</Text>
-                <Text style={styles.photoAddText}>Agregar</Text>
-              </TouchableOpacity>
+              <View style={styles.photoAddGroup}>
+                <TouchableOpacity style={styles.photoAdd} onPress={pickFromCamera}>
+                  <Text style={styles.photoAddIcon}>📷</Text>
+                  <Text style={styles.photoAddText}>Cámara</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.photoAdd} onPress={pickFromGallery}>
+                  <Text style={styles.photoAddIcon}>🖼️</Text>
+                  <Text style={styles.photoAddText}>Galería</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </>
@@ -412,7 +427,8 @@ const styles = StyleSheet.create({
   photoThumbImg: { width: 72, height: 72 },
   photoRemove: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   photoRemoveText: { color: '#fff', fontSize: 14, lineHeight: 18, fontWeight: '700' },
+  photoAddGroup: { flexDirection: 'row', gap: 8 },
   photoAdd: { width: 72, height: 72, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  photoAddIcon: { fontSize: 22, color: COLORS.muted, lineHeight: 26 },
+  photoAddIcon: { fontSize: 22, lineHeight: 26 },
   photoAddText: { fontSize: 10, color: COLORS.dim },
 });
