@@ -1,6 +1,6 @@
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Dimensions, Animated, Modal, TextInput, KeyboardAvoidingView, Platform, Alert,
+  Dimensions, Animated, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef } from 'react';
@@ -10,7 +10,9 @@ import Svg, { Ellipse, Line, Polygon, Circle, Path } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';
 import { logout } from '../services/auth';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, storage } from '../firebase/config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import * as ImagePicker from 'expo-image-picker';
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
   const d = [
@@ -386,7 +388,27 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [displayName, setDisplayName] = useState(userDoc?.displayName ?? '');
   const [username, setUsername] = useState(userDoc?.username ?? '');
   const [handicap, setHandicap] = useState(userDoc?.handicap?.toString() ?? '');
+  const [photoURI, setPhotoURI] = useState<string | null>(userDoc?.photoURL ?? null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+    if (result.canceled || !firebaseUser) return;
+    const uri = result.assets[0].uri;
+    setUploadingPhoto(true);
+    try {
+      const blob = await (await fetch(uri)).blob();
+      const storageRef = ref(storage, `avatars/${firebaseUser.uid}`);
+      await uploadBytes(storageRef, blob);
+      const url = await getDownloadURL(storageRef);
+      setPhotoURI(url);
+      await updateDoc(doc(db, 'users', firebaseUser.uid), { photoURL: url });
+    } catch { Alert.alert('Error', 'No se pudo subir la foto.'); }
+    finally { setUploadingPhoto(false); }
+  };
 
   const handleSave = async () => {
     if (!firebaseUser) return;
@@ -405,6 +427,8 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
     }
   };
 
+  const initials = (userDoc?.displayName ?? '??').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -418,6 +442,20 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
                 <Ionicons name="close" size={20} color={COLORS.muted} />
               </TouchableOpacity>
             </View>
+
+            {/* Avatar */}
+            <TouchableOpacity style={epStyles.avatarWrap} onPress={pickPhoto} disabled={uploadingPhoto}>
+              {photoURI
+                ? <Image source={{ uri: photoURI }} style={epStyles.avatarImg} />
+                : <View style={epStyles.avatarFallback}><Text style={epStyles.avatarInitials}>{initials}</Text></View>
+              }
+              <View style={epStyles.avatarOverlay}>
+                {uploadingPhoto
+                  ? <Ionicons name="hourglass-outline" size={16} color="#fff" />
+                  : <Ionicons name="camera" size={16} color="#fff" />
+                }
+              </View>
+            </TouchableOpacity>
 
             <Text style={epStyles.label}>Nombre</Text>
             <View style={epStyles.inputBox}>
@@ -454,6 +492,11 @@ const epStyles = StyleSheet.create({
   input: { color: '#f0f0f0', fontSize: 15, paddingVertical: 12 },
   saveBtn: { backgroundColor: '#c8e03a', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
   saveBtnText: { color: '#0f0f0f', fontWeight: '700', fontSize: 15 },
+  avatarWrap: { alignSelf: 'center', marginBottom: 8 },
+  avatarImg: { width: 72, height: 72, borderRadius: 36 },
+  avatarFallback: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#c8e03a', alignItems: 'center', justifyContent: 'center' },
+  avatarInitials: { fontSize: 24, fontWeight: '800', color: '#0f0f0f' },
+  avatarOverlay: { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: '#333', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#161616' },
 });
 
 export default function ProfileScreen() {
@@ -610,9 +653,10 @@ export default function ProfileScreen() {
           pointerEvents="box-none"
         >
           <View style={styles.header}>
-            <View style={styles.avatarLarge}>
-              <Text style={styles.avatarText}>{displayUser.initials}</Text>
-            </View>
+            {userDoc?.photoURL
+              ? <Image source={{ uri: userDoc.photoURL }} style={styles.avatarLarge} />
+              : <View style={styles.avatarLarge}><Text style={styles.avatarText}>{displayUser.initials}</Text></View>
+            }
             <View style={styles.headerInfo}>
               <View style={styles.nameRow}>
                 <Text style={styles.name}>{displayUser.name}</Text>
