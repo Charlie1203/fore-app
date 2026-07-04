@@ -1,9 +1,10 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { View } from "react-native";
+import { View, ActivityIndicator } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 
 import FeedScreen from "./screens/FeedScreen";
@@ -11,8 +12,12 @@ import UploadScreen from "./screens/UploadScreen";
 import SearchScreen from "./screens/SearchScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import TorneosScreen from "./screens/TorneosScreen";
+import LoginScreen from "./screens/auth/LoginScreen";
+import RegisterScreen from "./screens/auth/RegisterScreen";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 const Tab = createBottomTabNavigator();
+const AuthStackNav = createNativeStackNavigator();
 
 const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   Inicio: "home",
@@ -53,44 +58,78 @@ function GolfBallTabIcon({ color }: { color: string }) {
   );
 }
 
+function TabsNavigator() {
+  return (
+    <Tab.Navigator
+      id={undefined}
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: "#111",
+          borderTopColor: "#222",
+          borderTopWidth: 0.5,
+          paddingBottom: 20,
+          paddingTop: 8,
+          height: 80,
+        },
+        tabBarActiveTintColor: "#c8e03a",
+        tabBarInactiveTintColor: "#444",
+        tabBarShowLabel: false,
+        tabBarIcon: ({ color, focused }) => {
+          if (route.name === "Cargar") return <GolfBallTabIcon color={color} />;
+          return (
+            <Ionicons
+              name={focused ? ICONS[route.name] : (`${ICONS[route.name]}-outline` as any)}
+              size={22}
+              color={color}
+            />
+          );
+        },
+      })}
+    >
+      <Tab.Screen name="Inicio" component={FeedScreen} />
+      <Tab.Screen name="Torneos" component={TorneosScreen} />
+      <Tab.Screen name="Cargar" component={UploadScreen} />
+      <Tab.Screen name="Grupos" component={SearchScreen} />
+      <Tab.Screen name="Perfil" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+}
+
+function AuthStack() {
+  return (
+    <AuthStackNav.Navigator id={undefined} screenOptions={{ headerShown: false }}>
+      <AuthStackNav.Screen name="Login" component={LoginScreen} />
+      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+    </AuthStackNav.Navigator>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <View style={{ flex: 1, backgroundColor: "#0f0f0f", alignItems: "center", justifyContent: "center" }}>
+      <ActivityIndicator color="#c8e03a" />
+    </View>
+  );
+}
+
+function RootNavigator() {
+  const { firebaseUser, userDoc, loading } = useAuth();
+
+  if (loading) return <LoadingScreen />;
+  if (!firebaseUser || !userDoc) return <AuthStack />;
+  return <TabsNavigator />;
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <Tab.Navigator
-          screenOptions={({ route }) => ({
-            headerShown: false,
-            tabBarStyle: {
-              backgroundColor: "#111",
-              borderTopColor: "#222",
-              borderTopWidth: 0.5,
-              paddingBottom: 20,
-              paddingTop: 8,
-              height: 80,
-            },
-            tabBarActiveTintColor: "#c8e03a",
-            tabBarInactiveTintColor: "#444",
-            tabBarShowLabel: false,
-            tabBarIcon: ({ color, focused }) => {
-              if (route.name === "Cargar") return <GolfBallTabIcon color={color} />;
-              return (
-                <Ionicons
-                  name={focused ? ICONS[route.name] : (`${ICONS[route.name]}-outline` as any)}
-                  size={22}
-                  color={color}
-                />
-              );
-            },
-          })}
-        >
-          <Tab.Screen name="Inicio" component={FeedScreen} />
-          <Tab.Screen name="Torneos" component={TorneosScreen} />
-          <Tab.Screen name="Cargar" component={UploadScreen} />
-          <Tab.Screen name="Grupos" component={SearchScreen} />
-          <Tab.Screen name="Perfil" component={ProfileScreen} />
-        </Tab.Navigator>
-      </NavigationContainer>
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar style="light" />
+          <RootNavigator />
+        </NavigationContainer>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

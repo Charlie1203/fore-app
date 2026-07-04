@@ -4,6 +4,18 @@
     "slug": "fore-app",
     "version": "1.0.0",
     "scheme": "fore",
-    "platforms": ["ios", "android"]
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.foreapp.golf"
+    },
+    "android": {
+      "package": "com.foreapp.golf"
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

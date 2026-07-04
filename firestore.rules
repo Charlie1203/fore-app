@@ -1,0 +1,143 @@
+rules_version = "2";
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function isGroupMember(groupId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+    }
+    function isGroupAdmin(groupId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == "admin";
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid);
+      allow delete: if false;
+    }
+
+    match /usernames/{username} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /follows/{followId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.followerUid == request.auth.uid;
+      allow delete: if isSignedIn()
+                    && resource.data.followerUid == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /rounds/{roundId} {
+      allow read: if isSignedIn()
+                  && (resource.data.visibility == "public" || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
+        allow delete: if isSignedIn() &&
+          (resource.data.authorId == request.auth.uid ||
+           get(/databases/$(database)/documents/rounds/$(roundId)).data.userId == request.auth.uid);
+        allow update: if false;
+      }
+    }
+
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.authorId == request.auth.uid;
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
+        allow delete: if isSignedIn() &&
+          (resource.data.authorId == request.auth.uid ||
+           get(/databases/$(database)/documents/posts/$(postId)).data.authorId == request.auth.uid);
+        allow update: if false;
+      }
+    }
+
+    match /stories/{storyId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /clubs/{clubId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /groups/{groupId} {
+      allow read: if isSignedIn() && (resource.data.type == "club" || isGroupMember(groupId));
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isGroupAdmin(groupId);
+
+      match /members/{memberUid} {
+        allow read: if isSignedIn() && (get(/databases/$(database)/documents/groups/$(groupId)).data.type == "club" || isGroupMember(groupId));
+        allow create: if isSignedIn() &&
+          ( get(/databases/$(database)/documents/groups/$(groupId)).data.type == "club"
+            ? request.auth.uid == memberUid
+            : isGroupAdmin(groupId) );
+        allow update, delete: if isGroupAdmin(groupId) || request.auth.uid == memberUid;
+      }
+
+      match /posts/{postId} {
+        allow read: if isGroupMember(groupId);
+        allow create: if isGroupMember(groupId) && request.resource.data.authorId == request.auth.uid;
+        allow update, delete: if isSignedIn() &&
+          (resource.data.authorId == request.auth.uid || isGroupAdmin(groupId));
+
+        match /comments/{commentId} {
+          allow read: if isGroupMember(groupId);
+          allow create: if isGroupMember(groupId) && request.resource.data.authorId == request.auth.uid;
+          allow delete: if isSignedIn() &&
+            (resource.data.authorId == request.auth.uid || isGroupAdmin(groupId));
+          allow update: if false;
+        }
+
+        match /attendees/{uid} {
+          allow read: if isGroupMember(groupId);
+          allow write: if isSignedIn() && request.auth.uid == uid;
+        }
+      }
+    }
+
+    match /tournaments/{tournamentId} {
+      allow read: if isSignedIn() &&
+        (resource.data.groupId == null || isGroupMember(resource.data.groupId));
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.createdBy == request.auth.uid;
+
+      match /participants/{uid} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && request.auth.uid == uid;
+      }
+      match /leaderboard/{uid} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() &&
+          get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.createdBy == request.auth.uid;
+      }
+    }
+
+    match /achievements/{achievementId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+  }
+}

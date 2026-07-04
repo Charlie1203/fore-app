@@ -7,6 +7,7 @@ import { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from 'react-native-pager-view';
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from 'react-native-svg';
+import { useAuth } from '../context/AuthContext';
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
   const d = [
@@ -55,19 +56,12 @@ const COLORS = {
   dark2: '#242424',
 };
 
-const USER = {
-  name: 'Juan Noceti',
-  initials: 'JN',
-  username: '@juannoceti',
-  club: 'Haras Santa María',
-  handicap: 12.4,
+// Stats que todavía no vienen de Firestore en esta etapa (se migran junto con Historial/Stats).
+const MOCK_USER_STATS = {
   rounds: 18,
   bestScore: 74,
   eagles: 0,
   birdies: 34,
-  followers: 142,
-  following: 98,
-  friends: 31,
 };
 
 const COURSES = [
@@ -162,12 +156,12 @@ function HcpChart({ thirdKpi }: { thirdKpi: { value: number; label: string } }) 
 
       <View style={styles.kpiFooter}>
         <View style={styles.kpiItem}>
-          <Text style={styles.kpiVal}>{USER.rounds}</Text>
+          <Text style={styles.kpiVal}>{MOCK_USER_STATS.rounds}</Text>
           <Text style={styles.kpiLabel}>Rondas{'\n'}este año</Text>
         </View>
         <View style={styles.kpiDivider} />
         <View style={styles.kpiItem}>
-          <Text style={styles.kpiVal}>{USER.bestScore}</Text>
+          <Text style={styles.kpiVal}>{MOCK_USER_STATS.bestScore}</Text>
           <Text style={styles.kpiLabel}>Mejor{'\n'}score</Text>
         </View>
         <View style={styles.kpiDivider} />
@@ -384,11 +378,24 @@ function AchievementRow({ a }: { a: typeof ACHIEVEMENTS[0] }) {
 }
 
 export default function ProfileScreen() {
+  const { userDoc } = useAuth();
   const [tab, setTab] = useState(0);
   const pagerRef = useRef<PagerView>(null);
-  const thirdKpi = USER.eagles > 0
-    ? { value: USER.eagles, label: 'Eagles' }
-    : { value: USER.birdies, label: 'Birdies' };
+  const thirdKpi = MOCK_USER_STATS.eagles > 0
+    ? { value: MOCK_USER_STATS.eagles, label: 'Eagles' }
+    : { value: MOCK_USER_STATS.birdies, label: 'Birdies' };
+
+  const initials = (userDoc?.displayName ?? '??')
+    .split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const displayUser = {
+    name: userDoc?.displayName ?? '',
+    initials,
+    username: '@' + (userDoc?.username ?? ''),
+    club: userDoc?.club ?? 'Sin club',
+    handicap: userDoc?.handicap ?? 0,
+    followers: userDoc?.followersCount ?? 0,
+    following: userDoc?.followingCount ?? 0,
+  };
 
   // Collapsible header
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -506,18 +513,18 @@ export default function ProfileScreen() {
         >
           <View style={styles.header}>
             <View style={styles.avatarLarge}>
-              <Text style={styles.avatarText}>{USER.initials}</Text>
+              <Text style={styles.avatarText}>{displayUser.initials}</Text>
             </View>
             <View style={styles.headerInfo}>
               <View style={styles.nameRow}>
-                <Text style={styles.name}>{USER.name}</Text>
+                <Text style={styles.name}>{displayUser.name}</Text>
                 <View style={styles.hcpBadge}>
-                  <Text style={styles.hcpBadgeNum}>{USER.handicap}</Text>
+                  <Text style={styles.hcpBadgeNum}>{displayUser.handicap}</Text>
                   <Text style={styles.hcpBadgeLabel}>HCP</Text>
                 </View>
               </View>
-              <Text style={styles.username}>{USER.username}</Text>
-              <Text style={styles.club}>📍 {USER.club}</Text>
+              <Text style={styles.username}>{displayUser.username}</Text>
+              <Text style={styles.club}>📍 {displayUser.club}</Text>
             </View>
             <TouchableOpacity style={styles.editBtn}>
               <Text style={styles.editText}>Editar</Text>
@@ -526,12 +533,12 @@ export default function ProfileScreen() {
 
           <View style={styles.socialRow}>
             <TouchableOpacity style={styles.socialItem}>
-              <Text style={styles.socialVal}>{USER.following}</Text>
+              <Text style={styles.socialVal}>{displayUser.following}</Text>
               <Text style={styles.socialLabel}>Siguiendo</Text>
             </TouchableOpacity>
             <View style={styles.socialDivider} />
             <TouchableOpacity style={styles.socialItem}>
-              <Text style={styles.socialVal}>{USER.followers}</Text>
+              <Text style={styles.socialVal}>{displayUser.followers}</Text>
               <Text style={styles.socialLabel}>Seguidores</Text>
             </TouchableOpacity>
           </View>
