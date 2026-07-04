@@ -1,13 +1,16 @@
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Dimensions, Animated,
+  Dimensions, Animated, Modal, TextInput, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from 'react-native-pager-view';
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';
+import { logout } from '../services/auth';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
   const d = [
@@ -377,9 +380,93 @@ function AchievementRow({ a }: { a: typeof ACHIEVEMENTS[0] }) {
   );
 }
 
+function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { firebaseUser, userDoc } = useAuth();
+  const insets = useSafeAreaInsets();
+  const [displayName, setDisplayName] = useState(userDoc?.displayName ?? '');
+  const [club, setClub] = useState(userDoc?.club ?? '');
+  const [handicap, setHandicap] = useState(userDoc?.handicap?.toString() ?? '');
+  const [bio, setBio] = useState(userDoc?.bio ?? '');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!firebaseUser) return;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', firebaseUser.uid), {
+        displayName: displayName.trim(),
+        club: club.trim() || null,
+        handicap: handicap ? parseFloat(handicap) : null,
+        bio: bio.trim() || null,
+      });
+      onClose();
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={[epStyles.sheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={epStyles.handle} />
+            <View style={epStyles.header}>
+              <Text style={epStyles.title}>Editar perfil</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Ionicons name="close" size={20} color={COLORS.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={epStyles.label}>Nombre</Text>
+            <View style={epStyles.inputBox}>
+              <TextInput style={epStyles.input} value={displayName} onChangeText={setDisplayName} placeholder="Tu nombre" placeholderTextColor={COLORS.dim} />
+            </View>
+
+            <Text style={epStyles.label}>Club</Text>
+            <View style={epStyles.inputBox}>
+              <TextInput style={epStyles.input} value={club} onChangeText={setClub} placeholder="Ej: Haras Santa María" placeholderTextColor={COLORS.dim} />
+            </View>
+
+            <Text style={epStyles.label}>Handicap</Text>
+            <View style={epStyles.inputBox}>
+              <TextInput style={epStyles.input} value={handicap} onChangeText={t => setHandicap(t.replace(/[^0-9.]/g, ''))} placeholder="Ej: 12.4" placeholderTextColor={COLORS.dim} keyboardType="decimal-pad" />
+            </View>
+
+            <Text style={epStyles.label}>Bio</Text>
+            <View style={[epStyles.inputBox, { height: 72 }]}>
+              <TextInput style={[epStyles.input, { height: 60 }]} value={bio} onChangeText={setBio} placeholder="Algo sobre vos..." placeholderTextColor={COLORS.dim} multiline />
+            </View>
+
+            <TouchableOpacity style={[epStyles.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
+              <Text style={epStyles.saveBtnText}>{saving ? 'Guardando...' : 'Guardar'}</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
+
+const epStyles = StyleSheet.create({
+  sheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 24, paddingTop: 12 },
+  handle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  title: { fontSize: 16, fontWeight: '700', color: '#f0f0f0' },
+  label: { fontSize: 11, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6, marginTop: 14 },
+  inputBox: { backgroundColor: '#1e1e1e', borderRadius: 10, borderWidth: 0.5, borderColor: '#2a2a2a', paddingHorizontal: 14, justifyContent: 'center' },
+  input: { color: '#f0f0f0', fontSize: 15, paddingVertical: 12 },
+  saveBtn: { backgroundColor: '#c8e03a', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  saveBtnText: { color: '#0f0f0f', fontWeight: '700', fontSize: 15 },
+});
+
 export default function ProfileScreen() {
   const { userDoc } = useAuth();
   const [tab, setTab] = useState(0);
+  const [editVisible, setEditVisible] = useState(false);
   const pagerRef = useRef<PagerView>(null);
   const thirdKpi = MOCK_USER_STATS.eagles > 0
     ? { value: MOCK_USER_STATS.eagles, label: 'Eagles' }
@@ -460,6 +547,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <EditProfileModal visible={editVisible} onClose={() => setEditVisible(false)} />
       <View style={{ flex: 1 }}>
         {/* Scrollable pages — PagerView takes full space */}
         <PagerView
@@ -526,9 +614,14 @@ export default function ProfileScreen() {
               <Text style={styles.username}>{displayUser.username}</Text>
               <Text style={styles.club}>📍 {displayUser.club}</Text>
             </View>
-            <TouchableOpacity style={styles.editBtn}>
-              <Text style={styles.editText}>Editar</Text>
-            </TouchableOpacity>
+            <View style={{ gap: 8 }}>
+              <TouchableOpacity style={styles.editBtn} onPress={() => setEditVisible(true)}>
+                <Text style={styles.editText}>Editar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.logoutBtn} onPress={() => Alert.alert('Cerrar sesión', '¿Seguro?', [{ text: 'Cancelar' }, { text: 'Salir', style: 'destructive', onPress: logout }])}>
+                <Ionicons name="log-out-outline" size={16} color={COLORS.muted} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.socialRow}>
@@ -593,6 +686,7 @@ const styles = StyleSheet.create({
   username: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
   club: { fontSize: 11, color: COLORS.muted, marginTop: 4 },
   editBtn: { borderWidth: 0.5, borderColor: COLORS.dim, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  logoutBtn: { borderWidth: 0.5, borderColor: '#2a2a2a', borderRadius: 8, padding: 6, alignItems: 'center' },
   editText: { fontSize: 12, color: COLORS.muted },
 
   hcpBadge: { backgroundColor: COLORS.lime, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, flexDirection: 'row', alignItems: 'baseline', gap: 3 },
