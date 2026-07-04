@@ -400,7 +400,14 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
     const uri = result.assets[0].uri;
     setUploadingPhoto(true);
     try {
-      const blob = await (await fetch(uri)).blob();
+      const blob: Blob = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.onload = () => resolve(xhr.response);
+        xhr.onerror = reject;
+        xhr.responseType = 'blob';
+        xhr.open('GET', uri, true);
+        xhr.send(null);
+      });
       const storageRef = ref(storage, `users/${firebaseUser.uid}/avatar.jpg`);
       await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
       const url = await getDownloadURL(storageRef);
