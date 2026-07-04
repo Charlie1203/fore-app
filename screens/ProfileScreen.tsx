@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
   achSub: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
   achDate: { fontSize: 10, color: COLORS.dim },
 
-  card: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, overflow: 'hidden', marginBottom: 8 },
+  card: { backgroundColor: COLORS.bg, borderBottomWidth: 8, borderBottomColor: '#1a1a1a', overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingBottom: 6 },
   cardTime: { fontSize: 11, color: COLORS.muted },
   cardBody: { paddingHorizontal: 12, paddingBottom: 10 },

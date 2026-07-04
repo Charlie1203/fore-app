@@ -954,7 +954,7 @@ const styles = StyleSheet.create({
   fab: { position: 'absolute', bottom: 20, right: 18, width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.lime, alignItems: 'center', justifyContent: 'center', zIndex: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
 
   // Post cards
-  postCard: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  postCard: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 8, borderBottomColor: '#1a1a1a' },
   postCardPinned: { backgroundColor: '#0f1a09' },
   postHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   postAutor: { fontSize: 14, fontWeight: '700', color: COLORS.white },
@@ -1004,7 +1004,7 @@ const styles = StyleSheet.create({
   voyBtnTextActive: { color: '#0f0f0f' },
 
   // Sistema
-  sistemaPost: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  sistemaPost: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 8, borderBottomColor: '#1a1a1a' },
   sistemaTexto: { fontSize: 13, color: COLORS.muted, textAlign: 'center' },
   sistemaTiempo: { fontSize: 11, color: COLORS.dim, textAlign: 'center', marginTop: 3 },
 
