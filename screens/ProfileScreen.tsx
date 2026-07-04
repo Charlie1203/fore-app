@@ -401,7 +401,7 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
     setUploadingPhoto(true);
     try {
       const blob = await (await fetch(uri)).blob();
-      const storageRef = ref(storage, `avatars/${firebaseUser.uid}`);
+      const storageRef = ref(storage, `users/${firebaseUser.uid}/avatar.jpg`);
       await uploadBytes(storageRef, blob);
       const url = await getDownloadURL(storageRef);
       setPhotoURI(url);
