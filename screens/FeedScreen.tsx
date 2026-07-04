@@ -821,8 +821,8 @@ const styles = StyleSheet.create({
 	feed: { paddingBottom: 20 },
 	card: {
 		backgroundColor: COLORS.bg,
-		borderBottomWidth: 0.5,
-		borderBottomColor: '#1e1e1e',
+		borderBottomWidth: 8,
+		borderBottomColor: '#1a1a1a',
 		paddingBottom: 4,
 	},
 	cardHeader: {
