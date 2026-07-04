@@ -413,7 +413,7 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
       const url = await getDownloadURL(storageRef);
       setPhotoURI(url);
       await updateDoc(doc(db, 'users', firebaseUser.uid), { photoURL: url });
-    } catch { Alert.alert('Error', 'No se pudo subir la foto.'); }
+    } catch (err: any) { console.error('AVATAR UPLOAD ERROR:', JSON.stringify(err), err?.message, err?.code); Alert.alert('Error', err?.message ?? 'No se pudo subir la foto.'); }
     finally { setUploadingPhoto(false); }
   };
 
