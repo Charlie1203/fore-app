@@ -402,7 +402,7 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
     try {
       const blob = await (await fetch(uri)).blob();
       const storageRef = ref(storage, `users/${firebaseUser.uid}/avatar.jpg`);
-      await uploadBytes(storageRef, blob);
+      await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
       const url = await getDownloadURL(storageRef);
       setPhotoURI(url);
       await updateDoc(doc(db, 'users', firebaseUser.uid), { photoURL: url });
