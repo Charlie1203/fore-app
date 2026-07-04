@@ -384,9 +384,8 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
   const { firebaseUser, userDoc } = useAuth();
   const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState(userDoc?.displayName ?? '');
-  const [club, setClub] = useState(userDoc?.club ?? '');
+  const [username, setUsername] = useState(userDoc?.username ?? '');
   const [handicap, setHandicap] = useState(userDoc?.handicap?.toString() ?? '');
-  const [bio, setBio] = useState(userDoc?.bio ?? '');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -395,9 +394,8 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
     try {
       await updateDoc(doc(db, 'users', firebaseUser.uid), {
         displayName: displayName.trim(),
-        club: club.trim() || null,
+        username: username.trim().toLowerCase().replace(/^@/, ''),
         handicap: handicap ? parseFloat(handicap) : null,
-        bio: bio.trim() || null,
       });
       onClose();
     } catch (e) {
@@ -426,19 +424,14 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
               <TextInput style={epStyles.input} value={displayName} onChangeText={setDisplayName} placeholder="Tu nombre" placeholderTextColor={COLORS.dim} />
             </View>
 
-            <Text style={epStyles.label}>Club</Text>
+            <Text style={epStyles.label}>Usuario</Text>
             <View style={epStyles.inputBox}>
-              <TextInput style={epStyles.input} value={club} onChangeText={setClub} placeholder="Ej: Haras Santa María" placeholderTextColor={COLORS.dim} />
+              <TextInput style={epStyles.input} value={username} onChangeText={setUsername} placeholder="@usuario" placeholderTextColor={COLORS.dim} autoCapitalize="none" />
             </View>
 
-            <Text style={epStyles.label}>Handicap</Text>
+            <Text style={epStyles.label}>Matrícula (HCP)</Text>
             <View style={epStyles.inputBox}>
               <TextInput style={epStyles.input} value={handicap} onChangeText={t => setHandicap(t.replace(/[^0-9.]/g, ''))} placeholder="Ej: 12.4" placeholderTextColor={COLORS.dim} keyboardType="decimal-pad" />
-            </View>
-
-            <Text style={epStyles.label}>Bio</Text>
-            <View style={[epStyles.inputBox, { height: 72 }]}>
-              <TextInput style={[epStyles.input, { height: 60 }]} value={bio} onChangeText={setBio} placeholder="Algo sobre vos..." placeholderTextColor={COLORS.dim} multiline />
             </View>
 
             <TouchableOpacity style={[epStyles.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
@@ -467,6 +460,7 @@ export default function ProfileScreen() {
   const { userDoc } = useAuth();
   const [tab, setTab] = useState(0);
   const [editVisible, setEditVisible] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
   const pagerRef = useRef<PagerView>(null);
   const thirdKpi = MOCK_USER_STATS.eagles > 0
     ? { value: MOCK_USER_STATS.eagles, label: 'Eagles' }
@@ -548,6 +542,22 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <EditProfileModal visible={editVisible} onClose={() => setEditVisible(false)} />
+      {/* Settings menu */}
+      <Modal visible={menuVisible} animationType="fade" transparent onRequestClose={() => setMenuVisible(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setMenuVisible(false)}>
+          <View style={styles.settingsMenu}>
+            <TouchableOpacity style={styles.settingsItem} onPress={() => { setMenuVisible(false); setTimeout(() => setEditVisible(true), 200); }}>
+              <Ionicons name="person-outline" size={18} color={COLORS.white} />
+              <Text style={styles.settingsItemText}>Editar perfil</Text>
+            </TouchableOpacity>
+            <View style={styles.settingsDivider} />
+            <TouchableOpacity style={styles.settingsItem} onPress={() => { setMenuVisible(false); Alert.alert('Cerrar sesión', '¿Seguro?', [{ text: 'Cancelar' }, { text: 'Salir', style: 'destructive', onPress: logout }]); }}>
+              <Ionicons name="log-out-outline" size={18} color={COLORS.red} />
+              <Text style={[styles.settingsItemText, { color: COLORS.red }]}>Cerrar sesión</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
       <View style={{ flex: 1 }}>
         {/* Scrollable pages — PagerView takes full space */}
         <PagerView
@@ -614,14 +624,9 @@ export default function ProfileScreen() {
               <Text style={styles.username}>{displayUser.username}</Text>
               <Text style={styles.club}>📍 {displayUser.club}</Text>
             </View>
-            <View style={{ gap: 8 }}>
-              <TouchableOpacity style={styles.editBtn} onPress={() => setEditVisible(true)}>
-                <Text style={styles.editText}>Editar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.logoutBtn} onPress={() => Alert.alert('Cerrar sesión', '¿Seguro?', [{ text: 'Cancelar' }, { text: 'Salir', style: 'destructive', onPress: logout }])}>
-                <Ionicons name="log-out-outline" size={16} color={COLORS.muted} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.settingsBtn} onPress={() => setMenuVisible(true)}>
+              <Ionicons name="settings-outline" size={20} color={COLORS.muted} />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.socialRow}>
@@ -686,7 +691,11 @@ const styles = StyleSheet.create({
   username: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
   club: { fontSize: 11, color: COLORS.muted, marginTop: 4 },
   editBtn: { borderWidth: 0.5, borderColor: COLORS.dim, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  logoutBtn: { borderWidth: 0.5, borderColor: '#2a2a2a', borderRadius: 8, padding: 6, alignItems: 'center' },
+  settingsBtn: { padding: 6 },
+  settingsMenu: { backgroundColor: '#1e1e1e', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 32, paddingTop: 8 },
+  settingsItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 24, paddingVertical: 16 },
+  settingsItemText: { fontSize: 15, color: COLORS.white },
+  settingsDivider: { height: 0.5, backgroundColor: COLORS.border, marginHorizontal: 24 },
   editText: { fontSize: 12, color: COLORS.muted },
 
   hcpBadge: { backgroundColor: COLORS.lime, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, flexDirection: 'row', alignItems: 'baseline', gap: 3 },

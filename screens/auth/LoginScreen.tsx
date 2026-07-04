@@ -13,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import AuthTextInput from '../../components/AuthTextInput';
 import { loginWithEmail, mapAuthError } from '../../services/auth';
+import { getDocs, query, collection, where } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 
 const COLORS = {
 	bg: '#0f0f0f',
@@ -24,22 +26,33 @@ const COLORS = {
 	red: '#e07070',
 };
 
+async function resolveEmail(input: string): Promise<string> {
+	// Si tiene @ en el medio es un email, si no es un username
+	if (input.includes('@') && input.indexOf('@') > 0) return input;
+	// Buscar el email asociado al username
+	const username = input.replace(/^@/, '').toLowerCase();
+	const snap = await getDocs(query(collection(db, 'users'), where('username', '==', username)));
+	if (snap.empty) throw { code: 'auth/user-not-found' };
+	return snap.docs[0].data().email as string;
+}
+
 export default function LoginScreen() {
 	const navigation = useNavigation<any>();
-	const [email, setEmail] = useState('');
+	const [identifier, setIdentifier] = useState('');
 	const [password, setPassword] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const handleLogin = async () => {
-		if (!email || !password) {
-			setError('Completá email y contraseña.');
+		if (!identifier || !password) {
+			setError('Completá usuario/email y contraseña.');
 			return;
 		}
 		setError(null);
 		setLoading(true);
 		try {
-			await loginWithEmail(email.trim(), password);
+			const email = await resolveEmail(identifier.trim());
+			await loginWithEmail(email, password);
 		} catch (e: any) {
 			setError(mapAuthError(e.code));
 		} finally {
@@ -64,12 +77,12 @@ export default function LoginScreen() {
 
 					<View style={styles.form}>
 						<AuthTextInput
-							icon="mail-outline"
-							placeholder="Email"
+							icon="person-outline"
+							placeholder="Email o @usuario"
 							autoCapitalize="none"
 							keyboardType="email-address"
-							value={email}
-							onChangeText={setEmail}
+							value={identifier}
+							onChangeText={setIdentifier}
 						/>
 						<AuthTextInput
 							icon="lock-closed-outline"
