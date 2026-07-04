@@ -554,7 +554,7 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
         <View style={styles.leaderAccent} />
         <Avatar initials="PE" bg="#222" color={COLORS.lime} size={40} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.leaderLabel}>Líder del mes</Text>
+          <Text style={styles.leaderLabel}>Mejor ronda del mes</Text>
           <Text style={styles.leaderName}>Pepe Noceti</Text>
         </View>
         <View style={styles.leaderScoreBlock}>

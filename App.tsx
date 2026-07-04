@@ -12,12 +12,16 @@ import UploadScreen from "./screens/UploadScreen";
 import SearchScreen from "./screens/SearchScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import TorneosScreen from "./screens/TorneosScreen";
+import GlobalSearchScreen from "./screens/GlobalSearchScreen";
+import NotificationsScreen from "./screens/NotificationsScreen";
+import CreateTorneoScreen from "./screens/CreateTorneoScreen";
 import LoginScreen from "./screens/auth/LoginScreen";
 import RegisterScreen from "./screens/auth/RegisterScreen";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
 const Tab = createBottomTabNavigator();
 const AuthStackNav = createNativeStackNavigator();
+const RootStack = createNativeStackNavigator();
 
 const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   Inicio: "home",
@@ -113,12 +117,23 @@ function LoadingScreen() {
   );
 }
 
+function AppStack() {
+  return (
+    <RootStack.Navigator id={undefined} screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="Tabs" component={TabsNavigator} />
+      <RootStack.Screen name="GlobalSearch" component={GlobalSearchScreen} options={{ animation: 'fade' }} />
+      <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ animation: 'slide_from_right' }} />
+      <RootStack.Screen name="CreateTorneo" component={CreateTorneoScreen} options={{ animation: 'slide_from_right' }} />
+    </RootStack.Navigator>
+  );
+}
+
 function RootNavigator() {
   const { firebaseUser, userDoc, loading } = useAuth();
 
   if (loading) return <LoadingScreen />;
   if (!firebaseUser || !userDoc) return <AuthStack />;
-  return <TabsNavigator />;
+  return <AppStack />;
 }
 
 export default function App() {

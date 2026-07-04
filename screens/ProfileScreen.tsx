@@ -77,10 +77,10 @@ const COURSES = [
 ];
 
 const ACHIEVEMENTS = [
-  { icon: '🦅', title: 'Primer eagle', sub: 'Hoyo 14 · Haras Santa María', date: 'Mar 2026' },
-  { icon: '🔥', title: 'Rompió 75', sub: 'Score 74 en Haras Santa María', date: 'Jun 2026' },
-  { icon: '📉', title: 'HCP bajo de 13', sub: 'De 15.2 a 12.4 en 6 meses', date: 'Jun 2026' },
-  { icon: '⛳', title: '10 rondas jugadas', sub: 'Primer hito del año', date: 'May 2026' },
+  { icon: 'trophy-outline', title: 'Primer eagle', sub: 'Hoyo 14 · Haras Santa María', date: 'Mar 2026' },
+  { icon: 'stats-chart-outline', title: 'Rompió 75', sub: 'Score 74 en Haras Santa María', date: 'Jun 2026' },
+  { icon: 'trending-down-outline', title: 'HCP bajo de 13', sub: 'De 15.2 a 12.4 en 6 meses', date: 'Jun 2026' },
+  { icon: 'checkmark-circle-outline', title: '10 rondas jugadas', sub: 'Primer hito del año', date: 'May 2026' },
 ];
 
 const HCP_HISTORY = [
@@ -287,9 +287,6 @@ function CardFooter({ likes, comments }: { likes: number; comments: number }) {
         <Text style={styles.actionText}>{comments}</Text>
       </TouchableOpacity>
       <View style={{ flex: 1 }} />
-      <TouchableOpacity>
-        <Ionicons name="repeat-outline" size={18} color={COLORS.dim} />
-      </TouchableOpacity>
     </View>
   );
 }
@@ -308,8 +305,8 @@ function RoundCard({ post }: { post: typeof POSTS[0] }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={styles.courseBadge}>
-          <Text style={styles.courseText}>📍 {post.course}</Text>
+        <View>
+          <Text style={styles.cardCourse}>📍 {post.course}</Text>
         </View>
         <Text style={styles.cardTime}>{post.time}</Text>
       </View>
@@ -372,7 +369,7 @@ function CourseRow({ course }: { course: typeof COURSES[0] }) {
 function AchievementRow({ a }: { a: typeof ACHIEVEMENTS[0] }) {
   return (
     <View style={styles.achRow}>
-      <View style={styles.achIcon}><Text style={{ fontSize: 20 }}>{a.icon}</Text></View>
+      <View style={styles.achIcon}><Ionicons name={a.icon as any} size={22} color={COLORS.lime} /></View>
       <View style={{ flex: 1 }}>
         <Text style={styles.achTitle}>{a.title}</Text>
         <Text style={styles.achSub}>{a.sub}</Text>
@@ -771,7 +768,7 @@ const styles = StyleSheet.create({
   chartLabel: { fontSize: 9, color: COLORS.muted },
 
   divider: { height: 0.5, backgroundColor: '#222', marginHorizontal: 18, marginTop: 20, marginBottom: 4 },
-  feed: { paddingHorizontal: 12, paddingBottom: 20, gap: 8 },
+  feed: { paddingBottom: 20 },
 
   tabBar: {
     position: 'absolute',
@@ -796,8 +793,8 @@ const styles = StyleSheet.create({
   courseBest: { fontSize: 16, fontWeight: '800', color: COLORS.lime },
   courseBestLbl: { fontSize: 9, color: COLORS.muted },
 
-  achRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.card, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
-  achIcon: { width: 42, height: 42, borderRadius: 10, backgroundColor: '#1e2e0a', borderWidth: 0.5, borderColor: COLORS.lime, alignItems: 'center', justifyContent: 'center' },
+  achRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 18, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
+  achIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   achTitle: { fontSize: 14, fontWeight: '600', color: COLORS.white },
   achSub: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
   achDate: { fontSize: 10, color: COLORS.dim },
@@ -811,6 +808,7 @@ const styles = StyleSheet.create({
   actionText: { fontSize: 12, color: COLORS.dim },
   courseBadge: { backgroundColor: COLORS.dark2, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   courseText: { fontSize: 11, color: COLORS.muted },
+  cardCourse: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
   holesRow: { flexDirection: 'row', gap: 3, marginBottom: 6 },
   summaryBox: { backgroundColor: '#141414', borderRadius: 10, padding: 10, gap: 10 },
   summaryScores: { flexDirection: 'row', alignItems: 'center', gap: 12 },

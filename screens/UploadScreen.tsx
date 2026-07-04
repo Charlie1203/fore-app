@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -68,7 +69,7 @@ function ClubPickerModal({ club, course, onSelect, onClose }: {
         <View style={styles.pickerHeader}>
           <Text style={styles.pickerTitle}>¿Dónde jugaste?</Text>
           <TouchableOpacity onPress={onClose}>
-            <Text style={styles.pickerClose}>✕</Text>
+            <Ionicons name="close" size={20} color={COLORS.muted} />
           </TouchableOpacity>
         </View>
 
@@ -90,7 +91,7 @@ function ClubPickerModal({ club, course, onSelect, onClose }: {
               onPress={() => { setSelectedClub(c.name); setSelectedCourse(null); }}
             >
               <Text style={[styles.optionText, selectedClub === c.name && styles.optionTextSelected]}>{c.name}</Text>
-              {selectedClub === c.name && <Text style={styles.checkmark}>✓</Text>}
+              {selectedClub === c.name && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
             </TouchableOpacity>
           ))}
 
@@ -104,7 +105,7 @@ function ClubPickerModal({ club, course, onSelect, onClose }: {
                   onPress={() => setSelectedCourse(cr)}
                 >
                   <Text style={[styles.optionText, selectedCourse === cr && styles.optionTextSelected]}>{cr}</Text>
-                  {selectedCourse === cr && <Text style={styles.checkmark}>✓</Text>}
+                  {selectedCourse === cr && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
                 </TouchableOpacity>
               ))}
             </>
@@ -179,10 +180,11 @@ function Step2({ club, course, onClubChange, onPublish }: {
       )}
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.stepContent}>
       <TouchableOpacity style={styles.coursePill} onPress={() => setShowPicker(true)}>
+        <Ionicons name="location-outline" size={14} color={COLORS.muted} />
         <Text style={styles.coursePillText}>
-          {club ? `📍 ${club}${course ? ` · ${course}` : ''}` : '📍 Elegir cancha...'}
+          {club ? `${club}${course ? ` · ${course}` : ''}` : 'Elegir cancha...'}
         </Text>
-        <Text style={styles.coursePillEdit}>✏️</Text>
+        <Ionicons name="pencil-outline" size={13} color={COLORS.dim} />
       </TouchableOpacity>
 
       <View style={styles.totalBox}>
@@ -196,13 +198,6 @@ function Step2({ club, course, onClubChange, onPublish }: {
             {vsPar > 0 ? '+' : ''}{vsPar}
           </Text>
           <Text style={styles.totalLbl}>vs Par</Text>
-        </View>
-        <View style={styles.totalDivider} />
-        <View style={styles.totalItem}>
-          <Text style={[styles.totalVal, { color: COLORS.lime }]}>
-            {scores.filter((s, i) => s - DEFAULT_PARS[i] === -1).length}
-          </Text>
-          <Text style={styles.totalLbl}>Birdies</Text>
         </View>
       </View>
 
@@ -228,12 +223,19 @@ function Step2({ club, course, onClubChange, onPublish }: {
   );
 }
 
+const TORNEOS_ACTIVOS = [
+  { id: '1', nombre: 'Open de Verano', modalidad: 'Stableford' },
+  { id: '2', nombre: 'Torneo del Club', modalidad: 'Stroke Play' },
+];
+
 function Step3({ scores, club, course, onDone }: {
   scores: number[]; club: string; course: string; onDone: (photos: string[]) => void;
 }) {
-  const [shareOnFeed, setShareOnFeed] = useState(true);
+  const [shareOnFeed, setShareOnFeed] = useState(false);
   const [comment, setComment] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
+  const [torneoIds, setTorneoIds] = useState<string[]>([]);
+  const [showTorneos, setShowTorneos] = useState(false);
 
   const totalScore = scores.reduce((a, b) => a + b, 0);
   const totalPar = DEFAULT_PARS.reduce((a, b) => a + b, 0);
@@ -265,50 +267,65 @@ function Step3({ scores, club, course, onDone }: {
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.stepContent}>
-      <Text style={styles.stepTitle}>¿Compartir en el feed?</Text>
 
       <View style={styles.summaryPill}>
-        <Text style={styles.summaryPillCourse}>📍 {club} · {course}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="location-outline" size={12} color={COLORS.muted} />
+          <Text style={styles.summaryPillCourse}>{club} · {course}</Text>
+        </View>
         <View style={styles.summaryPillStats}>
           <Text style={styles.summaryPillScore}>{totalScore}</Text>
           <Text style={[styles.summaryPillVsPar, { color: vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
             {vsPar > 0 ? '+' : ''}{vsPar}
           </Text>
-          {birdies > 0 && <Text style={styles.summaryPillBirdies}>{birdies} birdie{birdies > 1 ? 's' : ''}</Text>}
         </View>
       </View>
 
-      <Text style={styles.label}>Visibilidad</Text>
-      <View style={styles.optionList}>
-        <TouchableOpacity
-          style={[styles.option, shareOnFeed && styles.optionSelected]}
-          onPress={() => setShareOnFeed(true)}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.optionText, shareOnFeed && styles.optionTextSelected]}>Publicar en el feed</Text>
-            <Text style={styles.optionSub}>Tus amigos van a ver esta vuelta</Text>
-          </View>
-          {shareOnFeed && <Text style={styles.checkmark}>✓</Text>}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.option, !shareOnFeed && styles.optionSelected]}
-          onPress={() => setShareOnFeed(false)}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.optionText, !shareOnFeed && styles.optionTextSelected]}>Solo guardar</Text>
-            <Text style={styles.optionSub}>Queda en tu historial pero no se publica</Text>
-          </View>
-          {!shareOnFeed && <Text style={styles.checkmark}>✓</Text>}
-        </TouchableOpacity>
-      </View>
+      {/* Vincular a torneo */}
+      <TouchableOpacity style={styles.shareToggleRow} onPress={() => setShowTorneos(v => !v)}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.shareToggleTitle}>Vincular a torneo</Text>
+          <Text style={styles.shareToggleSub}>
+            {torneoIds.length === 0 ? 'Ninguno seleccionado' : TORNEOS_ACTIVOS.filter(t => torneoIds.includes(t.id)).map(t => t.nombre).join(', ')}
+          </Text>
+        </View>
+        <Ionicons name={showTorneos ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.muted} />
+      </TouchableOpacity>
+      {showTorneos && (
+        <View style={{ marginBottom: 4 }}>
+          {TORNEOS_ACTIVOS.map(t => (
+            <TouchableOpacity
+              key={t.id}
+              style={styles.torneoNoneRow}
+              onPress={() => setTorneoIds(ids => ids.includes(t.id) ? ids.filter(x => x !== t.id) : [...ids, t.id])}
+            >
+              <View style={{ flex: 1, gap: 1 }}>
+                <Text style={[styles.torneoRowText, torneoIds.includes(t.id) && { color: COLORS.white, fontWeight: '600' }]}>{t.nombre}</Text>
+                <Text style={styles.torneoRowSub}>{t.modalidad}</Text>
+              </View>
+              {torneoIds.includes(t.id) && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* Toggle compartir */}
+      <TouchableOpacity style={styles.shareToggleRow} onPress={() => setShareOnFeed(v => !v)}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.shareToggleTitle}>Compartir con tus seguidores</Text>
+          <Text style={styles.shareToggleSub}>Aparece en el feed de tus amigos</Text>
+        </View>
+        <View style={[styles.shareToggleBox, shareOnFeed && styles.shareToggleBoxOn]}>
+          {shareOnFeed && <Ionicons name="checkmark" size={16} color="#0f0f0f" />}
+        </View>
+      </TouchableOpacity>
 
       {shareOnFeed && (
         <>
-          <Text style={[styles.label, { marginTop: 20 }]}>Comentario <Text style={styles.labelOptional}>(opcional)</Text></Text>
           <View style={styles.commentBox}>
             <TextInput
               style={styles.commentInput}
-              placeholder="¿Cómo estuvo la vuelta?"
+              placeholder="Contá cómo estuvo la vuelta..."
               placeholderTextColor={COLORS.dim}
               value={comment}
               onChangeText={setComment}
@@ -318,24 +335,24 @@ function Step3({ scores, club, course, onDone }: {
             <Text style={styles.commentCount}>{comment.length}/200</Text>
           </View>
 
-          <Text style={[styles.label, { marginTop: 20 }]}>Fotos <Text style={styles.labelOptional}>(opcional · hasta 4)</Text></Text>
+          {/* Fotos */}
           <View style={styles.photosRow}>
             {photos.map((uri, i) => (
               <View key={i} style={styles.photoThumb}>
                 <Image source={{ uri }} style={styles.photoThumbImg} />
                 <TouchableOpacity style={styles.photoRemove} onPress={() => removePhoto(i)}>
-                  <Text style={styles.photoRemoveText}>×</Text>
+                  <Ionicons name="close" size={12} color="#fff" />
                 </TouchableOpacity>
               </View>
             ))}
             {photos.length < 4 && (
               <View style={styles.photoAddGroup}>
                 <TouchableOpacity style={styles.photoAdd} onPress={pickFromCamera}>
-                  <Text style={styles.photoAddIcon}>📷</Text>
+                  <Ionicons name="camera-outline" size={22} color={COLORS.muted} />
                   <Text style={styles.photoAddText}>Cámara</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.photoAdd} onPress={pickFromGallery}>
-                  <Text style={styles.photoAddIcon}>🖼️</Text>
+                  <Ionicons name="image-outline" size={22} color={COLORS.muted} />
                   <Text style={styles.photoAddText}>Galería</Text>
                 </TouchableOpacity>
               </View>
@@ -408,18 +425,27 @@ const styles = StyleSheet.create({
   stepContent: { paddingHorizontal: 18, paddingBottom: 40 },
   stepTitle: { fontSize: 18, fontWeight: '700', color: COLORS.white, marginBottom: 20 },
   label: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  searchBox: { backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border, marginBottom: 10 },
-  searchInput: { padding: 12, fontSize: 14, color: COLORS.white },
-  optionList: { gap: 6 },
-  option: { backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border, padding: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  optionSelected: { borderColor: COLORS.lime, backgroundColor: '#1a2a0a' },
-  optionText: { fontSize: 14, color: COLORS.muted },
-  optionTextSelected: { color: COLORS.lime, fontWeight: '600' },
+  searchBox: { borderBottomWidth: 0.5, borderBottomColor: COLORS.border, marginBottom: 4 },
+  searchInput: { paddingVertical: 12, paddingHorizontal: 0, fontSize: 14, color: COLORS.white },
+  optionList: { gap: 0 },
+  option: { paddingVertical: 14, paddingHorizontal: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  optionSelected: { },
+  shareToggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 0.5, borderBottomColor: COLORS.border, marginBottom: 16 },
+  shareToggleTitle: { fontSize: 15, fontWeight: '600', color: COLORS.white },
+  shareToggleSub: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  shareToggleBox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: COLORS.dim, alignItems: 'center', justifyContent: 'center' },
+  shareToggleBoxOn: { backgroundColor: COLORS.lime, borderColor: COLORS.lime },
+  optionText: { fontSize: 14, color: COLORS.white },
+  optionTextSelected: { color: COLORS.lime, fontWeight: '700' },
   checkmark: { color: COLORS.lime, fontSize: 16, fontWeight: '700' },
+  sectionLabelUpload: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  torneoNoneRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  torneoRowText: { fontSize: 14, color: COLORS.muted },
+  torneoRowSub: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
   nextBtn: { backgroundColor: COLORS.lime, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 },
   nextBtnText: { fontSize: 15, fontWeight: '800', color: '#0f0f0f' },
-  coursePill: { backgroundColor: COLORS.dark2, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', borderWidth: 0.5, borderColor: COLORS.border },
-  coursePillText: { fontSize: 13, color: COLORS.white, fontWeight: '600' },
+  coursePill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, marginBottom: 4, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
+  coursePillText: { flex: 1, fontSize: 14, color: COLORS.white, fontWeight: '600' },
   coursePillEdit: { fontSize: 12 },
   modalOverlay: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end', zIndex: 100 },
   pickerSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', paddingTop: 12 },
@@ -427,31 +453,31 @@ const styles = StyleSheet.create({
   pickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, marginBottom: 12 },
   pickerTitle: { fontSize: 18, fontWeight: '800', color: COLORS.white },
   pickerClose: { fontSize: 16, color: COLORS.muted, padding: 4 },
-  totalBox: { flexDirection: 'row', backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, padding: 16, marginBottom: 20 },
+  totalBox: { flexDirection: 'row', paddingVertical: 20, marginBottom: 8, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
   totalItem: { flex: 1, alignItems: 'center' },
-  totalVal: { fontSize: 26, fontWeight: '800', color: COLORS.white },
-  totalLbl: { fontSize: 10, color: COLORS.muted, marginTop: 2 },
+  totalVal: { fontSize: 32, fontWeight: '800', color: COLORS.white },
+  totalLbl: { fontSize: 10, color: COLORS.muted, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
   totalDivider: { width: 0.5, backgroundColor: COLORS.border },
-  holeGroup: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, overflow: 'hidden' },
-  holeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
+  holeGroup: { overflow: 'hidden' },
+  holeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   holeInfo: { gap: 2 },
   holeNumText: { fontSize: 13, fontWeight: '700', color: COLORS.white },
   holeParText: { fontSize: 11, color: COLORS.dim },
   holeControls: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  controlBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: COLORS.dark2, alignItems: 'center', justifyContent: 'center' },
+  controlBtn: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
   controlBtnText: { fontSize: 20, color: COLORS.white, lineHeight: 24 },
   scoreBox: { width: 48, alignItems: 'center' },
   scoreText: { fontSize: 20, fontWeight: '800' },
   diffText: { fontSize: 10, fontWeight: '600' },
-  summaryPill: { backgroundColor: COLORS.dark2, borderRadius: 12, borderWidth: 0.5, borderColor: COLORS.border, padding: 14, marginBottom: 20, gap: 8 },
+  summaryPill: { paddingVertical: 16, marginBottom: 4, borderBottomWidth: 0.5, borderBottomColor: COLORS.border, gap: 6 },
   summaryPillCourse: { fontSize: 12, color: COLORS.muted },
   summaryPillStats: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
-  summaryPillScore: { fontSize: 28, fontWeight: '800', color: COLORS.white },
-  summaryPillVsPar: { fontSize: 16, fontWeight: '700' },
+  summaryPillScore: { fontSize: 32, fontWeight: '800', color: COLORS.white },
+  summaryPillVsPar: { fontSize: 18, fontWeight: '700' },
   summaryPillBirdies: { fontSize: 12, color: COLORS.lime, fontWeight: '600' },
   optionSub: { fontSize: 11, color: COLORS.dim, marginTop: 2 },
   labelOptional: { color: COLORS.dim, fontWeight: '400', textTransform: 'none' },
-  commentBox: { backgroundColor: COLORS.card, borderRadius: 10, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
+  commentBox: { borderBottomWidth: 0.5, borderBottomColor: COLORS.border, paddingVertical: 12 },
   commentInput: { fontSize: 14, color: COLORS.white, minHeight: 80, textAlignVertical: 'top' },
   commentCount: { fontSize: 10, color: COLORS.dim, textAlign: 'right', marginTop: 4 },
   toast: { position: 'absolute', bottom: 40, left: 24, right: 24, backgroundColor: '#1e2e0a', borderWidth: 1, borderColor: COLORS.lime, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },

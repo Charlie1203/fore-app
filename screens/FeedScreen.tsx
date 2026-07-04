@@ -15,7 +15,7 @@
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { useRoute } from "@react-navigation/native";
+import { useRoute, useNavigation } from "@react-navigation/native";
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -420,10 +420,6 @@ function CardFooter({
 					<GolfBallIcon color={COLORS.dim} size={16} />
 					<Text style={styles.actionText}>{comments}</Text>
 				</TouchableOpacity>
-				<View style={{ flex: 1 }} />
-				<TouchableOpacity>
-					<Ionicons name="repeat-outline" size={19} color={COLORS.dim} />
-				</TouchableOpacity>
 			</View>
 		</>
 	);
@@ -683,8 +679,10 @@ const MOCK_PHOTOS = [
 	'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800',
 ];
 
+
 export default function FeedScreen() {
 	const route = useRoute<any>();
+	const navigation = useNavigation<any>();
 	const toastOpacity = useRef(new Animated.Value(0)).current;
 	const [showToast, setShowToast] = useState(false);
 	const [newPostPhotos, setNewPostPhotos] = useState<string[]>([]);
@@ -735,8 +733,12 @@ export default function FeedScreen() {
 					FORE<Text style={{ color: COLORS.lime }}>!</Text>
 				</Text>
 				<View style={{ flexDirection: "row", gap: 18 }}>
-					<Ionicons name="search-outline" size={22} color={COLORS.white} />
-					<Ionicons name="notifications-outline" size={22} color={COLORS.white} />
+					<TouchableOpacity onPress={() => navigation.navigate('GlobalSearch')}>
+						<Ionicons name="search-outline" size={22} color={COLORS.white} />
+					</TouchableOpacity>
+					<TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+						<Ionicons name="notifications-outline" size={22} color={COLORS.white} />
+					</TouchableOpacity>
 				</View>
 			</View>
 			<ScrollView showsVerticalScrollIndicator={false}>
@@ -781,7 +783,7 @@ export default function FeedScreen() {
 					</View>
 				</Animated.View>
 			)}
-		</SafeAreaView>
+</SafeAreaView>
 	);
 }
 
