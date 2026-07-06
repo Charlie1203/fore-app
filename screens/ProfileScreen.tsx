@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from 'react-native-pager-view';
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from 'react-native-svg';
@@ -503,27 +504,67 @@ const epStyles = StyleSheet.create({
   avatarOverlay: { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: '#333', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#161616' },
 });
 
+export type ViewUser = {
+  name: string;
+  initials: string;
+  bg?: string;
+  color?: string;
+  handicap?: number;
+};
+
 export default function ProfileScreen() {
   const { userDoc } = useAuth();
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const viewUser: ViewUser | undefined = route.params?.viewUser;
+  const isOwnProfile = !viewUser;
+
   const [tab, setTab] = useState(0);
   const [editVisible, setEditVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [following, setFollowing] = useState(false);
   const pagerRef = useRef<PagerView>(null);
+
+  const onPressFollow = () => {
+    if (following) {
+      Alert.alert('Dejar de seguir', `¿Dejar de seguir a ${viewUser?.name}?`, [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Dejar de seguir', style: 'destructive', onPress: () => setFollowing(false) },
+      ]);
+    } else {
+      setFollowing(true);
+    }
+  };
   const thirdKpi = MOCK_USER_STATS.eagles > 0
     ? { value: MOCK_USER_STATS.eagles, label: 'Eagles' }
     : { value: MOCK_USER_STATS.birdies, label: 'Birdies' };
 
-  const initials = (userDoc?.displayName ?? '??')
-    .split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
-  const displayUser = {
-    name: userDoc?.displayName ?? '',
-    initials,
-    username: '@' + (userDoc?.username ?? ''),
-    club: userDoc?.club ?? 'Sin club',
-    handicap: userDoc?.handicap ?? 0,
-    followers: userDoc?.followersCount ?? 0,
-    following: userDoc?.followingCount ?? 0,
-  };
+  const initials = viewUser
+    ? viewUser.initials
+    : (userDoc?.displayName ?? '??').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  const displayUser = viewUser
+    ? {
+        name: viewUser.name,
+        initials,
+        username: '',
+        club: 'Sin club',
+        handicap: viewUser.handicap ?? 0,
+        followers: 0,
+        following: 0,
+        avatarBg: viewUser.bg ?? COLORS.lime,
+        avatarColor: viewUser.color ?? '#0f0f0f',
+      }
+    : {
+        name: userDoc?.displayName ?? '',
+        initials,
+        username: '@' + (userDoc?.username ?? ''),
+        club: userDoc?.club ?? 'Sin club',
+        handicap: userDoc?.handicap ?? 0,
+        followers: userDoc?.followersCount ?? 0,
+        following: userDoc?.followingCount ?? 0,
+        avatarBg: COLORS.lime,
+        avatarColor: '#0f0f0f',
+      };
 
   // Collapsible header
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -588,8 +629,9 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <EditProfileModal visible={editVisible} onClose={() => setEditVisible(false)} />
+      {isOwnProfile && <EditProfileModal visible={editVisible} onClose={() => setEditVisible(false)} />}
       {/* Settings menu */}
+      {isOwnProfile && (
       <Modal visible={menuVisible} animationType="fade" transparent onRequestClose={() => setMenuVisible(false)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setMenuVisible(false)}>
           <View style={styles.settingsMenu}>
@@ -605,6 +647,7 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+      )}
       <View style={{ flex: 1 }}>
         {/* Scrollable pages — PagerView takes full space */}
         <PagerView
@@ -656,10 +699,15 @@ export default function ProfileScreen() {
           onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)}
           pointerEvents="box-none"
         >
+          {!isOwnProfile && (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="arrow-back" size={22} color={COLORS.white} />
+            </TouchableOpacity>
+          )}
           <View style={styles.header}>
-            {userDoc?.photoURL
+            {!viewUser && userDoc?.photoURL
               ? <Image source={{ uri: userDoc.photoURL }} style={styles.avatarLarge} />
-              : <View style={styles.avatarLarge}><Text style={styles.avatarText}>{displayUser.initials}</Text></View>
+              : <View style={[styles.avatarLarge, { backgroundColor: displayUser.avatarBg }]}><Text style={[styles.avatarText, { color: displayUser.avatarColor }]}>{displayUser.initials}</Text></View>
             }
             <View style={styles.headerInfo}>
               <View style={styles.nameRow}>
@@ -669,12 +717,23 @@ export default function ProfileScreen() {
                   <Text style={styles.hcpBadgeLabel}>HCP</Text>
                 </View>
               </View>
-              <Text style={styles.username}>{displayUser.username}</Text>
+              {!!displayUser.username && <Text style={styles.username}>{displayUser.username}</Text>}
               <Text style={styles.club}>📍 {displayUser.club}</Text>
             </View>
-            <TouchableOpacity style={styles.settingsBtn} onPress={() => setMenuVisible(true)}>
-              <Ionicons name="settings-outline" size={20} color={COLORS.muted} />
-            </TouchableOpacity>
+            {isOwnProfile ? (
+              <TouchableOpacity style={styles.settingsBtn} onPress={() => setMenuVisible(true)}>
+                <Ionicons name="settings-outline" size={20} color={COLORS.muted} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.followBtn, following && styles.followBtnActive]}
+                onPress={onPressFollow}
+              >
+                <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
+                  {following ? 'Siguiendo' : 'Seguir'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.socialRow}>
@@ -730,6 +789,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
   },
 
+  backBtn: { paddingHorizontal: 18, paddingTop: 14 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, paddingBottom: 12 },
   avatarLarge: { width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.lime, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 22, fontWeight: '800', color: '#0f0f0f' },
@@ -740,6 +800,10 @@ const styles = StyleSheet.create({
   club: { fontSize: 11, color: COLORS.muted, marginTop: 4 },
   editBtn: { borderWidth: 0.5, borderColor: COLORS.dim, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   settingsBtn: { padding: 6 },
+  followBtn: { borderWidth: 0.5, borderColor: COLORS.lime, backgroundColor: COLORS.lime, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  followBtnActive: { borderColor: COLORS.dim, backgroundColor: 'transparent' },
+  followBtnText: { fontSize: 13, fontWeight: '700', color: '#0f0f0f' },
+  followBtnTextActive: { color: COLORS.muted },
   settingsMenu: { backgroundColor: '#1e1e1e', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 32, paddingTop: 8 },
   settingsItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 24, paddingVertical: 16 },
   settingsItemText: { fontSize: 15, color: COLORS.white },

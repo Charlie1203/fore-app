@@ -86,7 +86,14 @@ export default function GlobalSearchScreen() {
               <>
                 <Text style={styles.sectionLabel}>{query.length > 0 ? 'JUGADORES' : 'SUGERIDOS'}</Text>
                 {filteredUsers.map(u => (
-                  <View key={u.id} style={styles.row}>
+                  <TouchableOpacity
+                    key={u.id}
+                    style={styles.row}
+                    onPress={() => u.username === '@juann'
+                      ? navigation.navigate('Tabs', { screen: 'Perfil' })
+                      : navigation.navigate('PerfilUsuario', { viewUser: { name: u.name, initials: u.initials, bg: u.bg, color: COLORS.lime, handicap: parseFloat(u.hcp) } })
+                    }
+                  >
                     <View style={[styles.avatar, { backgroundColor: u.bg }]}>
                       <Text style={styles.avatarText}>{u.initials}</Text>
                     </View>
@@ -95,7 +102,7 @@ export default function GlobalSearchScreen() {
                       <Text style={styles.rowSub}>{u.username} · HCP {u.hcp}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </>
             )}

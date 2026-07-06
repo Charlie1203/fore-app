@@ -1,9 +1,9 @@
 ﻿import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Dimensions, Image, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from 'react-native-pager-view';
-import { TorneoProximoDetail, TorneoEnCursoDetail, TorneoFinalizadoDetail } from './TorneosScreen';
 import type { Torneo } from './TorneosScreen';
 import Svg, { Circle, Path, Ellipse, Line, Polygon } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
@@ -162,14 +162,6 @@ const TORNEOS_MOCK: Torneo[] = [
   },
 ];
 
-const MODALIDADES_INFO = [
-  { key: 'Stroke Play', icon: '🏌️', desc: 'Suma de todos los golpes' },
-  { key: 'Stableford', icon: '⭐', desc: 'Puntos por hoyo vs par' },
-  { key: 'Match Play', icon: '⚔️', desc: 'Hoyo a hoyo entre jugadores' },
-  { key: 'Better Ball', icon: '👥', desc: 'Mejor score de la pareja' },
-  { key: 'Scramble', icon: '🎯', desc: 'Equipo elige el mejor tiro' },
-];
-
 function Avatar({ initials, bg, color, size = 42 }: { initials: string; bg: string; color: string; size?: number }) {
   return (
     <View style={[styles.avatar, { backgroundColor: bg, width: size, height: size, borderRadius: size / 2 }]}>
@@ -187,7 +179,10 @@ const MOCK_COMMENTS = [
 ];
 
 function CommentsSheet({ visible, onClose, count }: { visible: boolean; onClose: () => void; count: number }) {
+  const navigation = useNavigation<any>();
   const [text, setText] = useState('');
+  const abrirPerfil = (c: typeof MOCK_COMMENTS[0]) =>
+    navigation.navigate('PerfilUsuario', { viewUser: { name: c.autor, initials: c.initials, bg: c.bg, color: c.color } });
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -199,10 +194,14 @@ function CommentsSheet({ visible, onClose, count }: { visible: boolean; onClose:
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
           {MOCK_COMMENTS.map(c => (
             <View key={c.id} style={styles.commentRow}>
-              <Avatar initials={c.initials} bg={c.bg} color={c.color} size={32} />
+              <TouchableOpacity onPress={() => abrirPerfil(c)}>
+                <Avatar initials={c.initials} bg={c.bg} color={c.color} size={32} />
+              </TouchableOpacity>
               <View style={styles.commentBubble}>
                 <View style={styles.commentMeta}>
-                  <Text style={styles.commentAutor}>{c.autor}</Text>
+                  <TouchableOpacity onPress={() => abrirPerfil(c)}>
+                    <Text style={styles.commentAutor}>{c.autor}</Text>
+                  </TouchableOpacity>
                   <Text style={styles.commentTiempo}>{c.tiempo}</Text>
                 </View>
                 <Text style={styles.commentTexto}>{c.texto}</Text>
@@ -250,8 +249,12 @@ function PostActions({ post, onLike, onComment }: { post: Post; onLike: () => vo
 }
 
 function PostHeader({ post }: { post: Post }) {
+  const navigation = useNavigation<any>();
+  // El post fijado lo publica el club (la cuenta del grupo), no una persona — no navega a un perfil.
+  const esPersona = !post.pinned;
+  const abrirPerfil = () => navigation.navigate('PerfilUsuario', { viewUser: { name: post.autor, initials: post.initials, bg: post.bg, color: post.color } });
   return (
-    <View style={styles.postHeader}>
+    <TouchableOpacity style={styles.postHeader} activeOpacity={esPersona ? 0.7 : 1} onPress={esPersona ? abrirPerfil : undefined}>
       <Avatar initials={post.initials!} bg={post.bg!} color={post.color!} size={36} />
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -265,7 +268,7 @@ function PostHeader({ post }: { post: Post }) {
         </View>
         <Text style={styles.postTiempo}>{post.tiempo}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -485,12 +488,11 @@ function PostComposer({ visible, onClose }: { visible: boolean; onClose: () => v
 // ─── GroupDetail ──────────────────────────────────────────────────────────────
 
 function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
+  const navigation = useNavigation<any>();
   const isMember = MY_GROUPS.some(g => g.id === group.id);
   const [joined, setJoined] = useState(isMember);
   const [tab, setTab] = useState(0);
-  const [showTorneo, setShowTorneo] = useState(false);
   const [showComposer, setShowComposer] = useState(false);
-  const [selectedTorneo, setSelectedTorneo] = useState<Torneo | null>(null);
   const [posts, setPosts] = useState<Post[]>(ACTIVIDAD_POSTS);
   const [commentsPost, setCommentsPost] = useState<Post | null>(null);
 
@@ -523,11 +525,7 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
 
   return (
     <View style={{ flex: 1 }}>
-      {showTorneo && <CreateTorneoModal onClose={() => setShowTorneo(false)} grupoDefault={group.name} />}
       <PostComposer visible={showComposer} onClose={() => setShowComposer(false)} />
-      {selectedTorneo?.estado === 'próximo' && <TorneoProximoDetail torneo={selectedTorneo} onClose={() => setSelectedTorneo(null)} />}
-      {selectedTorneo?.estado === 'en curso' && <TorneoEnCursoDetail torneo={selectedTorneo} onClose={() => setSelectedTorneo(null)} />}
-      {selectedTorneo?.estado === 'finalizado' && <TorneoFinalizadoDetail torneo={selectedTorneo} onClose={() => setSelectedTorneo(null)} />}
       {commentsPost && (
         <CommentsSheet
           visible={!!commentsPost}
@@ -543,14 +541,17 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
         </TouchableOpacity>
         <Text style={styles.detailTitle}>{group.name}</Text>
         {tab === 1 && (
-          <TouchableOpacity style={styles.headerAddBtn} onPress={() => setShowTorneo(true)}>
+          <TouchableOpacity style={styles.headerAddBtn} onPress={() => navigation.navigate('CreateTorneo', { grupoFijo: group.name })}>
             <Ionicons name="add" size={24} color={COLORS.lime} />
           </TouchableOpacity>
         )}
       </View>
 
       {/* Líder fijo */}
-      <View style={styles.leaderCard}>
+      <TouchableOpacity
+        style={styles.leaderCard}
+        onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: 'Pepe Noceti', initials: 'PE', bg: '#222', color: COLORS.lime } })}
+      >
         <View style={styles.leaderAccent} />
         <Avatar initials="PE" bg="#222" color={COLORS.lime} size={40} />
         <View style={{ flex: 1 }}>
@@ -561,7 +562,7 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
           <Text style={styles.leaderScoreNum}>71</Text>
           <Text style={styles.leaderScoreSub}>-1 vs par</Text>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Tabs fijos */}
       <View style={styles.groupTabBar}>
@@ -590,7 +591,7 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
 
           <ScrollView key="1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
             {TORNEOS_MOCK.map(t => (
-              <TouchableOpacity key={t.id} style={styles.torneoRow} onPress={() => setSelectedTorneo(t)}>
+              <TouchableOpacity key={t.id} style={styles.torneoRow} onPress={() => navigation.navigate('TorneoDetail', { torneo: t })}>
                 <View style={[styles.torneoEstadoDot, t.estado === 'próximo' ? styles.torneoEstadoDotNext : styles.torneoEstadoDotDone]} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.torneoNombre}>{t.nombre}</Text>
@@ -606,13 +607,17 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
 
           <ScrollView key="2" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
             {PLAYERS.map((p, i) => (
-              <View key={i} style={styles.row}>
+              <TouchableOpacity
+                key={i}
+                style={styles.row}
+                onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: p.name, initials: p.initials, bg: p.bg, color: p.color, handicap: p.hcp } })}
+              >
                 <Avatar initials={p.initials} bg={p.bg} color={p.color} size={46} />
                 <View style={styles.rowInfo}>
                   <Text style={styles.rowName}>{p.name}</Text>
                   <Text style={styles.rowSub}>{p.username} · HCP {p.hcp}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </PagerView>
@@ -628,106 +633,6 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
 }
 
 // ─── Modales ──────────────────────────────────────────────────────────────────
-
-function ModalidadDropdown({ value, onChange }: { value: string | null; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <View style={styles.dropdown}>
-      <TouchableOpacity style={styles.dropdownBtn} onPress={() => setOpen(o => !o)}>
-        <Text style={[styles.dropdownBtnText, !value && { color: COLORS.dim }]}>
-          {value ?? 'Elegir modalidad...'}
-        </Text>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.muted} />
-      </TouchableOpacity>
-      {open && (
-        <View style={styles.dropdownList}>
-          {MODALIDADES_INFO.map((m, i) => (
-            <TouchableOpacity
-              key={m.key}
-              style={[styles.dropdownItem, i < MODALIDADES_INFO.length - 1 && styles.dropdownItemBorder, value === m.key && styles.dropdownItemActive]}
-              onPress={() => { onChange(m.key); setOpen(false); }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.dropdownItemText, value === m.key && styles.dropdownItemTextActive]}>{m.key}</Text>
-                <Text style={styles.dropdownItemDesc}>{m.desc}</Text>
-              </View>
-              {value === m.key && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
-function CreateTorneoModal({ onClose, grupoDefault }: { onClose: () => void; grupoDefault?: string }) {
-  const [nombre, setNombre] = useState('');
-  const [modalidad, setModalidad] = useState<string | null>(null);
-  const [rondas, setRondas] = useState('');
-  const [visibilidad, setVisibilidad] = useState<'grupo' | 'publico'>(grupoDefault ? 'grupo' : 'publico');
-
-  const canCreate = nombre.trim() && modalidad && rondas.trim();
-
-  return (
-    <View style={styles.modal}>
-      <View style={styles.modalCard}>
-        <View style={styles.modalHandle} />
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Nuevo torneo</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={20} color={COLORS.muted} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24, gap: 12 }}>
-          <Text style={styles.label}>Nombre</Text>
-          <View style={styles.inputBox}>
-            <TextInput
-              style={styles.inputText}
-              placeholder="Ej: Copa Julio"
-              placeholderTextColor={COLORS.dim}
-              value={nombre}
-              onChangeText={setNombre}
-            />
-          </View>
-
-          <Text style={styles.label}>Modalidad</Text>
-          <ModalidadDropdown value={modalidad} onChange={setModalidad} />
-
-          <Text style={styles.label}>Rondas</Text>
-          <View style={styles.inputBox}>
-            <TextInput
-              style={styles.inputText}
-              placeholder="Ej: 2"
-              placeholderTextColor={COLORS.dim}
-              value={rondas}
-              onChangeText={t => setRondas(t.replace(/[^0-9]/g, ''))}
-              keyboardType="number-pad"
-              maxLength={2}
-            />
-          </View>
-
-          <Text style={styles.label}>Grupo <Text style={{ color: COLORS.dim, fontWeight: '400', textTransform: 'none' }}>(opcional)</Text></Text>
-          <View style={styles.dropdown}>
-            <View style={[styles.dropdownBtn, { backgroundColor: '#1a2a0a' }]}>
-              <Text style={[styles.dropdownBtnText, { color: COLORS.lime }]}>{grupoDefault}</Text>
-            </View>
-          </View>
-        </ScrollView>
-
-        <View style={styles.modalFooter}>
-          <TouchableOpacity
-            style={[styles.createBtn, !canCreate && { opacity: 0.4 }]}
-            onPress={onClose}
-            disabled={!canCreate}
-          >
-            <Text style={styles.createBtnText}>Crear torneo</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 function CreateGroupModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('');
@@ -783,14 +688,20 @@ function GroupRow({ group, onPress }: { group: Group; onPress: () => void }) {
 }
 
 function PlayerRow({ player }: { player: Player }) {
+  const navigation = useNavigation<any>();
   const [following, setFollowing] = useState(false);
   return (
     <View style={styles.row}>
-      <Avatar initials={player.initials} bg={player.bg} color={player.color} size={46} />
-      <View style={styles.rowInfo}>
-        <Text style={styles.rowName}>{player.name}</Text>
-        <Text style={styles.rowSub}>{player.username} · HCP {player.hcp}</Text>
-      </View>
+      <TouchableOpacity
+        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}
+        onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: player.name, initials: player.initials, bg: player.bg, color: player.color, handicap: player.hcp } })}
+      >
+        <Avatar initials={player.initials} bg={player.bg} color={player.color} size={46} />
+        <View style={styles.rowInfo}>
+          <Text style={styles.rowName}>{player.name}</Text>
+          <Text style={styles.rowSub}>{player.username} · HCP {player.hcp}</Text>
+        </View>
+      </TouchableOpacity>
       <TouchableOpacity
         style={[styles.followBtn, following && styles.followBtnActive]}
         onPress={() => setFollowing(!following)}
@@ -1053,7 +964,6 @@ const styles = StyleSheet.create({
   // Modales
   modal: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end', zIndex: 100 },
   modalCard: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '90%', paddingTop: 12 },
-  modalHandle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 4 },
   modalFooter: { paddingHorizontal: 24, paddingBottom: 32, paddingTop: 12, borderTopWidth: 0.5, borderTopColor: '#222' },
   modalTitle: { fontSize: 18, fontWeight: '800', color: COLORS.white },
@@ -1065,14 +975,6 @@ const styles = StyleSheet.create({
   dropdown: { borderRadius: 10, borderWidth: 0.5, borderColor: '#2a2a2a', overflow: 'hidden' },
   dropdownBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#1a1a1a' },
   dropdownBtnText: { fontSize: 14, color: COLORS.white, fontWeight: '500' },
-  dropdownList: { borderTopWidth: 0.5, borderTopColor: '#2a2a2a' },
-  dropdownItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#161616' },
-  dropdownItemBorder: { borderBottomWidth: 0.5, borderBottomColor: '#222' },
-  dropdownItemActive: { backgroundColor: '#1a2a0a' },
-  dropdownItemText: { fontSize: 14, color: COLORS.muted, fontWeight: '500' },
-  dropdownItemTextActive: { color: COLORS.lime, fontWeight: '600' },
-  dropdownItemDesc: { fontSize: 11, color: COLORS.dim, marginTop: 2 },
-  visibilidadRow: { gap: 8 },
   visibilidadBtn: { borderWidth: 0.5, borderColor: '#2a2a2a', borderRadius: 10, padding: 14, backgroundColor: '#1a1a1a' },
   visibilidadBtnActive: { borderColor: COLORS.lime, backgroundColor: '#1a2a0a' },
   visibilidadBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.muted },

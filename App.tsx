@@ -12,9 +12,12 @@ import UploadScreen from "./screens/UploadScreen";
 import SearchScreen from "./screens/SearchScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import TorneosScreen from "./screens/TorneosScreen";
+import TorneoDetailScreen from "./screens/TorneoDetailScreen";
 import GlobalSearchScreen from "./screens/GlobalSearchScreen";
 import NotificationsScreen from "./screens/NotificationsScreen";
 import CreateTorneoScreen from "./screens/CreateTorneoScreen";
+import InvitarJugadoresScreen from "./screens/InvitarJugadoresScreen";
+import TorneoCreadoScreen from "./screens/TorneoCreadoScreen";
 import LoginScreen from "./screens/auth/LoginScreen";
 import RegisterScreen from "./screens/auth/RegisterScreen";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -123,7 +126,11 @@ function AppStack() {
       <RootStack.Screen name="Tabs" component={TabsNavigator} />
       <RootStack.Screen name="GlobalSearch" component={GlobalSearchScreen} options={{ animation: 'fade' }} />
       <RootStack.Screen name="Notifications" component={NotificationsScreen} options={{ animation: 'slide_from_right' }} />
+      <RootStack.Screen name="TorneoDetail" component={TorneoDetailScreen} options={{ presentation: 'fullScreenModal' }} />
+      <RootStack.Screen name="PerfilUsuario" component={ProfileScreen} options={{ animation: 'slide_from_right' }} />
       <RootStack.Screen name="CreateTorneo" component={CreateTorneoScreen} options={{ animation: 'slide_from_right' }} />
+      <RootStack.Screen name="InvitarJugadores" component={InvitarJugadoresScreen} options={{ animation: 'slide_from_right' }} />
+      <RootStack.Screen name="TorneoCreado" component={TorneoCreadoScreen} options={{ animation: 'fade', gestureEnabled: false }} />
     </RootStack.Navigator>
   );
 }

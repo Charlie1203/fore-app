@@ -17,7 +17,7 @@ import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from "react-native-svg";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 
 const SCREEN_W = Dimensions.get("window").width;
@@ -104,9 +104,23 @@ const STORIES_OTHERS = [
 	{ initials: "MR", bg: "#3a2a1a", color: "#e0a03a", name: "Manu R.", photo: null, seen: false },
 ];
 
-function StoryViewer({ story, onClose }: { story: typeof STORIES_OTHERS[0]; onClose: () => void }) {
+function StoryViewer({ stories, initialIndex, onClose }: { stories: typeof STORIES_OTHERS; initialIndex: number; onClose: () => void }) {
+	const insets = useSafeAreaInsets();
+	const [index, setIndex] = useState(initialIndex);
+	const story = stories[index];
+
+	const goNext = () => {
+		if (index < stories.length - 1) setIndex(i => i + 1);
+		else onClose();
+	};
+	const goPrev = () => {
+		if (index > 0) setIndex(i => i - 1);
+	};
+
+	if (!story) return null;
+
 	return (
-		<Modal visible animationType="fade" statusBarTranslucent>
+		<Modal visible animationType="fade" statusBarTranslucent onRequestClose={onClose}>
 			<View style={styles.storyModal}>
 				{story.photo
 					? <Image source={{ uri: story.photo }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -114,14 +128,27 @@ function StoryViewer({ story, onClose }: { story: typeof STORIES_OTHERS[0]; onCl
 						<Text style={{ fontSize: 64, fontWeight: '800', color: story.color }}>{story.initials}</Text>
 					</View>
 				}
-				<View style={styles.storyOverlay}>
-					<View style={styles.storyBar} />
+
+				{/* Zonas de toque: derecha avanza, izquierda retrocede — como Instagram */}
+				<View style={styles.storyTapZones} pointerEvents="box-none">
+					<TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={goPrev} />
+					<TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={goNext} />
+				</View>
+
+				<View style={[styles.storyOverlay, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+					<View style={styles.storyBarRow}>
+						{stories.map((_, i) => (
+							<View key={i} style={styles.storyBarTrack}>
+								<View style={[styles.storyBarFill, { width: i <= index ? '100%' : '0%' }]} />
+							</View>
+						))}
+					</View>
 					<View style={styles.storyHeader}>
 						<View style={[styles.storyAvatarSmall, { backgroundColor: story.bg }]}>
 							<Text style={[styles.storyAvatarText, { color: story.color }]}>{story.initials}</Text>
 						</View>
 						<Text style={styles.storyName}>{story.name}</Text>
-						<TouchableOpacity onPress={onClose} style={{ marginLeft: 'auto' }}>
+						<TouchableOpacity onPress={onClose} style={{ marginLeft: 'auto', padding: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
 							<Ionicons name="close" size={26} color="#fff" />
 						</TouchableOpacity>
 					</View>
@@ -346,7 +373,10 @@ const MOCK_COMMENTS = [
 ];
 
 function CommentsSheet({ visible, count, onClose }: { visible: boolean; count: number; onClose: () => void }) {
+	const navigation = useNavigation<any>();
 	const [text, setText] = useState('');
+	const abrirPerfil = (c: typeof MOCK_COMMENTS[0]) =>
+		navigation.navigate('PerfilUsuario', { viewUser: { name: c.autor, initials: c.initials, bg: c.bg, color: c.color } });
 	return (
 		<Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
 			<View style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -358,12 +388,16 @@ function CommentsSheet({ visible, count, onClose }: { visible: boolean; count: n
 					<ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 						{MOCK_COMMENTS.map(c => (
 							<View key={c.id} style={styles.commentRow}>
-								<View style={[styles.commentAvatar, { backgroundColor: c.bg }]}>
-									<Text style={[styles.commentAvatarText, { color: c.color }]}>{c.initials}</Text>
-								</View>
+								<TouchableOpacity onPress={() => abrirPerfil(c)}>
+									<View style={[styles.commentAvatar, { backgroundColor: c.bg }]}>
+										<Text style={[styles.commentAvatarText, { color: c.color }]}>{c.initials}</Text>
+									</View>
+								</TouchableOpacity>
 								<View style={styles.commentBubble}>
 									<View style={styles.commentMeta}>
-										<Text style={styles.commentAutor}>{c.autor}</Text>
+										<TouchableOpacity onPress={() => abrirPerfil(c)}>
+											<Text style={styles.commentAutor}>{c.autor}</Text>
+										</TouchableOpacity>
 										<Text style={styles.commentTiempo}>{c.tiempo}</Text>
 									</View>
 									<Text style={styles.commentTexto}>{c.texto}</Text>
@@ -426,16 +460,18 @@ function CardFooter({
 }
 
 function HcpCard() {
+	const navigation = useNavigation<any>();
+	const abrirPerfil = () => navigation.navigate('PerfilUsuario', { viewUser: { name: 'Pepe Noceti', initials: 'PE', bg: '#333', color: COLORS.lime } });
 	return (
 		<View style={styles.card}>
-			<View style={styles.cardHeader}>
+			<TouchableOpacity style={styles.cardHeader} onPress={abrirPerfil}>
 				<Avatar initials="PE" bg="#333" color={COLORS.lime} />
 				<View style={styles.cardMeta}>
 					<Text style={styles.cardName}>Pepe Noceti</Text>
 					<Text style={styles.cardTime}>hace 2 horas</Text>
 				</View>
 				<Text style={styles.dots}>···</Text>
-			</View>
+			</TouchableOpacity>
 			<View style={styles.cardBody}>
 				<View style={styles.hcpRow}>
 					<View style={styles.hcpBadge}>
@@ -585,15 +621,18 @@ function PhotoCarousel({ photos }: { photos: string[] }) {
 }
 
 function RoundCard({ photos = [] }: { photos?: string[] }) {
+	const navigation = useNavigation<any>();
 	const [expanded, setExpanded] = useState(false);
 	const score = JUAN_HOLES.reduce((a, h) => a + h.score, 0);
 	const totalPar = JUAN_HOLES.reduce((a, h) => a + h.par, 0);
 	const vsPar = score - totalPar;
 	const hasPhotos = photos.length > 0;
+	// Es tu propio post: va a tu perfil (tab), no a un perfil de solo lectura.
+	const abrirPerfil = () => navigation.navigate('Tabs', { screen: 'Perfil' });
 
 	return (
 		<View style={styles.card}>
-			<View style={styles.cardHeader}>
+			<TouchableOpacity style={styles.cardHeader} onPress={abrirPerfil}>
 				<Avatar initials="JN" bg={COLORS.lime} color="#0f0f0f" />
 				<View style={styles.cardMeta}>
 					<Text style={styles.cardName}>Juan Noceti</Text>
@@ -601,7 +640,7 @@ function RoundCard({ photos = [] }: { photos?: string[] }) {
 					<Text style={styles.cardTime}>hace 5 horas</Text>
 				</View>
 				<Text style={styles.dots}>···</Text>
-			</View>
+			</TouchableOpacity>
 
 			{hasPhotos ? (
 				<>
@@ -644,16 +683,18 @@ function RoundCard({ photos = [] }: { photos?: string[] }) {
 }
 
 function MilestoneCard() {
+	const navigation = useNavigation<any>();
+	const abrirPerfil = () => navigation.navigate('PerfilUsuario', { viewUser: { name: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: COLORS.lime } });
 	return (
 		<View style={styles.card}>
-			<View style={styles.cardHeader}>
+			<TouchableOpacity style={styles.cardHeader} onPress={abrirPerfil}>
 				<Avatar initials="CA" bg="#2a3a1a" color={COLORS.lime} />
 				<View style={styles.cardMeta}>
 					<Text style={styles.cardName}>Carlitos Laprida</Text>
 					<Text style={styles.cardTime}>ayer</Text>
 				</View>
 				<Text style={styles.dots}>···</Text>
-			</View>
+			</TouchableOpacity>
 			<View style={styles.cardBody}>
 				<View style={styles.milestone}>
 					<View style={styles.milestoneIcon}>
@@ -687,8 +728,13 @@ export default function FeedScreen() {
 	const [showToast, setShowToast] = useState(false);
 	const [newPostPhotos, setNewPostPhotos] = useState<string[]>([]);
 	const [myStory, setMyStory] = useState<string | null>(null);
-	const [viewingStory, setViewingStory] = useState<typeof STORIES_OTHERS[0] | null>(null);
+	const [viewingIndex, setViewingIndex] = useState<number | null>(null);
 	const [seenStories, setSeenStories] = useState<Set<string>>(new Set());
+
+	const storiesConNombre = STORIES_OTHERS.filter(s => s.photo);
+	const combinedStories = myStory
+		? [{ initials: 'JN', bg: COLORS.lime, color: '#0f0f0f', name: 'Tu historia', photo: myStory, seen: false }, ...storiesConNombre]
+		: storiesConNombre;
 
 	useEffect(() => {
 		if (!route.params?.showSuccess) return;
@@ -713,19 +759,16 @@ export default function FeedScreen() {
 		if (!result.canceled) setMyStory(result.assets[0].uri);
 	};
 
-	const openStory = (s: typeof STORIES_OTHERS[0]) => {
-		setSeenStories(prev => new Set(prev).add(s.name));
-		setViewingStory(s);
+	const openStoryAt = (idx: number) => {
+		const s = combinedStories[idx];
+		if (s) setSeenStories(prev => new Set(prev).add(s.name));
+		setViewingIndex(idx);
 	};
 
 	return (
 		<SafeAreaView style={styles.container} edges={["top"]}>
-			{viewingStory && <StoryViewer story={viewingStory} onClose={() => setViewingStory(null)} />}
-			{myStory && (
-				<StoryViewer
-					story={{ initials: 'JN', bg: '#c8e03a', color: '#0f0f0f', name: 'Tu historia', photo: myStory, seen: false }}
-					onClose={() => setViewingStory(null)}
-				/>
+			{viewingIndex !== null && (
+				<StoryViewer stories={combinedStories} initialIndex={viewingIndex} onClose={() => setViewingIndex(null)} />
 			)}
 
 			<View style={styles.header}>
@@ -744,7 +787,7 @@ export default function FeedScreen() {
 			<ScrollView showsVerticalScrollIndicator={false}>
 				<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesRow} contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 12 }}>
 					{/* Vos */}
-					<TouchableOpacity style={styles.storyItem} onPress={myStory ? () => setViewingStory({ initials: 'JN', bg: '#c8e03a', color: '#0f0f0f', name: 'Tu historia', photo: myStory, seen: false }) : addMyStory}>
+					<TouchableOpacity style={styles.storyItem} onPress={myStory ? () => openStoryAt(0) : addMyStory}>
 						<View style={[styles.storyRing, { borderColor: myStory ? COLORS.lime : '#333' }]}>
 							<Avatar initials="JN" bg={COLORS.lime} color="#0f0f0f" size={42} />
 							{!myStory && (
@@ -757,8 +800,8 @@ export default function FeedScreen() {
 					</TouchableOpacity>
 
 					{/* Otros */}
-					{STORIES_OTHERS.filter(s => s.photo).map((s, i) => (
-						<TouchableOpacity key={i} style={styles.storyItem} onPress={() => openStory(s)}>
+					{storiesConNombre.map((s, i) => (
+						<TouchableOpacity key={i} style={styles.storyItem} onPress={() => openStoryAt(combinedStories.indexOf(s))}>
 							<View style={[styles.storyRing, { borderColor: seenStories.has(s.name) ? '#444' : COLORS.lime }]}>
 								<Avatar initials={s.initials} bg={s.bg} color={s.color} size={42} />
 							</View>
@@ -808,8 +851,11 @@ const styles = StyleSheet.create({
 	storyPlus: { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: COLORS.lime, borderWidth: 1.5, borderColor: COLORS.bg, alignItems: 'center', justifyContent: 'center' },
 	storyPlusText: { fontSize: 13, fontWeight: '800', color: '#0f0f0f', lineHeight: 16 },
 	storyModal: { flex: 1, backgroundColor: '#000' },
+	storyTapZones: { ...StyleSheet.absoluteFillObject, flexDirection: 'row' },
 	storyOverlay: { position: 'absolute', top: 0, left: 0, right: 0 },
-	storyBar: { height: 3, backgroundColor: COLORS.lime, marginHorizontal: 12, marginTop: 50, borderRadius: 2 },
+	storyBarRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 12 },
+	storyBarTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.3)', overflow: 'hidden' },
+	storyBarFill: { height: '100%', backgroundColor: COLORS.lime },
 	storyHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 12 },
 	storyAvatarSmall: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 	storyAvatarText: { fontSize: 12, fontWeight: '800' },

@@ -1,5 +1,6 @@
-import { View, Text, ScrollView, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
 import { SafeAreaView as SafeAreaViewCtx } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -27,9 +28,13 @@ function Avatar({ initials, bg, color, size = 40 }: { initials: string; bg: stri
 }
 
 function PodiumCard({ player }: { player: typeof RANKING[0] }) {
+  const navigation = useNavigation<any>();
   const isFirst = player.pos === 1;
+  const abrirPerfil = () => player.isMe
+    ? navigation.navigate('Tabs', { screen: 'Perfil' })
+    : navigation.navigate('PerfilUsuario', { viewUser: { name: player.name, initials: player.initials, bg: player.bg, color: player.color } });
   return (
-    <View style={[styles.podiumCard, isFirst && styles.podiumCardFirst]}>
+    <TouchableOpacity style={[styles.podiumCard, isFirst && styles.podiumCardFirst]} onPress={abrirPerfil}>
       <Text style={styles.podiumMedal}>{MEDAL[player.pos]}</Text>
       <Avatar initials={player.initials} bg={player.bg} color={player.color} size={isFirst ? 56 : 46} />
       <Text style={[styles.podiumName, isFirst && { color: COLORS.white, fontSize: 13 }]} numberOfLines={1}>{player.name.split(' ')[0]}</Text>
@@ -37,11 +42,12 @@ function PodiumCard({ player }: { player: typeof RANKING[0] }) {
       <Text style={[styles.podiumVsPar, { color: player.vsPar <= 0 ? COLORS.lime : COLORS.muted }]}>
         {player.vsPar > 0 ? '+' : ''}{player.vsPar}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 export default function RankingScreen() {
+  const navigation = useNavigation<any>();
   const now = new Date();
   const mes = now.toLocaleString('es', { month: 'long' });
 
@@ -64,7 +70,14 @@ export default function RankingScreen() {
         {/* Lista 4 en adelante */}
         <View style={styles.list}>
           {RANKING.slice(3).map(p => (
-            <View key={p.pos} style={[styles.row, p.isMe && styles.rowMe]}>
+            <TouchableOpacity
+              key={p.pos}
+              style={[styles.row, p.isMe && styles.rowMe]}
+              onPress={() => p.isMe
+                ? navigation.navigate('Tabs', { screen: 'Perfil' })
+                : navigation.navigate('PerfilUsuario', { viewUser: { name: p.name, initials: p.initials, bg: p.bg, color: p.color } })
+              }
+            >
               <Text style={styles.rowPos}>{p.pos}</Text>
               <Avatar initials={p.initials} bg={p.bg} color={p.color} size={38} />
               <View style={styles.rowInfo}>
@@ -79,7 +92,7 @@ export default function RankingScreen() {
                   {p.vsPar > 0 ? '+' : ''}{p.vsPar}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
 
