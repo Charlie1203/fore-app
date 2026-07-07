@@ -386,6 +386,8 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [displayName, setDisplayName] = useState(userDoc?.displayName ?? '');
   const [username, setUsername] = useState(userDoc?.username ?? '');
   const [matricula, setMatricula] = useState(userDoc?.matricula ?? '');
+  const [club, setClub] = useState(userDoc?.club ?? '');
+  const [bio, setBio] = useState(userDoc?.bio ?? '');
   const [photoURI, setPhotoURI] = useState<string | null>(userDoc?.photoURL ?? null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -423,6 +425,8 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
         displayName: displayName.trim(),
         username: username.trim().toLowerCase().replace(/^@/, ''),
         matricula: matricula.trim() || null,
+        club: club.trim() || null,
+        bio: bio.trim() || null,
         // El handicap no se edita acá: se sincroniza solo a partir de la matrícula.
       });
       onClose();
@@ -478,6 +482,24 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
               <TextInput style={epStyles.input} value={matricula} onChangeText={t => setMatricula(t.replace(/[^0-9]/g, ''))} placeholder="Ej: 123456" placeholderTextColor={COLORS.dim} keyboardType="number-pad" />
             </View>
             <Text style={epStyles.hintText}>El handicap se vincula solo a partir de tu matrícula.</Text>
+
+            <Text style={epStyles.label}>Club</Text>
+            <View style={epStyles.inputBox}>
+              <TextInput style={epStyles.input} value={club} onChangeText={setClub} placeholder="Ej: Haras Santa María" placeholderTextColor={COLORS.dim} />
+            </View>
+
+            <Text style={epStyles.label}>Bio</Text>
+            <View style={[epStyles.inputBox, { paddingVertical: 10 }]}>
+              <TextInput
+                style={[epStyles.input, { paddingVertical: 2, minHeight: 60 }]}
+                value={bio}
+                onChangeText={t => setBio(t.slice(0, 150))}
+                placeholder="Contá algo sobre vos"
+                placeholderTextColor={COLORS.dim}
+                multiline
+              />
+            </View>
+            <Text style={epStyles.hintText}>{bio.length}/150</Text>
 
             <TouchableOpacity style={[epStyles.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
               <Text style={epStyles.saveBtnText}>{saving ? 'Guardando...' : 'Guardar'}</Text>
@@ -739,6 +761,10 @@ export default function ProfileScreen() {
             )}
           </View>
 
+          {isOwnProfile && !!userDoc?.bio && (
+            <Text style={styles.bio}>{userDoc.bio}</Text>
+          )}
+
           <View style={styles.socialRow}>
             <TouchableOpacity style={styles.socialItem}>
               <Text style={styles.socialVal}>{displayUser.following}</Text>
@@ -801,6 +827,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 17, fontWeight: '700', color: COLORS.white },
   username: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
   club: { fontSize: 11, color: COLORS.muted, marginTop: 4 },
+  bio: { fontSize: 13, color: COLORS.white, marginHorizontal: 18, marginTop: 8, lineHeight: 18 },
   editBtn: { borderWidth: 0.5, borderColor: COLORS.dim, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   settingsBtn: { padding: 6 },
   followBtn: { borderWidth: 0.5, borderColor: COLORS.lime, backgroundColor: COLORS.lime, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
