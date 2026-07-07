@@ -63,14 +63,6 @@ const COLORS = {
   dark2: '#242424',
 };
 
-// Stats que todavía no vienen de Firestore en esta etapa (se migran junto con Historial/Stats).
-const MOCK_USER_STATS = {
-  rounds: 18,
-  bestScore: 74,
-  eagles: 0,
-  birdies: 34,
-};
-
 const COURSES = [
   { name: 'Haras Santa María', rounds: 9, bestScore: 74 },
   { name: 'Martindale CC', rounds: 5, bestScore: 79 },
@@ -98,7 +90,7 @@ const Y_AXIS_W = 32;
 const TAB_BAR_H = 44;
 const BOTTOM_TAB_H = 80;
 
-function HcpChart({ thirdKpi }: { thirdKpi: { value: number; label: string } }) {
+function HcpChart({ thirdKpi, roundsCount, bestScore }: { thirdKpi: { value: number; label: string }; roundsCount: number; bestScore: number | null }) {
   const values = HCP_HISTORY.map(h => h.value);
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
@@ -163,12 +155,12 @@ function HcpChart({ thirdKpi }: { thirdKpi: { value: number; label: string } }) 
 
       <View style={styles.kpiFooter}>
         <View style={styles.kpiItem}>
-          <Text style={styles.kpiVal}>{MOCK_USER_STATS.rounds}</Text>
-          <Text style={styles.kpiLabel}>Rondas{'\n'}este año</Text>
+          <Text style={styles.kpiVal}>{roundsCount}</Text>
+          <Text style={styles.kpiLabel}>Rondas{'\n'}cargadas</Text>
         </View>
         <View style={styles.kpiDivider} />
         <View style={styles.kpiItem}>
-          <Text style={styles.kpiVal}>{MOCK_USER_STATS.bestScore}</Text>
+          <Text style={styles.kpiVal}>{bestScore ?? '—'}</Text>
           <Text style={styles.kpiLabel}>Mejor{'\n'}score</Text>
         </View>
         <View style={styles.kpiDivider} />
@@ -541,9 +533,13 @@ export default function ProfileScreen() {
       setFollowing(true);
     }
   };
-  const thirdKpi = MOCK_USER_STATS.eagles > 0
-    ? { value: MOCK_USER_STATS.eagles, label: 'Eagles' }
-    : { value: MOCK_USER_STATS.birdies, label: 'Birdies' };
+  const totalEagles = rounds.reduce((a, r) => a + r.eagles, 0);
+  const totalBirdies = rounds.reduce((a, r) => a + r.birdies, 0);
+  const roundsCount = rounds.length;
+  const bestScore = rounds.length > 0 ? Math.min(...rounds.map(r => r.totalScore)) : null;
+  const thirdKpi = totalEagles > 0
+    ? { value: totalEagles, label: 'Eagles' }
+    : { value: totalBirdies, label: 'Birdies' };
 
   const initials = viewUser
     ? viewUser.initials
@@ -686,7 +682,7 @@ export default function ProfileScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={{ marginHorizontal: 18, marginTop: 8, marginBottom: 8 }}>
-              <HcpChart thirdKpi={thirdKpi} />
+              <HcpChart thirdKpi={thirdKpi} roundsCount={roundsCount} bestScore={bestScore} />
             </View>
           </Animated.ScrollView>
 

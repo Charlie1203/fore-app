@@ -21,8 +21,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
-import { collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore";
-import type { RoundDoc } from "../firebase/types";
+import {
+	collection, query, where, orderBy, limit, onSnapshot,
+	doc, getDoc, setDoc, deleteDoc, updateDoc, addDoc, increment, serverTimestamp,
+} from "firebase/firestore";
+import type { RoundDoc, CommentDoc } from "../firebase/types";
 
 const SCREEN_W = Dimensions.get("window").width;
 
@@ -378,11 +381,57 @@ const MOCK_COMMENTS = [
 	{ id: '2', autor: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', texto: 'Crack, cuándo repetimos?', tiempo: 'hace 30 min' },
 ];
 
-function CommentsSheet({ visible, count, onClose }: { visible: boolean; count: number; onClose: () => void }) {
+function formatFechaComentario(ts: any): string {
+	if (!ts?.toDate) return 'ahora';
+	return ts.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+}
+
+function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean; roundId?: string; count: number; onClose: () => void }) {
 	const navigation = useNavigation<any>();
+	const { firebaseUser, userDoc } = useAuth();
 	const [text, setText] = useState('');
-	const abrirPerfil = (c: typeof MOCK_COMMENTS[0]) =>
-		navigation.navigate('PerfilUsuario', { viewUser: { name: c.autor, initials: c.initials, bg: c.bg, color: c.color } });
+	const [comments, setComments] = useState<CommentDoc[]>([]);
+	const [sending, setSending] = useState(false);
+
+	useEffect(() => {
+		if (!visible || !roundId) return;
+		const q = query(collection(db, 'rounds', roundId, 'comments'), orderBy('createdAt', 'asc'));
+		const unsubscribe = onSnapshot(q, snap => setComments(snap.docs.map(d => d.data() as CommentDoc)));
+		return unsubscribe;
+	}, [visible, roundId]);
+
+	const abrirPerfil = (c: typeof MOCK_COMMENTS[0] | CommentDoc) => {
+		const name = 'autor' in c ? c.autor : c.authorName;
+		const initials = 'autor' in c ? c.initials : c.authorInitials;
+		const bg = 'autor' in c ? c.bg : COLORS.lime;
+		const color = 'autor' in c ? c.color : '#0f0f0f';
+		navigation.navigate('PerfilUsuario', { viewUser: { name, initials, bg, color } });
+	};
+
+	const enviar = async () => {
+		const value = text.trim();
+		if (!value || !roundId || !firebaseUser || sending) return;
+		setSending(true);
+		try {
+			const authorName = userDoc?.displayName ?? 'Vos';
+			const authorInitials = authorName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+			await addDoc(collection(db, 'rounds', roundId, 'comments'), {
+				authorId: firebaseUser.uid,
+				authorName,
+				authorInitials,
+				authorAvatarColor: '#0f0f0f',
+				text: value,
+				createdAt: serverTimestamp(),
+			});
+			await updateDoc(doc(db, 'rounds', roundId), { commentsCount: increment(1) });
+			setText('');
+		} catch {
+			// noop — el usuario puede reintentar
+		} finally {
+			setSending(false);
+		}
+	};
+
 	return (
 		<Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
 			<View style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -392,24 +441,45 @@ function CommentsSheet({ visible, count, onClose }: { visible: boolean; count: n
 					<View style={styles.commentsHandle} />
 					<Text style={styles.commentsTitle}>{count} comentarios</Text>
 					<ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-						{MOCK_COMMENTS.map(c => (
-							<View key={c.id} style={styles.commentRow}>
-								<TouchableOpacity onPress={() => abrirPerfil(c)}>
-									<View style={[styles.commentAvatar, { backgroundColor: c.bg }]}>
-										<Text style={[styles.commentAvatarText, { color: c.color }]}>{c.initials}</Text>
+						{roundId ? (
+							comments.length > 0 ? comments.map(c => (
+								<View key={c.id} style={styles.commentRow}>
+									<TouchableOpacity onPress={() => abrirPerfil(c)}>
+										<View style={[styles.commentAvatar, { backgroundColor: COLORS.lime }]}>
+											<Text style={[styles.commentAvatarText, { color: '#0f0f0f' }]}>{c.authorInitials}</Text>
+										</View>
+									</TouchableOpacity>
+									<View style={styles.commentBubble}>
+										<View style={styles.commentMeta}>
+											<TouchableOpacity onPress={() => abrirPerfil(c)}>
+												<Text style={styles.commentAutor}>{c.authorName}</Text>
+											</TouchableOpacity>
+											<Text style={styles.commentTiempo}>{formatFechaComentario(c.createdAt)}</Text>
+										</View>
+										<Text style={styles.commentTexto}>{c.text}</Text>
 									</View>
-								</TouchableOpacity>
-								<View style={styles.commentBubble}>
-									<View style={styles.commentMeta}>
-										<TouchableOpacity onPress={() => abrirPerfil(c)}>
-											<Text style={styles.commentAutor}>{c.autor}</Text>
-										</TouchableOpacity>
-										<Text style={styles.commentTiempo}>{c.tiempo}</Text>
-									</View>
-									<Text style={styles.commentTexto}>{c.texto}</Text>
 								</View>
-							</View>
-						))}
+							)) : <Text style={styles.commentsEmpty}>Sin comentarios todavía.</Text>
+						) : (
+							MOCK_COMMENTS.map(c => (
+								<View key={c.id} style={styles.commentRow}>
+									<TouchableOpacity onPress={() => abrirPerfil(c)}>
+										<View style={[styles.commentAvatar, { backgroundColor: c.bg }]}>
+											<Text style={[styles.commentAvatarText, { color: c.color }]}>{c.initials}</Text>
+										</View>
+									</TouchableOpacity>
+									<View style={styles.commentBubble}>
+										<View style={styles.commentMeta}>
+											<TouchableOpacity onPress={() => abrirPerfil(c)}>
+												<Text style={styles.commentAutor}>{c.autor}</Text>
+											</TouchableOpacity>
+											<Text style={styles.commentTiempo}>{c.tiempo}</Text>
+										</View>
+										<Text style={styles.commentTexto}>{c.texto}</Text>
+									</View>
+								</View>
+							))
+						)}
 					</ScrollView>
 					<View style={styles.commentInput}>
 						<View style={[styles.commentAvatar, { backgroundColor: '#2a1a3a' }]}>
@@ -421,9 +491,11 @@ function CommentsSheet({ visible, count, onClose }: { visible: boolean; count: n
 							placeholderTextColor="#444"
 							value={text}
 							onChangeText={setText}
+							editable={!!roundId}
+							onSubmitEditing={enviar}
 						/>
 						{text.length > 0 && (
-							<TouchableOpacity onPress={() => setText('')}>
+							<TouchableOpacity onPress={enviar} disabled={sending}>
 								<Ionicons name="send" size={18} color={COLORS.lime} />
 							</TouchableOpacity>
 						)}
@@ -436,25 +508,56 @@ function CommentsSheet({ visible, count, onClose }: { visible: boolean; count: n
 }
 
 function CardFooter({
+	roundId,
 	likes,
 	comments,
 	liked = false,
 }: {
+	roundId?: string;
 	likes: number;
 	comments: number;
 	liked?: boolean;
 }) {
+	const { firebaseUser } = useAuth();
 	const [isLiked, setIsLiked] = useState(liked);
+	const [busy, setBusy] = useState(false);
 	const [showComments, setShowComments] = useState(false);
+
+	useEffect(() => {
+		if (!roundId || !firebaseUser) return;
+		getDoc(doc(db, 'rounds', roundId, 'likes', firebaseUser.uid)).then(snap => setIsLiked(snap.exists()));
+	}, [roundId, firebaseUser?.uid]);
+
+	const toggleLike = async () => {
+		if (!roundId || !firebaseUser) { setIsLiked(l => !l); return; }
+		if (busy) return;
+		setBusy(true);
+		const likeRef = doc(db, 'rounds', roundId, 'likes', firebaseUser.uid);
+		const roundRef = doc(db, 'rounds', roundId);
+		try {
+			if (isLiked) {
+				await deleteDoc(likeRef);
+				await updateDoc(roundRef, { likesCount: increment(-1) });
+				setIsLiked(false);
+			} else {
+				await setDoc(likeRef, { uid: firebaseUser.uid, createdAt: serverTimestamp() });
+				await updateDoc(roundRef, { likesCount: increment(1) });
+				setIsLiked(true);
+			}
+		} catch {
+			// noop — el estado visual vuelve a quedar como estaba en el próximo render
+		} finally {
+			setBusy(false);
+		}
+	};
+
 	return (
 		<>
-			<CommentsSheet visible={showComments} count={comments} onClose={() => setShowComments(false)} />
+			<CommentsSheet visible={showComments} roundId={roundId} count={comments} onClose={() => setShowComments(false)} />
 			<View style={styles.cardFooter}>
-				<TouchableOpacity style={styles.action} onPress={() => setIsLiked(l => !l)}>
+				<TouchableOpacity style={styles.action} onPress={toggleLike} disabled={busy}>
 					<GolfFlagIcon color={isLiked ? COLORS.lime : COLORS.dim} size={17} />
-					<Text style={[styles.actionText, isLiked && { color: COLORS.lime }]}>
-						{isLiked ? likes : likes}
-					</Text>
+					<Text style={[styles.actionText, isLiked && { color: COLORS.lime }]}>{likes}</Text>
 				</TouchableOpacity>
 				<TouchableOpacity style={styles.action} onPress={() => setShowComments(true)}>
 					<GolfBallIcon color={COLORS.dim} size={16} />
@@ -668,7 +771,7 @@ function RoundCard({ round }: { round: RoundDoc }) {
 				</View>
 			)}
 
-			<CardFooter likes={round.likesCount} comments={round.commentsCount} />
+			<CardFooter roundId={round.id} likes={round.likesCount} comments={round.commentsCount} />
 		</View>
 	);
 }
@@ -887,6 +990,7 @@ const styles = StyleSheet.create({
 	commentsSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
 	commentsHandle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 12 },
 	commentsTitle: { fontSize: 15, fontWeight: '700', color: '#f0f0f0', paddingHorizontal: 20, marginBottom: 12 },
+	commentsEmpty: { color: COLORS.muted, fontSize: 13, textAlign: 'center', marginTop: 24, paddingHorizontal: 24 },
 	commentRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: '#1e1e1e' },
 	commentAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 	commentAvatarText: { fontSize: 10, fontWeight: '700' },
