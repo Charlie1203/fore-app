@@ -1,6 +1,6 @@
-﻿import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Dimensions, Image, Modal, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useRef } from 'react';
+﻿import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Dimensions, Image, Modal, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from 'react-native-pager-view';
@@ -180,18 +180,28 @@ const MOCK_COMMENTS = [
 
 function CommentsSheet({ visible, onClose, count }: { visible: boolean; onClose: () => void; count: number }) {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
+  const [kbHeight, setKbHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, e => setKbHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKbHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
   const abrirPerfil = (c: typeof MOCK_COMMENTS[0]) =>
     navigation.navigate('PerfilUsuario', { viewUser: { name: c.autor, initials: c.initials, bg: c.bg, color: c.color } });
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
       <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.commentsSheet}>
         <View style={styles.commentsHandle} />
         <Text style={styles.commentsTitle}>{count} comentarios</Text>
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {MOCK_COMMENTS.map(c => (
             <View key={c.id} style={styles.commentRow}>
               <TouchableOpacity onPress={() => abrirPerfil(c)}>
@@ -209,7 +219,7 @@ function CommentsSheet({ visible, onClose, count }: { visible: boolean; onClose:
             </View>
           ))}
         </ScrollView>
-        <View style={styles.commentInput}>
+        <View style={[styles.commentInput, { paddingBottom: kbHeight > 0 ? kbHeight + 12 : 12 + insets.bottom }]}>
           <Avatar initials="JU" bg="#2a1a3a" color="#b070e0" size={32} />
           <TextInput
             style={styles.commentTextInput}
@@ -217,6 +227,7 @@ function CommentsSheet({ visible, onClose, count }: { visible: boolean; onClose:
             placeholderTextColor={COLORS.dim}
             value={text}
             onChangeText={setText}
+            returnKeyType="send"
           />
           {text.length > 0 && (
             <TouchableOpacity onPress={() => setText('')}>
@@ -225,7 +236,6 @@ function CommentsSheet({ visible, onClose, count }: { visible: boolean; onClose:
           )}
         </View>
       </View>
-      </KeyboardAvoidingView>
       </View>
     </Modal>
   );

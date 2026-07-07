@@ -10,9 +10,9 @@
 	Modal,
 	StatusBar,
 	TextInput,
-	KeyboardAvoidingView,
 	Platform,
 	ActivityIndicator,
+	Keyboard,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -397,8 +397,17 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 	const scrollRef = useRef<ScrollView>(null);
 	const inputRef = useRef<TextInput>(null);
 	const insets = useSafeAreaInsets();
+	const [kbHeight, setKbHeight] = useState(0);
 
 	const myInitials = (userDoc?.displayName ?? '??').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+
+	// Solo iOS: en Android el teclado ya resizea la ventana nativa, no hace falta compensar a mano.
+	useEffect(() => {
+		if (Platform.OS !== 'ios') return;
+		const showSub = Keyboard.addListener('keyboardWillShow', e => setKbHeight(e.endCoordinates.height));
+		const hideSub = Keyboard.addListener('keyboardWillHide', () => setKbHeight(0));
+		return () => { showSub.remove(); hideSub.remove(); };
+	}, []);
 
 	useEffect(() => {
 		if (!visible || !roundId) return;
@@ -441,7 +450,7 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 
 	return (
 		<Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-			<KeyboardAvoidingView style={{ flex: 1, justifyContent: 'flex-end' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+			<View style={{ flex: 1, justifyContent: 'flex-end' }}>
 				<TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
 				<View style={styles.commentsSheet}>
 					<View style={styles.commentsHandle} />
@@ -498,7 +507,7 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 							))
 						)}
 					</ScrollView>
-					<View style={[styles.commentInput, { paddingBottom: 12 + insets.bottom }]}>
+					<View style={[styles.commentInput, { paddingBottom: kbHeight > 0 ? kbHeight + 12 : 12 + insets.bottom }]}>
 						<View style={[styles.commentAvatar, { backgroundColor: COLORS.lime }]}>
 							<Text style={[styles.commentAvatarText, { color: '#0f0f0f' }]}>{myInitials}</Text>
 						</View>
@@ -523,7 +532,7 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 						}
 					</View>
 				</View>
-			</KeyboardAvoidingView>
+			</View>
 		</Modal>
 	);
 }
