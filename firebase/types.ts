@@ -43,6 +43,8 @@ export interface HoleResult {
 export interface RoundDoc {
 	id: string;
 	userId: string;
+	authorName: string; // denormalizado para no tener que leer el user doc al armar el feed
+	authorInitials: string;
 	courseId: string | null;
 	courseName: string;
 	clubName: string;

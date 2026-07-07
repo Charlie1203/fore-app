@@ -19,6 +19,10 @@ import { useRoute, useNavigation } from "@react-navigation/native";
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
+import { useAuth } from "../context/AuthContext";
+import { db } from "../firebase/config";
+import { collection, query, where, orderBy, limit, onSnapshot } from "firebase/firestore";
+import type { RoundDoc } from "../firebase/types";
 
 const SCREEN_W = Dimensions.get("window").width;
 
@@ -494,27 +498,6 @@ function HcpCard() {
 	);
 }
 
-const JUAN_HOLES = [
-	{ score: 4, par: 4 },
-	{ score: 2, par: 4 },
-	{ score: 5, par: 5 },
-	{ score: 3, par: 3 },
-	{ score: 6, par: 4 },
-	{ score: 4, par: 4 },
-	{ score: 4, par: 4 },
-	{ score: 3, par: 3 },
-	{ score: 4, par: 4 },
-	{ score: 4, par: 4 },
-	{ score: 4, par: 4 },
-	{ score: 5, par: 4 },
-	{ score: 4, par: 4 },
-	{ score: 3, par: 3 },
-	{ score: 4, par: 4 },
-	{ score: 5, par: 5 },
-	{ score: 3, par: 4 },
-	{ score: 4, par: 4 },
-];
-
 function RoundSummary({
 	holes,
 	score,
@@ -622,37 +605,43 @@ function PhotoCarousel({ photos }: { photos: string[] }) {
 	);
 }
 
-function RoundCard({ photos = [] }: { photos?: string[] }) {
+function formatFechaRonda(ts: any): string {
+	if (!ts?.toDate) return 'recién';
+	return ts.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+}
+
+function RoundCard({ round }: { round: RoundDoc }) {
 	const navigation = useNavigation<any>();
+	const { firebaseUser } = useAuth();
 	const [expanded, setExpanded] = useState(false);
-	const score = JUAN_HOLES.reduce((a, h) => a + h.score, 0);
-	const totalPar = JUAN_HOLES.reduce((a, h) => a + h.par, 0);
-	const vsPar = score - totalPar;
-	const hasPhotos = photos.length > 0;
-	// Es tu propio post: va a tu perfil (tab), no a un perfil de solo lectura.
-	const abrirPerfil = () => navigation.navigate('Tabs', { screen: 'Perfil' });
+	const hasPhotos = round.photos.length > 0;
+	const esPropio = round.userId === firebaseUser?.uid;
+
+	const abrirPerfil = () => esPropio
+		? navigation.navigate('Tabs', { screen: 'Perfil' })
+		: navigation.navigate('PerfilUsuario', { viewUser: { name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
 
 	return (
 		<View style={styles.card}>
 			<TouchableOpacity style={styles.cardHeader} onPress={abrirPerfil}>
-				<Avatar initials="JN" bg={COLORS.lime} color="#0f0f0f" />
+				<Avatar initials={round.authorInitials} bg={COLORS.lime} color="#0f0f0f" />
 				<View style={styles.cardMeta}>
-					<Text style={styles.cardName}>Juan Noceti</Text>
-					<Text style={styles.cardCourse}>📍 Haras Santa María · 18 hoyos</Text>
-					<Text style={styles.cardTime}>hace 5 horas</Text>
+					<Text style={styles.cardName}>{round.authorName}</Text>
+					<Text style={styles.cardCourse}>📍 {round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
+					<Text style={styles.cardTime}>{formatFechaRonda(round.date)}</Text>
 				</View>
 				<Text style={styles.dots}>···</Text>
 			</TouchableOpacity>
 
 			{hasPhotos ? (
 				<>
-					<PhotoCarousel photos={photos} />
+					<PhotoCarousel photos={round.photos} />
 					<View style={styles.cardBody}>
 						<View style={styles.photoScoreRow}>
 							<View style={styles.photoScoreMain}>
-								<Text style={styles.photoScore}>{score}</Text>
-								<Text style={[styles.photoVsPar, { color: vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
-									{vsPar > 0 ? '+' : ''}{vsPar}
+								<Text style={styles.photoScore}>{round.totalScore}</Text>
+								<Text style={[styles.photoVsPar, { color: round.vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
+									{round.vsPar > 0 ? '+' : ''}{round.vsPar}
 								</Text>
 							</View>
 							<TouchableOpacity style={styles.verTarjetaBtn} onPress={() => setExpanded(!expanded)}>
@@ -660,26 +649,26 @@ function RoundCard({ photos = [] }: { photos?: string[] }) {
 								<Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={13} color={COLORS.lime} />
 							</TouchableOpacity>
 						</View>
-						{expanded && <Scorecard holes={JUAN_HOLES} score={score} vsPar={vsPar} />}
+						{expanded && <Scorecard holes={round.holes} score={round.totalScore} vsPar={round.vsPar} />}
 					</View>
 				</>
 			) : (
 				<View style={styles.cardBody}>
 					{expanded ? (
 						<>
-							<Scorecard holes={JUAN_HOLES} score={score} vsPar={vsPar} />
+							<Scorecard holes={round.holes} score={round.totalScore} vsPar={round.vsPar} />
 							<TouchableOpacity style={styles.collapseBtn} onPress={() => setExpanded(false)}>
 								<Text style={styles.expandBtnText}>Ocultar tarjeta</Text>
 								<Ionicons name="chevron-up" size={13} color={COLORS.lime} />
 							</TouchableOpacity>
 						</>
 					) : (
-						<RoundSummary holes={JUAN_HOLES} score={score} vsPar={vsPar} onExpand={() => setExpanded(true)} />
+						<RoundSummary holes={round.holes} score={round.totalScore} vsPar={round.vsPar} onExpand={() => setExpanded(true)} />
 					)}
 				</View>
 			)}
 
-			<CardFooter likes={8} comments={2} />
+			<CardFooter likes={round.likesCount} comments={round.commentsCount} />
 		</View>
 	);
 }
@@ -717,21 +706,16 @@ function MilestoneCard() {
 	);
 }
 
-const MOCK_PHOTOS = [
-	'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800',
-	'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800',
-];
-
 
 export default function FeedScreen() {
 	const route = useRoute<any>();
 	const navigation = useNavigation<any>();
 	const toastOpacity = useRef(new Animated.Value(0)).current;
 	const [showToast, setShowToast] = useState(false);
-	const [newPostPhotos, setNewPostPhotos] = useState<string[]>([]);
 	const [myStory, setMyStory] = useState<string | null>(null);
 	const [viewingIndex, setViewingIndex] = useState<number | null>(null);
 	const [seenStories, setSeenStories] = useState<Set<string>>(new Set());
+	const [rounds, setRounds] = useState<RoundDoc[]>([]);
 
 	const storiesConNombre = STORIES_OTHERS.filter(s => s.photo);
 	const combinedStories = myStory
@@ -739,8 +723,16 @@ export default function FeedScreen() {
 		: storiesConNombre;
 
 	useEffect(() => {
+		// Feed de rondas públicas — todavía sin filtrar por a quién seguís, eso llega cuando conectemos follows.
+		const q = query(collection(db, 'rounds'), where('visibility', '==', 'public'), orderBy('date', 'desc'), limit(20));
+		const unsubscribe = onSnapshot(q, snap => {
+			setRounds(snap.docs.map(d => d.data() as RoundDoc));
+		});
+		return unsubscribe;
+	}, []);
+
+	useEffect(() => {
 		if (!route.params?.showSuccess) return;
-		setNewPostPhotos(route.params?.photos ?? []);
 		setShowToast(true);
 		Animated.sequence([
 			Animated.timing(toastOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
@@ -814,8 +806,7 @@ export default function FeedScreen() {
 				<View style={styles.divider} />
 				<View style={styles.feed}>
 					<HcpCard />
-					{newPostPhotos.length > 0 ? <RoundCard photos={newPostPhotos} /> : <RoundCard />}
-					<RoundCard photos={MOCK_PHOTOS} />
+					{rounds.map(r => <RoundCard key={r.id} round={r} />)}
 					<MilestoneCard />
 				</View>
 			</ScrollView>

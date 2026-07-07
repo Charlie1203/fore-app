@@ -397,7 +397,7 @@ const uploadRoundPhoto = async (uri: string, uid: string, roundId: string, index
 
 export default function UploadScreen() {
   const navigation = useNavigation<any>();
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, userDoc } = useAuth();
   const [step, setStep] = useState(1);
   const [club, setClub] = useState('');
   const [course, setCourse] = useState('');
@@ -428,9 +428,14 @@ export default function UploadScreen() {
         ? await Promise.all(photos.map((uri, i) => uploadRoundPhoto(uri, firebaseUser.uid, roundRef.id, i)))
         : [];
 
+      const authorName = userDoc?.displayName ?? 'Jugador';
+      const authorInitials = authorName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+
       await setDoc(roundRef, {
         id: roundRef.id,
         userId: firebaseUser.uid,
+        authorName,
+        authorInitials,
         courseId: null,
         courseName: course,
         clubName: club,
@@ -451,7 +456,7 @@ export default function UploadScreen() {
       setClub('');
       setCourse('');
       setScores(DEFAULT_PARS.map(p => p));
-      navigation.navigate('Inicio', { showSuccess: Date.now(), photos: photoUrls });
+      navigation.navigate('Inicio', { showSuccess: Date.now() });
     } catch (e) {
       Alert.alert('Error', 'No se pudo guardar la vuelta. Intentá de nuevo.');
     } finally {
