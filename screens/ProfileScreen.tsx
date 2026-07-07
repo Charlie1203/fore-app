@@ -722,9 +722,6 @@ export default function ProfileScreen() {
               </View>
               {!!displayUser.username && <Text style={styles.username}>{displayUser.username}</Text>}
               <Text style={styles.club}>📍 {displayUser.club}</Text>
-              {isOwnProfile && userDoc?.matricula && (
-                <Text style={styles.matricula}>Matrícula {userDoc.matricula}</Text>
-              )}
             </View>
             {isOwnProfile ? (
               <TouchableOpacity style={styles.settingsBtn} onPress={() => setMenuVisible(true)}>
@@ -804,7 +801,6 @@ const styles = StyleSheet.create({
   name: { fontSize: 17, fontWeight: '700', color: COLORS.white },
   username: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
   club: { fontSize: 11, color: COLORS.muted, marginTop: 4 },
-  matricula: { fontSize: 10, color: COLORS.dim, marginTop: 3 },
   editBtn: { borderWidth: 0.5, borderColor: COLORS.dim, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   settingsBtn: { padding: 6 },
   followBtn: { borderWidth: 0.5, borderColor: COLORS.lime, backgroundColor: COLORS.lime, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
