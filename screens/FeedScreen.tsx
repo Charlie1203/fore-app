@@ -120,37 +120,39 @@ function StoryViewer({ stories, initialIndex, onClose }: { stories: typeof STORI
 
 	return (
 		<Modal visible animationType="fade" onRequestClose={onClose}>
-			{/* edges=['top']: deja libre el área de la hora/notch, la historia no la tapa */}
-			<SafeAreaView style={styles.storyModal} edges={['top']}>
-				{story.photo
-					? <Image source={{ uri: story.photo }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-					: <View style={[StyleSheet.absoluteFill, { backgroundColor: story.bg, alignItems: 'center', justifyContent: 'center' }]}>
-						<Text style={{ fontSize: 64, fontWeight: '800', color: story.color }}>{story.initials}</Text>
-					</View>
-				}
-
-				{/* Zonas de toque: derecha avanza, izquierda retrocede — como Instagram */}
-				<View style={styles.storyTapZones} pointerEvents="box-none">
-					<TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={goPrev} />
-					<TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={goNext} />
-				</View>
-
-				<View style={[styles.storyOverlay, { paddingTop: 8 }]} pointerEvents="box-none">
-					<View style={styles.storyBarRow}>
-						{stories.map((_, i) => (
-							<View key={i} style={styles.storyBarTrack}>
-								<View style={[styles.storyBarFill, { width: i <= index ? '100%' : '0%' }]} />
-							</View>
-						))}
-					</View>
-					<View style={styles.storyHeader}>
-						<View style={[styles.storyAvatarSmall, { backgroundColor: story.bg }]}>
-							<Text style={[styles.storyAvatarText, { color: story.color }]}>{story.initials}</Text>
+			{/* Fondo negro con la hora/notch libres; la tarjeta de la historia va con margen y esquinas redondeadas, como Instagram */}
+			<SafeAreaView style={styles.storyModal} edges={['top', 'bottom']}>
+				<View style={styles.storyCard}>
+					{story.photo
+						? <Image source={{ uri: story.photo }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+						: <View style={[StyleSheet.absoluteFill, { backgroundColor: story.bg, alignItems: 'center', justifyContent: 'center' }]}>
+							<Text style={{ fontSize: 64, fontWeight: '800', color: story.color }}>{story.initials}</Text>
 						</View>
-						<Text style={styles.storyName}>{story.name}</Text>
-						<TouchableOpacity onPress={onClose} style={{ marginLeft: 'auto', padding: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-							<Ionicons name="close" size={26} color="#fff" />
-						</TouchableOpacity>
+					}
+
+					{/* Zonas de toque: derecha avanza, izquierda retrocede — como Instagram */}
+					<View style={styles.storyTapZones} pointerEvents="box-none">
+						<TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={goPrev} />
+						<TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={goNext} />
+					</View>
+
+					<View style={[styles.storyOverlay, { paddingTop: 8 }]} pointerEvents="box-none">
+						<View style={styles.storyBarRow}>
+							{stories.map((_, i) => (
+								<View key={i} style={styles.storyBarTrack}>
+									<View style={[styles.storyBarFill, { width: i <= index ? '100%' : '0%' }]} />
+								</View>
+							))}
+						</View>
+						<View style={styles.storyHeader}>
+							<View style={[styles.storyAvatarSmall, { backgroundColor: story.bg }]}>
+								<Text style={[styles.storyAvatarText, { color: story.color }]}>{story.initials}</Text>
+							</View>
+							<Text style={styles.storyName}>{story.name}</Text>
+							<TouchableOpacity onPress={onClose} style={{ marginLeft: 'auto', padding: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+								<Ionicons name="close" size={26} color="#fff" />
+							</TouchableOpacity>
+						</View>
 					</View>
 				</View>
 			</SafeAreaView>
@@ -851,6 +853,7 @@ const styles = StyleSheet.create({
 	storyPlus: { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: COLORS.lime, borderWidth: 1.5, borderColor: COLORS.bg, alignItems: 'center', justifyContent: 'center' },
 	storyPlusText: { fontSize: 13, fontWeight: '800', color: '#0f0f0f', lineHeight: 16 },
 	storyModal: { flex: 1, backgroundColor: '#000' },
+	storyCard: { flex: 1, marginTop: 6, marginBottom: 10, marginHorizontal: 4, borderRadius: 18, overflow: 'hidden', backgroundColor: '#111' },
 	storyTapZones: { ...StyleSheet.absoluteFillObject, flexDirection: 'row' },
 	storyOverlay: { position: 'absolute', top: 0, left: 0, right: 0 },
 	storyBarRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 12 },
