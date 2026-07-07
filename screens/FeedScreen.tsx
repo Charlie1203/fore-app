@@ -17,7 +17,7 @@ import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from "react-native-svg";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 
 const SCREEN_W = Dimensions.get("window").width;
@@ -105,7 +105,6 @@ const STORIES_OTHERS = [
 ];
 
 function StoryViewer({ stories, initialIndex, onClose }: { stories: typeof STORIES_OTHERS; initialIndex: number; onClose: () => void }) {
-	const insets = useSafeAreaInsets();
 	const [index, setIndex] = useState(initialIndex);
 	const story = stories[index];
 
@@ -120,8 +119,9 @@ function StoryViewer({ stories, initialIndex, onClose }: { stories: typeof STORI
 	if (!story) return null;
 
 	return (
-		<Modal visible animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-			<View style={styles.storyModal}>
+		<Modal visible animationType="fade" onRequestClose={onClose}>
+			{/* edges=['top']: deja libre el área de la hora/notch, la historia no la tapa */}
+			<SafeAreaView style={styles.storyModal} edges={['top']}>
 				{story.photo
 					? <Image source={{ uri: story.photo }} style={StyleSheet.absoluteFill} resizeMode="cover" />
 					: <View style={[StyleSheet.absoluteFill, { backgroundColor: story.bg, alignItems: 'center', justifyContent: 'center' }]}>
@@ -135,7 +135,7 @@ function StoryViewer({ stories, initialIndex, onClose }: { stories: typeof STORI
 					<TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={goNext} />
 				</View>
 
-				<View style={[styles.storyOverlay, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+				<View style={[styles.storyOverlay, { paddingTop: 8 }]} pointerEvents="box-none">
 					<View style={styles.storyBarRow}>
 						{stories.map((_, i) => (
 							<View key={i} style={styles.storyBarTrack}>
@@ -153,7 +153,7 @@ function StoryViewer({ stories, initialIndex, onClose }: { stories: typeof STORI
 						</TouchableOpacity>
 					</View>
 				</View>
-			</View>
+			</SafeAreaView>
 		</Modal>
 	);
 }
