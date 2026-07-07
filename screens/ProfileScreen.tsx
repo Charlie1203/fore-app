@@ -3,17 +3,18 @@ import {
   Dimensions, Animated, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from 'react-native-pager-view';
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';
 import { logout } from '../services/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db, storage } from '../firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
+import type { RoundDoc } from '../firebase/types';
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
   const d = [
@@ -180,32 +181,10 @@ function HcpChart({ thirdKpi }: { thirdKpi: { value: number; label: string } }) 
   );
 }
 
-const POSTS = [
-  {
-    course: 'Haras Santa María',
-    time: 'hace 3 días',
-    likes: 8,
-    comments: 2,
-    holes: [
-      { score: 4, par: 4 }, { score: 3, par: 4 }, { score: 5, par: 5 }, { score: 3, par: 3 },
-      { score: 5, par: 4 }, { score: 4, par: 4 }, { score: 4, par: 4 }, { score: 3, par: 3 }, { score: 4, par: 4 },
-      { score: 4, par: 4 }, { score: 4, par: 4 }, { score: 5, par: 4 }, { score: 4, par: 4 },
-      { score: 3, par: 3 }, { score: 4, par: 4 }, { score: 5, par: 5 }, { score: 3, par: 4 }, { score: 4, par: 4 },
-    ],
-  },
-  {
-    course: 'Martindale CC',
-    time: 'hace 1 semana',
-    likes: 4,
-    comments: 0,
-    holes: [
-      { score: 4, par: 4 }, { score: 4, par: 4 }, { score: 5, par: 4 }, { score: 3, par: 3 },
-      { score: 3, par: 4 }, { score: 5, par: 4 }, { score: 4, par: 4 }, { score: 5, par: 4 }, { score: 4, par: 4 },
-      { score: 4, par: 4 }, { score: 5, par: 4 }, { score: 3, par: 3 }, { score: 4, par: 4 },
-      { score: 3, par: 4 }, { score: 5, par: 4 }, { score: 5, par: 5 }, { score: 4, par: 4 }, { score: 4, par: 4 },
-    ],
-  },
-];
+function formatFechaRonda(ts: any): string {
+  if (!ts?.toDate) return '';
+  return ts.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+}
 
 const HOLE_SIZE = 24;
 
@@ -292,50 +271,42 @@ function CardFooter({ likes, comments }: { likes: number; comments: number }) {
   );
 }
 
-function RoundCard({ post }: { post: typeof POSTS[0] }) {
+function RoundCard({ round }: { round: RoundDoc }) {
   const [expanded, setExpanded] = useState(false);
-  const score = post.holes.reduce((a, h) => a + h.score, 0);
-  const totalPar = post.holes.reduce((a, h) => a + h.par, 0);
-  const vsPar = score - totalPar;
-  const eagles  = post.holes.filter(h => h.score - h.par <= -2).length;
-  const birdies = post.holes.filter(h => h.score - h.par === -1).length;
-  const pares   = post.holes.filter(h => h.score - h.par === 0).length;
-  const bogeys  = post.holes.filter(h => h.score - h.par === 1).length;
-  const doubles = post.holes.filter(h => h.score - h.par >= 2).length;
 
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View>
-          <Text style={styles.cardCourse}>📍 {post.course}</Text>
+          <Text style={styles.cardCourse}>📍 {round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
         </View>
-        <Text style={styles.cardTime}>{post.time}</Text>
+        <Text style={styles.cardTime}>{formatFechaRonda(round.date)}</Text>
       </View>
       <View style={styles.cardBody}>
         <View style={styles.summaryBox}>
           <View style={styles.summaryScores}>
             <View style={styles.summaryMain}>
-              <Text style={styles.summaryBigScore}>{score}</Text>
-              <Text style={[styles.summaryVsPar, { color: vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
-                {vsPar > 0 ? '+' : ''}{vsPar}
+              <Text style={styles.summaryBigScore}>{round.totalScore}</Text>
+              <Text style={[styles.summaryVsPar, { color: round.vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
+                {round.vsPar > 0 ? '+' : ''}{round.vsPar}
               </Text>
             </View>
             <View style={styles.summaryStats}>
-              {eagles > 0 && <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: COLORS.lime }]}>{eagles}</Text><Text style={styles.summaryLbl}>Eagles</Text></View>}
-              <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: COLORS.lime }]}>{birdies}</Text><Text style={styles.summaryLbl}>Birdies</Text></View>
-              <View style={styles.summaryItem}><Text style={styles.summaryVal}>{pares}</Text><Text style={styles.summaryLbl}>Pares</Text></View>
-              <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: COLORS.red }]}>{bogeys}</Text><Text style={styles.summaryLbl}>Bogeys</Text></View>
-              {doubles > 0 && <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: '#ff6060' }]}>{doubles}</Text><Text style={styles.summaryLbl}>Dobles+</Text></View>}
+              {round.eagles > 0 && <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: COLORS.lime }]}>{round.eagles}</Text><Text style={styles.summaryLbl}>Eagles</Text></View>}
+              <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: COLORS.lime }]}>{round.birdies}</Text><Text style={styles.summaryLbl}>Birdies</Text></View>
+              <View style={styles.summaryItem}><Text style={styles.summaryVal}>{round.pars}</Text><Text style={styles.summaryLbl}>Pares</Text></View>
+              <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: COLORS.red }]}>{round.bogeys}</Text><Text style={styles.summaryLbl}>Bogeys</Text></View>
+              {round.doublesPlus > 0 && <View style={styles.summaryItem}><Text style={[styles.summaryVal, { color: '#ff6060' }]}>{round.doublesPlus}</Text><Text style={styles.summaryLbl}>Dobles+</Text></View>}
             </View>
           </View>
 
           {expanded && (
             <>
               <View style={styles.holesRow}>
-                {post.holes.slice(0, 9).map((h, i) => <HoleCell key={i} num={i + 1} score={h.score} par={h.par} />)}
+                {round.holes.slice(0, 9).map((h, i) => <HoleCell key={i} num={h.number} score={h.score} par={h.par} />)}
               </View>
               <View style={[styles.holesRow, { marginBottom: 4 }]}>
-                {post.holes.slice(9, 18).map((h, i) => <HoleCell key={i} num={i + 10} score={h.score} par={h.par} />)}
+                {round.holes.slice(9, 18).map((h, i) => <HoleCell key={i} num={h.number} score={h.score} par={h.par} />)}
               </View>
             </>
           )}
@@ -346,7 +317,7 @@ function RoundCard({ post }: { post: typeof POSTS[0] }) {
           </TouchableOpacity>
         </View>
       </View>
-      <CardFooter likes={post.likes} comments={post.comments} />
+      <CardFooter likes={round.likesCount} comments={round.commentsCount} />
     </View>
   );
 }
@@ -538,7 +509,7 @@ export type ViewUser = {
 };
 
 export default function ProfileScreen() {
-  const { userDoc } = useAuth();
+  const { userDoc, firebaseUser } = useAuth();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const viewUser: ViewUser | undefined = route.params?.viewUser;
@@ -548,7 +519,17 @@ export default function ProfileScreen() {
   const [editVisible, setEditVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [following, setFollowing] = useState(false);
+  const [rounds, setRounds] = useState<RoundDoc[]>([]);
   const pagerRef = useRef<PagerView>(null);
+
+  useEffect(() => {
+    if (!isOwnProfile || !firebaseUser) { setRounds([]); return; }
+    const q = query(collection(db, 'rounds'), where('userId', '==', firebaseUser.uid), orderBy('date', 'desc'));
+    const unsubscribe = onSnapshot(q, snap => {
+      setRounds(snap.docs.map(d => d.data() as RoundDoc));
+    });
+    return unsubscribe;
+  }, [isOwnProfile, firebaseUser?.uid]);
 
   const onPressFollow = () => {
     if (following) {
@@ -690,7 +671,10 @@ export default function ProfileScreen() {
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
-            {POSTS.map((post, i) => <RoundCard key={i} post={post} />)}
+            {rounds.length > 0
+              ? rounds.map(r => <RoundCard key={r.id} round={r} />)
+              : <Text style={styles.emptyHistorial}>{isOwnProfile ? 'Todavía no cargaste ninguna vuelta.' : 'Sin vueltas cargadas.'}</Text>
+            }
           </Animated.ScrollView>
 
           <Animated.ScrollView
@@ -863,6 +847,7 @@ const styles = StyleSheet.create({
 
   divider: { height: 0.5, backgroundColor: '#222', marginHorizontal: 18, marginTop: 20, marginBottom: 4 },
   feed: { paddingBottom: 20 },
+  emptyHistorial: { color: COLORS.muted, fontSize: 13, textAlign: 'center', marginTop: 48, paddingHorizontal: 24 },
 
   tabBar: {
     position: 'absolute',

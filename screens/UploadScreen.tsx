@@ -1,9 +1,14 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Image, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
+import { db, storage } from '../firebase/config';
+import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import type { HoleResult } from '../firebase/types';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -228,8 +233,9 @@ const TORNEOS_ACTIVOS = [
   { id: '2', nombre: 'Torneo del Club', modalidad: 'Stroke Play' },
 ];
 
-function Step3({ scores, club, course, onDone }: {
-  scores: number[]; club: string; course: string; onDone: (photos: string[]) => void;
+function Step3({ scores, club, course, saving, onDone }: {
+  scores: number[]; club: string; course: string; saving: boolean;
+  onDone: (opts: { photos: string[]; shareOnFeed: boolean }) => void;
 }) {
   const [shareOnFeed, setShareOnFeed] = useState(false);
   const [comment, setComment] = useState('');
@@ -361,28 +367,96 @@ function Step3({ scores, club, course, onDone }: {
         </>
       )}
 
-      <TouchableOpacity style={styles.nextBtn} onPress={() => onDone(shareOnFeed ? photos : [])}>
-        <Text style={styles.nextBtnText}>{shareOnFeed ? 'Publicar vuelta' : 'Guardar vuelta'}</Text>
+      <TouchableOpacity
+        style={[styles.nextBtn, saving && { opacity: 0.6 }]}
+        onPress={() => onDone({ photos: shareOnFeed ? photos : [], shareOnFeed })}
+        disabled={saving}
+      >
+        {saving
+          ? <ActivityIndicator color="#0f0f0f" />
+          : <Text style={styles.nextBtnText}>{shareOnFeed ? 'Publicar vuelta' : 'Guardar vuelta'}</Text>
+        }
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
+const uploadRoundPhoto = async (uri: string, uid: string, roundId: string, index: number): Promise<string> => {
+  const blob: Blob = await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => resolve(xhr.response);
+    xhr.onerror = reject;
+    xhr.responseType = 'blob';
+    xhr.open('GET', uri, true);
+    xhr.send(null);
+  });
+  const photoRef = storageRef(storage, `rounds/${uid}/${roundId}/${index}.jpg`);
+  await uploadBytes(photoRef, blob, { contentType: 'image/jpeg' });
+  return getDownloadURL(photoRef);
+};
+
 export default function UploadScreen() {
   const navigation = useNavigation<any>();
+  const { firebaseUser } = useAuth();
   const [step, setStep] = useState(1);
   const [club, setClub] = useState('');
   const [course, setCourse] = useState('');
   const [scores, setScores] = useState(DEFAULT_PARS.map(p => p));
+  const [saving, setSaving] = useState(false);
 
   const handleScoresDone = (s: number[]) => { setScores(s); setStep(2); };
 
-  const handleDone = (photos: string[]) => {
-    setStep(1);
-    setClub('');
-    setCourse('');
-    setScores(DEFAULT_PARS.map(p => p));
-    navigation.navigate('Inicio', { showSuccess: Date.now(), photos });
+  const handleDone = async ({ photos, shareOnFeed }: { photos: string[]; shareOnFeed: boolean }) => {
+    if (!firebaseUser) return;
+    setSaving(true);
+    try {
+      const totalScore = scores.reduce((a, b) => a + b, 0);
+      const totalPar = DEFAULT_PARS.reduce((a, b) => a + b, 0);
+      let eagles = 0, birdies = 0, pares = 0, bogeys = 0, doublesPlus = 0;
+      const holes: HoleResult[] = scores.map((score, i) => {
+        const diff = score - DEFAULT_PARS[i];
+        if (diff <= -2) eagles++;
+        else if (diff === -1) birdies++;
+        else if (diff === 0) pares++;
+        else if (diff === 1) bogeys++;
+        else doublesPlus++;
+        return { number: i + 1, score, par: DEFAULT_PARS[i] };
+      });
+
+      const roundRef = doc(collection(db, 'rounds'));
+      const photoUrls = photos.length > 0
+        ? await Promise.all(photos.map((uri, i) => uploadRoundPhoto(uri, firebaseUser.uid, roundRef.id, i)))
+        : [];
+
+      await setDoc(roundRef, {
+        id: roundRef.id,
+        userId: firebaseUser.uid,
+        courseId: null,
+        courseName: course,
+        clubName: club,
+        date: serverTimestamp(),
+        holes,
+        totalScore,
+        totalPar,
+        vsPar: totalScore - totalPar,
+        eagles, birdies, pars: pares, bogeys, doublesPlus,
+        photos: photoUrls,
+        visibility: shareOnFeed ? 'public' : 'private',
+        likesCount: 0,
+        commentsCount: 0,
+        createdAt: serverTimestamp(),
+      });
+
+      setStep(1);
+      setClub('');
+      setCourse('');
+      setScores(DEFAULT_PARS.map(p => p));
+      navigation.navigate('Inicio', { showSuccess: Date.now(), photos: photoUrls });
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo guardar la vuelta. Intentá de nuevo.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -406,7 +480,7 @@ export default function UploadScreen() {
           onPublish={handleScoresDone}
         />
       )}
-      {step === 2 && <Step3 scores={scores} club={club} course={course} onDone={handleDone} />}
+      {step === 2 && <Step3 scores={scores} club={club} course={course} saving={saving} onDone={handleDone} />}
     </SafeAreaView>
   );
 }
