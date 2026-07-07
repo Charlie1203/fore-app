@@ -36,7 +36,7 @@ export default function RegisterScreen() {
 
 	const [displayName, setDisplayName] = useState('');
 	const [username, setUsername] = useState('');
-	const [handicap, setHandicap] = useState('');
+	const [matricula, setMatricula] = useState('');
 	const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
 
 	const [loading, setLoading] = useState(false);
@@ -111,15 +111,7 @@ export default function RegisterScreen() {
 			setError('El usuario debe tener 3-20 caracteres: minúsculas, números o guión bajo.');
 			return;
 		}
-		let handicapValue: number | null = null;
-		if (handicap.trim()) {
-			const parsed = Number(handicap.trim().replace(',', '.'));
-			if (isNaN(parsed) || parsed < 0 || parsed > 54) {
-				setError('El handicap debe ser un número entre 0 y 54.');
-				return;
-			}
-			handicapValue = parsed;
-		}
+		const matriculaValue = matricula.trim() || null;
 		const user = auth.currentUser;
 		if (!user) {
 			setError('Se perdió la sesión, volvé a intentar.');
@@ -132,7 +124,8 @@ export default function RegisterScreen() {
 				displayName: displayName.trim(),
 				email: user.email ?? '',
 				photoURL: user.photoURL ?? null,
-				handicap: handicapValue,
+				matricula: matriculaValue,
+				handicap: null, // se completa solo cuando se sincroniza con la matrícula
 				club: null,
 				clubId: null,
 				bio: null,
@@ -233,13 +226,13 @@ export default function RegisterScreen() {
 							</View>
 							<View>
 								<AuthTextInput
-									icon="golf-outline"
-									placeholder="Handicap (opcional)"
-									keyboardType="decimal-pad"
-									value={handicap}
-									onChangeText={setHandicap}
+									icon="card-outline"
+									placeholder="Matrícula (opcional)"
+									keyboardType="number-pad"
+									value={matricula}
+									onChangeText={setMatricula}
 								/>
-								<Text style={styles.hint}>Si no lo sabés todavía, lo podés completar más adelante</Text>
+								<Text style={styles.hint}>La usamos para vincular tu handicap automáticamente. Si no la tenés, la podés completar más adelante</Text>
 							</View>
 
 							{error && <Text style={styles.error}>{error}</Text>}

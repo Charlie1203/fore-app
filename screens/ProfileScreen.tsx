@@ -385,7 +385,7 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
   const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState(userDoc?.displayName ?? '');
   const [username, setUsername] = useState(userDoc?.username ?? '');
-  const [handicap, setHandicap] = useState(userDoc?.handicap?.toString() ?? '');
+  const [matricula, setMatricula] = useState(userDoc?.matricula ?? '');
   const [photoURI, setPhotoURI] = useState<string | null>(userDoc?.photoURL ?? null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -422,7 +422,8 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
       await updateDoc(doc(db, 'users', firebaseUser.uid), {
         displayName: displayName.trim(),
         username: username.trim().toLowerCase().replace(/^@/, ''),
-        handicap: handicap ? parseFloat(handicap) : null,
+        matricula: matricula.trim() || null,
+        // El handicap no se edita acá: se sincroniza solo a partir de la matrícula.
       });
       onClose();
     } catch (e) {
@@ -472,10 +473,11 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
               <TextInput style={epStyles.input} value={username} onChangeText={setUsername} placeholder="@usuario" placeholderTextColor={COLORS.dim} autoCapitalize="none" />
             </View>
 
-            <Text style={epStyles.label}>Matrícula (HCP)</Text>
+            <Text style={epStyles.label}>Matrícula</Text>
             <View style={epStyles.inputBox}>
-              <TextInput style={epStyles.input} value={handicap} onChangeText={t => setHandicap(t.replace(/[^0-9.]/g, ''))} placeholder="Ej: 12.4" placeholderTextColor={COLORS.dim} keyboardType="decimal-pad" />
+              <TextInput style={epStyles.input} value={matricula} onChangeText={t => setMatricula(t.replace(/[^0-9]/g, ''))} placeholder="Ej: 123456" placeholderTextColor={COLORS.dim} keyboardType="number-pad" />
             </View>
+            <Text style={epStyles.hintText}>El handicap se vincula solo a partir de tu matrícula.</Text>
 
             <TouchableOpacity style={[epStyles.saveBtn, saving && { opacity: 0.5 }]} onPress={handleSave} disabled={saving}>
               <Text style={epStyles.saveBtnText}>{saving ? 'Guardando...' : 'Guardar'}</Text>
@@ -495,6 +497,7 @@ const epStyles = StyleSheet.create({
   label: { fontSize: 11, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6, marginTop: 14 },
   inputBox: { backgroundColor: '#1e1e1e', borderRadius: 10, borderWidth: 0.5, borderColor: '#2a2a2a', paddingHorizontal: 14, justifyContent: 'center' },
   input: { color: '#f0f0f0', fontSize: 15, paddingVertical: 12 },
+  hintText: { fontSize: 11, color: '#666', marginTop: 6 },
   saveBtn: { backgroundColor: '#c8e03a', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
   saveBtnText: { color: '#0f0f0f', fontWeight: '700', fontSize: 15 },
   avatarWrap: { alignSelf: 'center', marginBottom: 8 },
@@ -548,7 +551,7 @@ export default function ProfileScreen() {
         initials,
         username: '',
         club: 'Sin club',
-        handicap: viewUser.handicap ?? 0,
+        handicap: viewUser.handicap ?? null,
         followers: 0,
         following: 0,
         avatarBg: viewUser.bg ?? COLORS.lime,
@@ -559,7 +562,7 @@ export default function ProfileScreen() {
         initials,
         username: '@' + (userDoc?.username ?? ''),
         club: userDoc?.club ?? 'Sin club',
-        handicap: userDoc?.handicap ?? 0,
+        handicap: userDoc?.handicap ?? null,
         followers: userDoc?.followersCount ?? 0,
         following: userDoc?.followingCount ?? 0,
         avatarBg: COLORS.lime,
@@ -713,12 +716,15 @@ export default function ProfileScreen() {
               <View style={styles.nameRow}>
                 <Text style={styles.name}>{displayUser.name}</Text>
                 <View style={styles.hcpBadge}>
-                  <Text style={styles.hcpBadgeNum}>{displayUser.handicap}</Text>
+                  <Text style={styles.hcpBadgeNum}>{displayUser.handicap ?? '—'}</Text>
                   <Text style={styles.hcpBadgeLabel}>HCP</Text>
                 </View>
               </View>
               {!!displayUser.username && <Text style={styles.username}>{displayUser.username}</Text>}
               <Text style={styles.club}>📍 {displayUser.club}</Text>
+              {isOwnProfile && userDoc?.matricula && (
+                <Text style={styles.matricula}>Matrícula {userDoc.matricula}</Text>
+              )}
             </View>
             {isOwnProfile ? (
               <TouchableOpacity style={styles.settingsBtn} onPress={() => setMenuVisible(true)}>
@@ -798,6 +804,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 17, fontWeight: '700', color: COLORS.white },
   username: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
   club: { fontSize: 11, color: COLORS.muted, marginTop: 4 },
+  matricula: { fontSize: 10, color: COLORS.dim, marginTop: 3 },
   editBtn: { borderWidth: 0.5, borderColor: COLORS.dim, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   settingsBtn: { padding: 6 },
   followBtn: { borderWidth: 0.5, borderColor: COLORS.lime, backgroundColor: COLORS.lime, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },

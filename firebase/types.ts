@@ -7,7 +7,8 @@ export interface UserDoc {
 	displayName: string;
 	email: string;
 	photoURL: string | null;
-	handicap: number | null;
+	matricula: string | null; // matrícula de la asociación de golf — el handicap se sincroniza a partir de esto
+	handicap: number | null; // no se edita a mano: se vincula automáticamente a partir de la matrícula
 	club: string | null;
 	clubId: string | null;
 	bio: string | null;
