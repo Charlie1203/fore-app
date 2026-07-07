@@ -396,7 +396,7 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 	useEffect(() => {
 		if (!visible || !roundId) return;
 		const q = query(collection(db, 'rounds', roundId, 'comments'), orderBy('createdAt', 'asc'));
-		const unsubscribe = onSnapshot(q, snap => setComments(snap.docs.map(d => d.data() as CommentDoc)));
+		const unsubscribe = onSnapshot(q, snap => setComments(snap.docs.map(d => ({ ...d.data(), id: d.id }) as CommentDoc)));
 		return unsubscribe;
 	}, [visible, roundId]);
 
