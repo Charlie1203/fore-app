@@ -12,12 +12,13 @@
 	TextInput,
 	KeyboardAvoidingView,
 	Platform,
+	ActivityIndicator,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from "react-native-svg";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
@@ -28,6 +29,7 @@ import {
 import type { RoundDoc, CommentDoc } from "../firebase/types";
 
 const SCREEN_W = Dimensions.get("window").width;
+const SCREEN_H = Dimensions.get("window").height;
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
 	const d = [
@@ -392,6 +394,11 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 	const [text, setText] = useState('');
 	const [comments, setComments] = useState<CommentDoc[]>([]);
 	const [sending, setSending] = useState(false);
+	const scrollRef = useRef<ScrollView>(null);
+	const inputRef = useRef<TextInput>(null);
+	const insets = useSafeAreaInsets();
+
+	const myInitials = (userDoc?.displayName ?? '??').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
 	useEffect(() => {
 		if (!visible || !roundId) return;
@@ -412,6 +419,7 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 		const value = text.trim();
 		if (!value || !roundId || !firebaseUser || sending) return;
 		setSending(true);
+		setText('');
 		try {
 			const authorName = userDoc?.displayName ?? 'Vos';
 			const authorInitials = authorName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -424,9 +432,8 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 				createdAt: serverTimestamp(),
 			});
 			await updateDoc(doc(db, 'rounds', roundId), { commentsCount: increment(1) });
-			setText('');
 		} catch {
-			// noop — el usuario puede reintentar
+			setText(value); // se perdió el envío, se lo devolvemos para que no lo pierda
 		} finally {
 			setSending(false);
 		}
@@ -434,13 +441,23 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 
 	return (
 		<Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-			<View style={{ flex: 1, justifyContent: 'flex-end' }}>
+			<KeyboardAvoidingView style={{ flex: 1, justifyContent: 'flex-end' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 				<TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
-				<KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
 				<View style={styles.commentsSheet}>
 					<View style={styles.commentsHandle} />
-					<Text style={styles.commentsTitle}>{count} comentarios</Text>
-					<ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+					<View style={styles.commentsHeader}>
+						<Text style={styles.commentsTitle}>{count} {count === 1 ? 'comentario' : 'comentarios'}</Text>
+						<TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+							<Ionicons name="close" size={20} color={COLORS.muted} />
+						</TouchableOpacity>
+					</View>
+					<ScrollView
+						ref={scrollRef}
+						style={{ flex: 1 }}
+						showsVerticalScrollIndicator={false}
+						keyboardShouldPersistTaps="handled"
+						onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+					>
 						{roundId ? (
 							comments.length > 0 ? comments.map(c => (
 								<View key={c.id} style={styles.commentRow}>
@@ -459,7 +476,7 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 										<Text style={styles.commentTexto}>{c.text}</Text>
 									</View>
 								</View>
-							)) : <Text style={styles.commentsEmpty}>Sin comentarios todavía.</Text>
+							)) : <Text style={styles.commentsEmpty}>Sin comentarios todavía. ¡Sé el primero!</Text>
 						) : (
 							MOCK_COMMENTS.map(c => (
 								<View key={c.id} style={styles.commentRow}>
@@ -481,28 +498,32 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 							))
 						)}
 					</ScrollView>
-					<View style={styles.commentInput}>
-						<View style={[styles.commentAvatar, { backgroundColor: '#2a1a3a' }]}>
-							<Text style={[styles.commentAvatarText, { color: '#b070e0' }]}>JN</Text>
+					<View style={[styles.commentInput, { paddingBottom: 12 + insets.bottom }]}>
+						<View style={[styles.commentAvatar, { backgroundColor: COLORS.lime }]}>
+							<Text style={[styles.commentAvatarText, { color: '#0f0f0f' }]}>{myInitials}</Text>
 						</View>
 						<TextInput
+							ref={inputRef}
 							style={styles.commentTextInput}
-							placeholder="Comentar..."
+							placeholder={roundId ? 'Comentar...' : 'Comentar (demo)'}
 							placeholderTextColor="#444"
 							value={text}
 							onChangeText={setText}
-							editable={!!roundId}
+							editable={!!roundId && !sending}
+							returnKeyType="send"
 							onSubmitEditing={enviar}
 						/>
-						{text.length > 0 && (
-							<TouchableOpacity onPress={enviar} disabled={sending}>
-								<Ionicons name="send" size={18} color={COLORS.lime} />
-							</TouchableOpacity>
-						)}
+						{sending
+							? <ActivityIndicator size="small" color={COLORS.lime} />
+							: text.length > 0 && (
+								<TouchableOpacity onPress={enviar} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+									<Ionicons name="send" size={18} color={COLORS.lime} />
+								</TouchableOpacity>
+							)
+						}
 					</View>
 				</View>
 			</KeyboardAvoidingView>
-		</View>
 		</Modal>
 	);
 }
@@ -987,10 +1008,11 @@ const styles = StyleSheet.create({
 	dots: { fontSize: 18, color: COLORS.dim },
 	cardBody: { paddingHorizontal: 16, paddingBottom: 12 },
 	commentsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-	commentsSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
-	commentsHandle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 12 },
-	commentsTitle: { fontSize: 15, fontWeight: '700', color: '#f0f0f0', paddingHorizontal: 20, marginBottom: 12 },
-	commentsEmpty: { color: COLORS.muted, fontSize: 13, textAlign: 'center', marginTop: 24, paddingHorizontal: 24 },
+	commentsSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: SCREEN_H * 0.65 },
+	commentsHandle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 8 },
+	commentsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 8 },
+	commentsTitle: { fontSize: 15, fontWeight: '700', color: '#f0f0f0' },
+	commentsEmpty: { color: COLORS.muted, fontSize: 13, textAlign: 'center', marginTop: 40, paddingHorizontal: 24 },
 	commentRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: '#1e1e1e' },
 	commentAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 	commentAvatarText: { fontSize: 10, fontWeight: '700' },
