@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
 	storyPlus: { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: COLORS.lime, borderWidth: 1.5, borderColor: COLORS.bg, alignItems: 'center', justifyContent: 'center' },
 	storyPlusText: { fontSize: 13, fontWeight: '800', color: '#0f0f0f', lineHeight: 16 },
 	storyModal: { flex: 1, backgroundColor: '#000' },
-	storyCard: { flex: 1, marginTop: 6, marginBottom: 10, marginHorizontal: 4, borderRadius: 18, overflow: 'hidden', backgroundColor: '#111' },
+	storyCard: { flex: 1, marginTop: 16, marginBottom: 28, marginHorizontal: 8, borderRadius: 22, overflow: 'hidden', backgroundColor: '#111' },
 	storyTapZones: { ...StyleSheet.absoluteFillObject, flexDirection: 'row' },
 	storyOverlay: { position: 'absolute', top: 0, left: 0, right: 0 },
 	storyBarRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 12 },
