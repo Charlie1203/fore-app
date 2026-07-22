@@ -122,6 +122,7 @@ export interface GroupDoc {
 	type: 'club' | 'privado';
 	photoURL: string | null;
 	membersCount: number;
+	memberUids: string[]; // denormalizado para consultar "mis grupos" con array-contains
 	createdBy: string;
 	createdAt: Timestamp;
 	lastActivityAt: Timestamp;

@@ -1,4 +1,4 @@
-﻿import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Dimensions, Image, Modal, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+﻿import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Dimensions, Image, Modal, KeyboardAvoidingView, Platform, Keyboard, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
@@ -7,6 +7,12 @@ import PagerView from 'react-native-pager-view';
 import type { Torneo } from './TorneosScreen';
 import Svg, { Circle, Path, Ellipse, Line, Polygon } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '../context/AuthContext';
+import { db, storage } from '../firebase/config';
+import { collection, query, where, orderBy, onSnapshot, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { createGroup, joinGroup } from '../services/groups';
+import type { GroupDoc, GroupMemberDoc, GroupPostDoc } from '../firebase/types';
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
   const d = [
@@ -46,18 +52,29 @@ const SCREEN_H = Dimensions.get('window').height;
 const GROUP_TAB_BAR_H = 44;
 const BOTTOM_TAB_H = 80;
 
-const MY_GROUPS = [
-  { id: '1', name: 'Haras Santa María', type: 'club', members: 142, initials: 'HS', bg: '#1a2a0a', color: '#c8e03a', lastActivity: 'hace 2 horas' },
-  { id: '2', name: 'Los del Jueves', type: 'privado', members: 6, initials: 'LJ', bg: '#2a1a3a', color: '#b070e0', lastActivity: 'hace 1 día' },
-  { id: '3', name: 'Martindale CC', type: 'club', members: 89, initials: 'MC', bg: '#1a2a3a', color: '#5fa0e0', lastActivity: 'hace 3 días' },
+// Paleta para avatares de grupos: el color se elige de forma estable a partir del id.
+const GROUP_PALETTE = [
+  { bg: '#1a2a0a', color: '#c8e03a' },
+  { bg: '#2a1a3a', color: '#b070e0' },
+  { bg: '#1a2a3a', color: '#5fa0e0' },
+  { bg: '#2a1a1a', color: '#e07070' },
+  { bg: '#2a2a1a', color: '#e0c03a' },
 ];
 
-const ALL_GROUPS = [
-  ...MY_GROUPS,
-  { id: '4', name: 'San Andrés GC', type: 'club', members: 67, initials: 'SA', bg: '#2a1a1a', color: '#e07070', lastActivity: 'hace 1 semana' },
-  { id: '5', name: 'Olivos GC', type: 'club', members: 201, initials: 'OG', bg: '#1a1a2a', color: '#7070e0', lastActivity: 'hace 2 días' },
-  { id: '6', name: 'Los Birdies', type: 'privado', members: 4, initials: 'LB', bg: '#2a2a1a', color: '#e0c03a', lastActivity: 'hace 5 días' },
-];
+function groupVisual(g: GroupDoc) {
+  const initials = g.name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+  const hash = g.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return { initials, ...GROUP_PALETTE[hash % GROUP_PALETTE.length] };
+}
+
+function formatTs(ts: any): string {
+  if (!ts?.toDate) return 'ahora';
+  const mins = (Date.now() - ts.toDate().getTime()) / 60000;
+  if (mins < 60) return `hace ${Math.max(1, Math.round(mins))} min`;
+  if (mins < 60 * 24) return `hace ${Math.round(mins / 60)} h`;
+  if (mins < 60 * 24 * 7) return `hace ${Math.round(mins / (60 * 24))} d`;
+  return ts.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+}
 
 const PLAYERS = [
   { name: 'Pepe Noceti', username: '@peponoceti', initials: 'PE', bg: '#333', color: '#c8e03a', hcp: 7.3 },
@@ -67,7 +84,6 @@ const PLAYERS = [
   { name: 'Tomás Bidegain', username: '@tomibide', initials: 'TB', bg: '#2a1a3a', color: '#b070e0', hcp: 11.2 },
 ];
 
-type Group = typeof MY_GROUPS[0];
 type Player = typeof PLAYERS[0];
 
 type PostType = 'texto' | 'fotos' | 'sistema';
@@ -93,58 +109,10 @@ interface Post {
   pinned?: boolean;
 }
 
-const ACTIVIDAD_POSTS: Post[] = [
-  {
-    id: '0', tipo: 'texto', pinned: true,
-    autor: 'Haras Santa María', initials: 'HS', bg: '#1a2a0a', color: '#c8e03a',
-    tiempo: 'hace 1 día',
-    texto: 'Recordatorio: el torneo del club es el 12 de julio. Inscripción cierra el viernes, hablar con la proshop para confirmar.',
-    likes: 18, liked: false, comentarios: 3,
-  },
-  {
-    id: '1', tipo: 'fotos',
-    autor: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a',
-    tiempo: 'hace 3 horas',
-    texto: 'Día perfecto en Haras. El hoyo 7 nos mató a todos 😂',
-    fotos: [
-      'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800',
-      'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800',
-    ],
-    likes: 12, liked: true, comentarios: 4,
-  },
-  {
-    id: '2', tipo: 'texto',
-    autor: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a',
-    tiempo: 'hace 6 horas',
-    texto: 'Alguien para el jueves? Yo estoy confirmado a las 8.',
-    likes: 4, liked: false, comentarios: 5,
-  },
-  {
-    id: '3', tipo: 'fotos',
-    autor: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a',
-    tiempo: 'hace 1 día',
-    texto: 'Primera vez que bajo de 80 en Haras 🙌',
-    fotos: ['https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?w=800'],
-    likes: 21, liked: false, comentarios: 7,
-  },
-  {
-    id: '4', tipo: 'texto',
-    autor: 'Sofía Lagos', initials: 'SL', bg: '#1a2a3a', color: '#5fa0e0',
-    tiempo: 'hace 3 días',
-    texto: 'Alguien tiene recomendación de profesor para trabajo de corto? Quiero mejorar el pitching antes del torneo.',
-    likes: 6, liked: false, comentarios: 8,
-  },
-  {
-    id: '5', tipo: 'sistema',
-    tiempo: 'hace 5 días',
-    texto: '🏆 Pepe Noceti ganó la Copa Junio con 38 puntos Stableford',
-    likes: 0, liked: false, comentarios: 0,
-  },
-];
-
 const TORNEOS_MOCK: Torneo[] = [
   {
     id: '1', nombre: 'Copa Junio', modalidad: 'Stableford', fecha: 'Jun 2026', estado: 'finalizado', grupo: 'Haras Santa María',
+    adminId: 'pepe', fechasRonda: ['2026-06-07'],
     participantes: [],
     leaderboard: [
       { pos: 1, nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', score: 38, diff: 0 },
@@ -154,6 +122,7 @@ const TORNEOS_MOCK: Torneo[] = [
   },
   {
     id: '2', nombre: 'Torneo del Club', modalidad: 'Stroke Play', fecha: 'Jul 2026', estado: 'próximo', grupo: 'Haras Santa María',
+    adminId: 'pepe', fechasRonda: ['2026-07-12'],
     participantes: [
       { nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', hcp: 7.3 },
       { nombre: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', hcp: 15.1 },
@@ -409,11 +378,16 @@ function SistemaPost({ post }: { post: Post }) {
 
 // ─── Post Composer ────────────────────────────────────────────────────────────
 
-function PostComposer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function PostComposer({ visible, onClose, onPublish }: {
+  visible: boolean;
+  onClose: () => void;
+  onPublish: (text: string, photos: string[]) => Promise<void>;
+}) {
   const [text, setText] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  const canPost = text.trim().length > 0 || photos.length > 0;
+  const canPost = (text.trim().length > 0 || photos.length > 0) && !saving;
 
   const pickFromGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -432,7 +406,22 @@ function PostComposer({ visible, onClose }: { visible: boolean; onClose: () => v
     if (!result.canceled) setPhotos(p => [...p, result.assets[0].uri].slice(0, 4));
   };
 
-  const handleClose = () => { setText(''); setPhotos([]); onClose(); };
+  const handleClose = () => { if (saving) return; setText(''); setPhotos([]); onClose(); };
+
+  const handlePublish = async () => {
+    if (!canPost) return;
+    setSaving(true);
+    try {
+      await onPublish(text.trim(), photos);
+      setText('');
+      setPhotos([]);
+      onClose();
+    } catch {
+      Alert.alert('Error', 'No se pudo publicar. Probá de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
@@ -446,10 +435,13 @@ function PostComposer({ visible, onClose }: { visible: boolean; onClose: () => v
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.composerPostBtn, !canPost && { opacity: 0.4 }]}
-              onPress={handleClose}
+              onPress={handlePublish}
               disabled={!canPost}
             >
-              <Text style={styles.composerPostBtnText}>Publicar</Text>
+              {saving
+                ? <ActivityIndicator size="small" color="#0f0f0f" />
+                : <Text style={styles.composerPostBtnText}>Publicar</Text>
+              }
             </TouchableOpacity>
           </View>
 
@@ -497,33 +489,122 @@ function PostComposer({ visible, onClose }: { visible: boolean; onClose: () => v
 
 // ─── GroupDetail ──────────────────────────────────────────────────────────────
 
-function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
+const uploadGroupPostPhoto = async (uri: string, groupId: string, postId: string, index: number): Promise<string> => {
+  const blob: Blob = await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => resolve(xhr.response);
+    xhr.onerror = reject;
+    xhr.responseType = 'blob';
+    xhr.open('GET', uri, true);
+    xhr.send(null);
+  });
+  const photoRef = storageRef(storage, `groups/${groupId}/posts/${postId}/${index}.jpg`);
+  await uploadBytes(photoRef, blob, { contentType: 'image/jpeg' });
+  return getDownloadURL(photoRef);
+};
+
+function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: boolean; onBack: () => void }) {
   const navigation = useNavigation<any>();
-  const isMember = MY_GROUPS.some(g => g.id === group.id);
-  const [joined, setJoined] = useState(isMember);
+  const { firebaseUser, userDoc } = useAuth();
   const [tab, setTab] = useState(0);
   const [showComposer, setShowComposer] = useState(false);
-  const [posts, setPosts] = useState<Post[]>(ACTIVIDAD_POSTS);
+  const [posts, setPosts] = useState<GroupPostDoc[]>([]);
+  const [members, setMembers] = useState<GroupMemberDoc[]>([]);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [commentsPost, setCommentsPost] = useState<Post | null>(null);
+  const [joining, setJoining] = useState(false);
 
   const pagerRef = useRef<PagerView>(null);
   const tabRef = useRef(0);
+
+  // Las reglas solo dejan leer posts a miembros — no suscribirse si no lo sos.
+  useEffect(() => {
+    if (!isMember) { setPosts([]); return; }
+    const q = query(collection(db, 'groups', group.id, 'posts'), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, snap => setPosts(snap.docs.map(d => ({ ...d.data(), id: d.id }) as GroupPostDoc)));
+  }, [group.id, isMember]);
+
+  // Miembros: legibles por cualquiera si es club, solo por miembros si es privado.
+  useEffect(() => {
+    if (!isMember && group.type !== 'club') { setMembers([]); return; }
+    return onSnapshot(collection(db, 'groups', group.id, 'members'), snap =>
+      setMembers(snap.docs.map(d => d.data() as GroupMemberDoc))
+    );
+  }, [group.id, isMember]);
 
   const handleTabPress = (i: number) => {
     setTab(i); tabRef.current = i;
     pagerRef.current?.setPage(i);
   };
 
+  // Like local (visual) por ahora — persistirlo llega con su propia subcolección más adelante.
   const toggleLike = (id: string) => {
-    setPosts(prev => prev.map(p => p.id === id
-      ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
-      : p
-    ));
+    setLikedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleJoin = async () => {
+    if (!userDoc || joining) return;
+    setJoining(true);
+    try {
+      await joinGroup(group.id, userDoc);
+      // La snapshot de "mis grupos" del padre actualiza isMember sola.
+    } catch {
+      Alert.alert('Error', 'No te pudimos sumar al grupo. Probá de nuevo.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const publicar = async (text: string, photoUris: string[]) => {
+    if (!firebaseUser || !userDoc) return;
+    const postRef = doc(collection(db, 'groups', group.id, 'posts'));
+    const photoUrls = await Promise.all(photoUris.map((uri, i) => uploadGroupPostPhoto(uri, group.id, postRef.id, i)));
+    const authorInitials = userDoc.displayName.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    await setDoc(postRef, {
+      id: postRef.id,
+      authorId: firebaseUser.uid,
+      authorName: userDoc.displayName,
+      authorInitials,
+      kind: photoUrls.length > 0 ? 'fotos' : 'texto',
+      text: text || null,
+      photos: photoUrls.length > 0 ? photoUrls : null,
+      price: null,
+      eventDate: null,
+      eventLocation: null,
+      attendeesCount: null,
+      pinned: false,
+      likesCount: 0,
+      commentsCount: 0,
+      createdAt: serverTimestamp(),
+    });
+    await updateDoc(doc(db, 'groups', group.id), { lastActivityAt: serverTimestamp() });
   };
 
   const TABS = ['Actividad', 'Torneos', 'Participantes'];
 
-  const renderPost = (post: Post) => {
+  // Adapta el doc real de Firestore a la forma que esperan los componentes de post.
+  const toPost = (p: GroupPostDoc): Post => ({
+    id: p.id,
+    tipo: p.kind === 'fotos' ? 'fotos' : p.kind === 'sistema' ? 'sistema' : 'texto',
+    autor: p.authorName,
+    initials: p.authorInitials,
+    bg: '#1a2a0a',
+    color: COLORS.lime,
+    tiempo: formatTs(p.createdAt),
+    texto: p.text ?? undefined,
+    fotos: p.photos ?? undefined,
+    likes: p.likesCount + (likedIds.has(p.id) ? 1 : 0),
+    liked: likedIds.has(p.id),
+    comentarios: p.commentsCount,
+    pinned: p.pinned,
+  });
+
+  const renderPost = (postDoc: GroupPostDoc) => {
+    const post = toPost(postDoc);
     const onLike = () => toggleLike(post.id);
     const onComment = () => setCommentsPost(post);
     switch (post.tipo) {
@@ -535,7 +616,7 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
 
   return (
     <View style={{ flex: 1 }}>
-      <PostComposer visible={showComposer} onClose={() => setShowComposer(false)} />
+      <PostComposer visible={showComposer} onClose={() => setShowComposer(false)} onPublish={publicar} />
       {commentsPost && (
         <CommentsSheet
           visible={!!commentsPost}
@@ -550,29 +631,20 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
           <Ionicons name="chevron-back" size={20} color={COLORS.white} />
         </TouchableOpacity>
         <Text style={styles.detailTitle}>{group.name}</Text>
-        {tab === 1 && (
+        {!isMember && group.type === 'club' && (
+          <TouchableOpacity style={styles.joinBtnSmall} onPress={handleJoin} disabled={joining}>
+            {joining
+              ? <ActivityIndicator size="small" color="#0f0f0f" />
+              : <Text style={styles.joinBtnSmallText}>Unirse</Text>
+            }
+          </TouchableOpacity>
+        )}
+        {isMember && tab === 1 && (
           <TouchableOpacity style={styles.headerAddBtn} onPress={() => navigation.navigate('CreateTorneo', { grupoFijo: group.name })}>
             <Ionicons name="add" size={24} color={COLORS.lime} />
           </TouchableOpacity>
         )}
       </View>
-
-      {/* Líder fijo */}
-      <TouchableOpacity
-        style={styles.leaderCard}
-        onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: 'Pepe Noceti', initials: 'PE', bg: '#222', color: COLORS.lime } })}
-      >
-        <View style={styles.leaderAccent} />
-        <Avatar initials="PE" bg="#222" color={COLORS.lime} size={40} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.leaderLabel}>Mejor ronda del mes</Text>
-          <Text style={styles.leaderName}>Pepe Noceti</Text>
-        </View>
-        <View style={styles.leaderScoreBlock}>
-          <Text style={styles.leaderScoreNum}>71</Text>
-          <Text style={styles.leaderScoreSub}>-1 vs par</Text>
-        </View>
-      </TouchableOpacity>
 
       {/* Tabs fijos */}
       <View style={styles.groupTabBar}>
@@ -596,7 +668,12 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
           onPageSelected={e => { setTab(e.nativeEvent.position); tabRef.current = e.nativeEvent.position; }}
         >
           <ScrollView key="0" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-            {posts.map(renderPost)}
+            {!isMember
+              ? <Text style={styles.emptyTabText}>Unite al grupo para ver la actividad.</Text>
+              : posts.length === 0
+                ? <Text style={styles.emptyTabText}>Todavía no hay actividad. ¡Publicá lo primero!</Text>
+                : posts.map(renderPost)
+            }
           </ScrollView>
 
           <ScrollView key="1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -616,23 +693,38 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
           </ScrollView>
 
           <ScrollView key="2" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-            {PLAYERS.map((p, i) => (
-              <TouchableOpacity
-                key={i}
-                style={styles.row}
-                onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: p.name, initials: p.initials, bg: p.bg, color: p.color, handicap: p.hcp } })}
-              >
-                <Avatar initials={p.initials} bg={p.bg} color={p.color} size={46} />
-                <View style={styles.rowInfo}>
-                  <Text style={styles.rowName}>{p.name}</Text>
-                  <Text style={styles.rowSub}>{p.username} · HCP {p.hcp}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {members.length === 0
+              ? <Text style={styles.emptyTabText}>{isMember || group.type === 'club' ? 'Sin participantes todavía.' : 'Unite al grupo para ver los participantes.'}</Text>
+              : members.map(m => {
+                  const initials = m.displayName.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+                  const esYo = m.uid === firebaseUser?.uid;
+                  return (
+                    <TouchableOpacity
+                      key={m.uid}
+                      style={styles.row}
+                      onPress={() => esYo
+                        ? navigation.navigate('Tabs', { screen: 'Perfil' })
+                        : navigation.navigate('PerfilUsuario', { viewUser: { name: m.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: m.handicap ?? undefined } })
+                      }
+                    >
+                      <Avatar initials={initials} bg={COLORS.lime} color="#0f0f0f" size={46} />
+                      <View style={styles.rowInfo}>
+                        <View style={styles.rowNameRow}>
+                          <Text style={styles.rowName}>{m.displayName}{esYo ? ' (vos)' : ''}</Text>
+                          {m.role === 'admin' && (
+                            <View style={styles.adminBadge}><Text style={styles.adminBadgeText}>Admin</Text></View>
+                          )}
+                        </View>
+                        <Text style={styles.rowSub}>{m.handicap != null ? `HCP ${m.handicap}` : 'Sin handicap'}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+            }
           </ScrollView>
         </PagerView>
 
-        {tab === 0 && (
+        {isMember && tab === 0 && (
           <TouchableOpacity style={styles.fab} onPress={() => setShowComposer(true)}>
             <Ionicons name="add" size={26} color="#0f0f0f" />
           </TouchableOpacity>
@@ -645,7 +737,24 @@ function GroupDetail({ group, onBack }: { group: Group; onBack: () => void }) {
 // ─── Modales ──────────────────────────────────────────────────────────────────
 
 function CreateGroupModal({ onClose }: { onClose: () => void }) {
+  const { userDoc } = useAuth();
   const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleCreate = async () => {
+    const value = name.trim();
+    if (!value || !userDoc || saving) return;
+    setSaving(true);
+    try {
+      await createGroup(value, userDoc);
+      onClose(); // el nuevo grupo aparece solo en "Tus grupos" vía la snapshot
+    } catch {
+      Alert.alert('Error', 'No se pudo crear el grupo. Probá de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <View style={styles.modal}>
       <View style={styles.modalCard}>
@@ -667,11 +776,14 @@ function CreateGroupModal({ onClose }: { onClose: () => void }) {
           />
         </View>
         <TouchableOpacity
-          style={[styles.createBtn, !name.trim() && { opacity: 0.4 }]}
-          onPress={onClose}
-          disabled={!name.trim()}
+          style={[styles.createBtn, (!name.trim() || saving) && { opacity: 0.4 }]}
+          onPress={handleCreate}
+          disabled={!name.trim() || saving}
         >
-          <Text style={styles.createBtnText}>Crear grupo</Text>
+          {saving
+            ? <ActivityIndicator color="#0f0f0f" />
+            : <Text style={styles.createBtnText}>Crear grupo</Text>
+          }
         </TouchableOpacity>
       </View>
     </View>
@@ -680,17 +792,17 @@ function CreateGroupModal({ onClose }: { onClose: () => void }) {
 
 // ─── Rows ─────────────────────────────────────────────────────────────────────
 
-function GroupRow({ group, onPress }: { group: Group; onPress: () => void }) {
-  const isMember = MY_GROUPS.some(g => g.id === group.id);
+function GroupRow({ group, isMember, onPress }: { group: GroupDoc; isMember: boolean; onPress: () => void }) {
+  const visual = groupVisual(group);
   return (
     <TouchableOpacity style={styles.row} onPress={onPress}>
-      <Avatar initials={group.initials} bg={group.bg} color={group.color} size={46} />
+      <Avatar initials={visual.initials} bg={visual.bg} color={visual.color} size={46} />
       <View style={styles.rowInfo}>
         <View style={styles.rowNameRow}>
           <Text style={styles.rowName}>{group.name}</Text>
           {isMember && <Ionicons name="checkmark-circle" size={15} color={COLORS.lime} />}
         </View>
-        <Text style={styles.rowSub}>{group.members} miembros · {group.type === 'club' ? 'Club' : 'Privado'} · {group.lastActivity}</Text>
+        <Text style={styles.rowSub}>{group.membersCount} {group.membersCount === 1 ? 'miembro' : 'miembros'} · {group.type === 'club' ? 'Club' : 'Privado'} · {formatTs(group.lastActivityAt)}</Text>
       </View>
       <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
     </TouchableOpacity>
@@ -727,21 +839,51 @@ function PlayerRow({ player }: { player: Player }) {
 // ─── Screen principal ─────────────────────────────────────────────────────────
 
 export default function SearchScreen() {
+  const { firebaseUser } = useAuth();
   const [search, setSearch] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [myGroups, setMyGroups] = useState<GroupDoc[]>([]);
+  const [clubs, setClubs] = useState<GroupDoc[]>([]);
+
+  // Mis grupos (privados y clubes a los que me sumé).
+  useEffect(() => {
+    if (!firebaseUser) { setMyGroups([]); return; }
+    const qMine = query(collection(db, 'groups'), where('memberUids', 'array-contains', firebaseUser.uid));
+    return onSnapshot(qMine, snap => {
+      const groups = snap.docs.map(d => ({ ...d.data(), id: d.id }) as GroupDoc);
+      groups.sort((a, b) => (b.lastActivityAt?.toMillis?.() ?? 0) - (a.lastActivityAt?.toMillis?.() ?? 0));
+      setMyGroups(groups);
+    });
+  }, [firebaseUser?.uid]);
+
+  // Clubes públicos (para descubrirlos en la búsqueda).
+  useEffect(() => {
+    const qClubs = query(collection(db, 'groups'), where('type', '==', 'club'));
+    return onSnapshot(qClubs, snap => setClubs(snap.docs.map(d => ({ ...d.data(), id: d.id }) as GroupDoc)));
+  }, []);
+
+  const myGroupIds = new Set(myGroups.map(g => g.id));
+  const allGroups = [...myGroups, ...clubs.filter(c => !myGroupIds.has(c.id))];
 
   const q = search.toLowerCase();
-  const filteredGroups = ALL_GROUPS.filter(g => g.name.toLowerCase().includes(q));
+  const filteredGroups = allGroups.filter(g => g.name.toLowerCase().includes(q));
   const filteredPlayers = PLAYERS.filter(p =>
     p.name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
   );
   const isSearching = search.length > 0;
 
+  // Buscamos el grupo por id en la data viva para que el detalle se actualice con las snapshots.
+  const selectedGroup = selectedGroupId ? allGroups.find(g => g.id === selectedGroupId) ?? null : null;
+
   if (selectedGroup) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <GroupDetail group={selectedGroup} onBack={() => setSelectedGroup(null)} />
+        <GroupDetail
+          group={selectedGroup}
+          isMember={myGroupIds.has(selectedGroup.id)}
+          onBack={() => setSelectedGroupId(null)}
+        />
       </SafeAreaView>
     );
   }
@@ -776,7 +918,7 @@ export default function SearchScreen() {
             <Text style={styles.sectionTitle}>Grupos</Text>
             <View style={styles.list}>
               {filteredGroups.map(g => (
-                <GroupRow key={g.id} group={g} onPress={() => setSelectedGroup(g)} />
+                <GroupRow key={g.id} group={g} isMember={myGroupIds.has(g.id)} onPress={() => setSelectedGroupId(g.id)} />
               ))}
             </View>
           </>
@@ -806,9 +948,12 @@ export default function SearchScreen() {
 
         <Text style={styles.sectionTitle}>Tus grupos</Text>
         <View style={styles.list}>
-          {MY_GROUPS.map(g => (
-            <GroupRow key={g.id} group={g} onPress={() => setSelectedGroup(g)} />
-          ))}
+          {myGroups.length === 0
+            ? <Text style={styles.emptyTabText}>Todavía no estás en ningún grupo. Creá uno o buscá un club.</Text>
+            : myGroups.map(g => (
+                <GroupRow key={g.id} group={g} isMember onPress={() => setSelectedGroupId(g.id)} />
+              ))
+          }
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -846,6 +991,9 @@ const styles = StyleSheet.create({
   followBtnTextActive: { color: COLORS.muted },
   empty: { alignItems: 'center', paddingTop: 40 },
   emptyText: { fontSize: 14, color: COLORS.muted },
+  emptyTabText: { fontSize: 13, color: COLORS.muted, textAlign: 'center', marginTop: 32, paddingHorizontal: 32, lineHeight: 19 },
+  adminBadge: { backgroundColor: '#1a2a0a', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  adminBadgeText: { fontSize: 10, color: COLORS.lime, fontWeight: '700' },
 
   // Detail
   detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 10, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },

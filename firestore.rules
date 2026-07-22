@@ -97,16 +97,27 @@ service cloud.firestore {
     }
 
     match /groups/{groupId} {
-      allow read: if isSignedIn() && (resource.data.type == "club" || isGroupMember(groupId));
+      // memberUids en el doc permite tanto la query "mis grupos" (array-contains)
+      // como validar membership sin leer la subcolección.
+      allow read: if isSignedIn() && (resource.data.type == "club" || request.auth.uid in resource.data.memberUids);
       allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
-      allow update, delete: if isGroupAdmin(groupId);
+      // Admin puede editar todo; cualquier usuario firmado puede tocar solo los campos de
+      // membresía/actividad (necesario para unirse a un club y refrescar lastActivityAt al postear).
+      allow update: if isGroupAdmin(groupId) ||
+        (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["memberUids", "membersCount", "lastActivityAt"]));
+      allow delete: if isGroupAdmin(groupId);
 
       match /members/{memberUid} {
         allow read: if isSignedIn() && (get(/databases/$(database)/documents/groups/$(groupId)).data.type == "club" || isGroupMember(groupId));
-        allow create: if isSignedIn() &&
-          ( get(/databases/$(database)/documents/groups/$(groupId)).data.type == "club"
-            ? request.auth.uid == memberUid
-            : isGroupAdmin(groupId) );
+        allow create: if isSignedIn() && (
+          // clubes: cualquiera puede sumarse a sí mismo
+          ( get(/databases/$(database)/documents/groups/$(groupId)).data.type == "club" && request.auth.uid == memberUid ) ||
+          // privados: el admin agrega gente, o el creador se agrega a sí mismo al crear el grupo
+          isGroupAdmin(groupId) ||
+          ( request.auth.uid == memberUid &&
+            get(/databases/$(database)/documents/groups/$(groupId)).data.createdBy == request.auth.uid )
+        );
         allow update, delete: if isGroupAdmin(groupId) || request.auth.uid == memberUid;
       }
 
