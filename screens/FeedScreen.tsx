@@ -843,12 +843,20 @@ function MilestoneCard() {
 export default function FeedScreen() {
 	const route = useRoute<any>();
 	const navigation = useNavigation<any>();
+	const { firebaseUser } = useAuth();
 	const toastOpacity = useRef(new Animated.Value(0)).current;
 	const [showToast, setShowToast] = useState(false);
 	const [myStory, setMyStory] = useState<string | null>(null);
 	const [viewingIndex, setViewingIndex] = useState<number | null>(null);
 	const [seenStories, setSeenStories] = useState<Set<string>>(new Set());
 	const [rounds, setRounds] = useState<RoundDoc[]>([]);
+	const [hayNotifsSinLeer, setHayNotifsSinLeer] = useState(false);
+
+	useEffect(() => {
+		if (!firebaseUser) return;
+		const q = query(collection(db, 'users', firebaseUser.uid, 'notifications'), where('read', '==', false), limit(1));
+		return onSnapshot(q, snap => setHayNotifsSinLeer(!snap.empty));
+	}, [firebaseUser?.uid]);
 
 	const storiesConNombre = STORIES_OTHERS.filter(s => s.photo);
 	const combinedStories = myStory
@@ -908,6 +916,7 @@ export default function FeedScreen() {
 					</TouchableOpacity>
 					<TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
 						<Ionicons name="notifications-outline" size={22} color={COLORS.white} />
+						{hayNotifsSinLeer && <View style={styles.notifDot} />}
 					</TouchableOpacity>
 				</View>
 			</View>
@@ -969,6 +978,7 @@ const styles = StyleSheet.create({
 		paddingVertical: 10,
 	},
 	logo: { fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
+	notifDot: { position: 'absolute', top: -1, right: -1, width: 9, height: 9, borderRadius: 5, backgroundColor: COLORS.lime, borderWidth: 1.5, borderColor: COLORS.bg },
 	headerIcon: { fontSize: 20 },
 	storiesRow: {},
 	storyItem: { alignItems: "center", marginRight: 12, gap: 4 },

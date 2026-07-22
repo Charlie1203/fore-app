@@ -11,7 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase/config';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { createGroup, joinGroup } from '../services/groups';
+import { joinGroup } from '../services/groups';
 import type { GroupDoc, GroupMemberDoc, GroupPostDoc } from '../firebase/types';
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
@@ -693,6 +693,17 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
           </ScrollView>
 
           <ScrollView key="2" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            {members.find(m => m.uid === firebaseUser?.uid)?.role === 'admin' && (
+              <TouchableOpacity
+                style={styles.addMemberRow}
+                onPress={() => navigation.navigate('AgregarMiembros', { groupId: group.id, groupName: group.name })}
+              >
+                <View style={styles.addMemberIcon}>
+                  <Ionicons name="person-add-outline" size={18} color={COLORS.lime} />
+                </View>
+                <Text style={styles.addMemberText}>Agregar participantes</Text>
+              </TouchableOpacity>
+            )}
             {members.length === 0
               ? <Text style={styles.emptyTabText}>{isMember || group.type === 'club' ? 'Sin participantes todavía.' : 'Unite al grupo para ver los participantes.'}</Text>
               : members.map(m => {
@@ -735,60 +746,6 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
 }
 
 // ─── Modales ──────────────────────────────────────────────────────────────────
-
-function CreateGroupModal({ onClose }: { onClose: () => void }) {
-  const { userDoc } = useAuth();
-  const [name, setName] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const handleCreate = async () => {
-    const value = name.trim();
-    if (!value || !userDoc || saving) return;
-    setSaving(true);
-    try {
-      await createGroup(value, userDoc);
-      onClose(); // el nuevo grupo aparece solo en "Tus grupos" vía la snapshot
-    } catch {
-      Alert.alert('Error', 'No se pudo crear el grupo. Probá de nuevo.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <View style={styles.modal}>
-      <View style={styles.modalCard}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Nuevo grupo</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={20} color={COLORS.muted} />
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.label}>Nombre del grupo</Text>
-        <View style={styles.inputBox}>
-          <TextInput
-            style={styles.inputText}
-            placeholder="Ej: Los del Jueves"
-            placeholderTextColor={COLORS.dim}
-            value={name}
-            onChangeText={setName}
-            autoFocus
-          />
-        </View>
-        <TouchableOpacity
-          style={[styles.createBtn, (!name.trim() || saving) && { opacity: 0.4 }]}
-          onPress={handleCreate}
-          disabled={!name.trim() || saving}
-        >
-          {saving
-            ? <ActivityIndicator color="#0f0f0f" />
-            : <Text style={styles.createBtnText}>Crear grupo</Text>
-          }
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
 
 // ─── Rows ─────────────────────────────────────────────────────────────────────
 
@@ -839,10 +796,10 @@ function PlayerRow({ player }: { player: Player }) {
 // ─── Screen principal ─────────────────────────────────────────────────────────
 
 export default function SearchScreen() {
+  const navigation = useNavigation<any>();
   const { firebaseUser } = useAuth();
   const [search, setSearch] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
   const [myGroups, setMyGroups] = useState<GroupDoc[]>([]);
   const [clubs, setClubs] = useState<GroupDoc[]>([]);
 
@@ -890,8 +847,6 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      {showCreate && <CreateGroupModal onClose={() => setShowCreate(false)} />}
-
       <View style={styles.header}>
         <Text style={styles.title}>Buscar</Text>
       </View>
@@ -939,7 +894,7 @@ export default function SearchScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={styles.createGroupBtn} onPress={() => setShowCreate(true)}>
+        <TouchableOpacity style={styles.createGroupBtn} onPress={() => navigation.navigate('CreateGrupo')}>
           <View style={styles.createGroupIcon}>
             <Ionicons name="add" size={20} color={COLORS.lime} />
           </View>
@@ -992,6 +947,9 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 40 },
   emptyText: { fontSize: 14, color: COLORS.muted },
   emptyTabText: { fontSize: 13, color: COLORS.muted, textAlign: 'center', marginTop: 32, paddingHorizontal: 32, lineHeight: 19 },
+  addMemberRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 18, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  addMemberIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#1a2a0a', alignItems: 'center', justifyContent: 'center' },
+  addMemberText: { fontSize: 15, fontWeight: '600', color: COLORS.lime },
   adminBadge: { backgroundColor: '#1a2a0a', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
   adminBadgeText: { fontSize: 10, color: COLORS.lime, fontWeight: '700' },
 

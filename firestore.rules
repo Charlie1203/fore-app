@@ -22,6 +22,14 @@ service cloud.firestore {
       allow create: if isOwner(uid);
       allow update: if isOwner(uid);
       allow delete: if false;
+
+      match /notifications/{notifId} {
+        allow read: if isOwner(uid);
+        // Cualquier usuario firmado puede notificar a otro (te agregaron a un grupo, etc.),
+        // pero solo el dueño puede marcarlas leídas o borrarlas.
+        allow create: if isSignedIn();
+        allow update, delete: if isOwner(uid);
+      }
     }
 
     match /usernames/{username} {

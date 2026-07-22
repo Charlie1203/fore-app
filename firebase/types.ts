@@ -26,6 +26,16 @@ export interface UsernameDoc {
 	uid: string;
 }
 
+// users/{uid}/notifications/{notifId}
+export interface NotificationDoc {
+	id: string;
+	type: 'group_added'; // se amplía a medida que aparezcan más eventos
+	icon: string; // nombre de Ionicons
+	text: string;
+	read: boolean;
+	createdAt: Timestamp;
+}
+
 // follows/{followerUid}_{followingUid}
 export interface FollowDoc {
 	followerUid: string;

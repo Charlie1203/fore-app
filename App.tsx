@@ -18,6 +18,8 @@ import NotificationsScreen from "./screens/NotificationsScreen";
 import CreateTorneoScreen from "./screens/CreateTorneoScreen";
 import InvitarJugadoresScreen from "./screens/InvitarJugadoresScreen";
 import TorneoCreadoScreen from "./screens/TorneoCreadoScreen";
+import CreateGrupoScreen from "./screens/CreateGrupoScreen";
+import AgregarMiembrosScreen from "./screens/AgregarMiembrosScreen";
 import LoginScreen from "./screens/auth/LoginScreen";
 import RegisterScreen from "./screens/auth/RegisterScreen";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -131,6 +133,8 @@ function AppStack() {
       <RootStack.Screen name="CreateTorneo" component={CreateTorneoScreen} options={{ animation: 'slide_from_right' }} />
       <RootStack.Screen name="InvitarJugadores" component={InvitarJugadoresScreen} options={{ animation: 'slide_from_right' }} />
       <RootStack.Screen name="TorneoCreado" component={TorneoCreadoScreen} options={{ animation: 'fade', gestureEnabled: false }} />
+      <RootStack.Screen name="CreateGrupo" component={CreateGrupoScreen} options={{ animation: 'slide_from_right' }} />
+      <RootStack.Screen name="AgregarMiembros" component={AgregarMiembrosScreen} options={{ animation: 'slide_from_right' }} />
     </RootStack.Navigator>
   );
 }

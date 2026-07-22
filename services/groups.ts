@@ -43,3 +43,33 @@ export async function joinGroup(groupId: string, user: UserDoc): Promise<void> {
 		lastActivityAt: serverTimestamp(),
 	});
 }
+
+/** Un admin agrega a otro usuario al grupo y le deja una notificación. */
+export async function addMemberToGroup(
+	groupId: string,
+	groupName: string,
+	member: Pick<UserDoc, 'uid' | 'displayName' | 'handicap'>,
+	addedByName: string,
+): Promise<void> {
+	await setDoc(doc(db, 'groups', groupId, 'members', member.uid), {
+		uid: member.uid,
+		displayName: member.displayName,
+		handicap: member.handicap ?? null,
+		role: 'member',
+		joinedAt: serverTimestamp(),
+	});
+	await updateDoc(doc(db, 'groups', groupId), {
+		memberUids: arrayUnion(member.uid),
+		membersCount: increment(1),
+		lastActivityAt: serverTimestamp(),
+	});
+	const notifRef = doc(collection(db, 'users', member.uid, 'notifications'));
+	await setDoc(notifRef, {
+		id: notifRef.id,
+		type: 'group_added',
+		icon: 'people-outline',
+		text: `${addedByName} te agregó al grupo ${groupName}`,
+		read: false,
+		createdAt: serverTimestamp(),
+	});
+}
