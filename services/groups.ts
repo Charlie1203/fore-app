@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, updateDoc, serverTimestamp, arrayUnion, increment } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { UserDoc } from '../firebase/types';
 
@@ -71,5 +71,14 @@ export async function addMemberToGroup(
 		text: `${addedByName} te agregó al grupo ${groupName}`,
 		read: false,
 		createdAt: serverTimestamp(),
+	});
+}
+
+/** Saca a un miembro del grupo. Lo usan tanto "salir del grupo" (uno mismo) como el admin al eliminar a otro. */
+export async function removeMemberFromGroup(groupId: string, uid: string): Promise<void> {
+	await deleteDoc(doc(db, 'groups', groupId, 'members', uid));
+	await updateDoc(doc(db, 'groups', groupId), {
+		memberUids: arrayRemove(uid),
+		membersCount: increment(-1),
 	});
 }

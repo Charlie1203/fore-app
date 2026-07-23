@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
 import { collection, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import type { TournamentDoc, TournamentParticipantDoc } from '../firebase/types';
-import { estadoDeTorneo, joinTournament } from '../services/tournaments';
+import { estadoDeTorneo, joinTournament, removeParticipantFromTournament } from '../services/tournaments';
 import { formatFechaTorneo } from './TorneosScreen';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -54,7 +54,36 @@ const MODALIDAD_INFO: Record<string, { icon: string; desc: string }> = {
 
 function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, joining, onJoin }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean; isParticipante: boolean; joining: boolean; onJoin: () => void }) {
   const navigation = useNavigation<any>();
+  const { firebaseUser } = useAuth();
   const modalidadInfo = MODALIDAD_INFO[torneo.modality] ?? { icon: 'trophy-outline', desc: '' };
+  const [removingUid, setRemovingUid] = useState<string | null>(null);
+
+  const quitarParticipante = async (uid: string) => {
+    if (removingUid) return;
+    setRemovingUid(uid);
+    try {
+      await removeParticipantFromTournament(torneo.id, uid);
+    } catch {
+      Alert.alert('Error', 'No pudimos completar la acción. Probá de nuevo.');
+    } finally {
+      setRemovingUid(null);
+    }
+  };
+
+  const confirmarSalir = () => {
+    Alert.alert('Salir del torneo', `¿Seguro que querés salir de ${torneo.name}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => firebaseUser && quitarParticipante(firebaseUser.uid) },
+    ]);
+  };
+
+  const confirmarEliminar = (p: TournamentParticipantDoc) => {
+    Alert.alert('Eliminar del torneo', `¿Sacar a ${p.displayName} del torneo?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: () => quitarParticipante(p.uid) },
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       <DetailNav
@@ -93,20 +122,42 @@ function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, 
             </TouchableOpacity>
           )}
         </View>
-        {participantes.map(p => (
-          <TouchableOpacity
-            key={p.uid}
-            style={styles.participanteRow}
-            onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: p.displayName, initials: p.initials, bg: COLORS.lime, color: '#0f0f0f', handicap: p.handicap } })}
-          >
-            <Avatar initials={p.initials} size={40} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.participanteNombre}>{p.displayName}</Text>
-              <Text style={styles.participanteSub}>{p.handicap != null ? `HCP ${p.handicap}` : 'Sin HCP cargado'}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
-          </TouchableOpacity>
-        ))}
+        {participantes.map(p => {
+          const esYo = p.uid === firebaseUser?.uid;
+          return (
+            <TouchableOpacity
+              key={p.uid}
+              style={styles.participanteRow}
+              onPress={() => esYo
+                ? navigation.navigate('Tabs', { screen: 'Perfil' })
+                : navigation.navigate('PerfilUsuario', { viewUser: { name: p.displayName, initials: p.initials, bg: COLORS.lime, color: '#0f0f0f', handicap: p.handicap } })
+              }
+            >
+              <Avatar initials={p.initials} size={40} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.participanteNombre}>{p.displayName}{esYo ? ' (vos)' : ''}</Text>
+                <Text style={styles.participanteSub}>{p.handicap != null ? `HCP ${p.handicap}` : 'Sin HCP cargado'}</Text>
+              </View>
+              {esYo ? (
+                <TouchableOpacity onPress={confirmarSalir} disabled={removingUid === p.uid} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  {removingUid === p.uid
+                    ? <ActivityIndicator size="small" color={COLORS.muted} />
+                    : <Ionicons name="exit-outline" size={20} color={COLORS.muted} />
+                  }
+                </TouchableOpacity>
+              ) : isAdmin ? (
+                <TouchableOpacity onPress={() => confirmarEliminar(p)} disabled={removingUid === p.uid} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  {removingUid === p.uid
+                    ? <ActivityIndicator size="small" color={COLORS.muted} />
+                    : <Ionicons name="person-remove-outline" size={19} color={COLORS.muted} />
+                  }
+                </TouchableOpacity>
+              ) : (
+                <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );

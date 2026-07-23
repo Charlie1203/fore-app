@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, updateDoc, serverTimestamp, arrayUnion, increment } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { TournamentModality, UserDoc } from '../firebase/types';
 
@@ -79,6 +79,15 @@ export async function addParticipantToTournament(
 		text: `${addedByName} te invitó al torneo ${tournamentName}`,
 		read: false,
 		createdAt: serverTimestamp(),
+	});
+}
+
+/** Saca a un participante del torneo. Lo usan tanto "salir del torneo" (uno mismo) como el admin al eliminar a otro. */
+export async function removeParticipantFromTournament(tournamentId: string, uid: string): Promise<void> {
+	await deleteDoc(doc(db, 'tournaments', tournamentId, 'participants', uid));
+	await updateDoc(doc(db, 'tournaments', tournamentId), {
+		participantUids: arrayRemove(uid),
+		participantsCount: increment(-1),
 	});
 }
 

@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase/config';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc, addDoc, updateDoc, serverTimestamp, getDocs, limit, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { joinGroup } from '../services/groups';
+import { joinGroup, removeMemberFromGroup } from '../services/groups';
 import { estadoDeTorneo, joinTournament } from '../services/tournaments';
 import type { CommentDoc, GroupDoc, GroupMemberDoc, GroupPostDoc, TournamentDoc, UserDoc } from '../firebase/types';
 import { formatFechaTorneo } from './TorneosScreen';
@@ -501,6 +501,35 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
     }
   };
 
+  const [removingUid, setRemovingUid] = useState<string | null>(null);
+
+  const eliminarMiembro = async (uid: string) => {
+    if (removingUid) return;
+    setRemovingUid(uid);
+    try {
+      await removeMemberFromGroup(group.id, uid);
+      if (uid === firebaseUser?.uid) onBack();
+    } catch {
+      Alert.alert('Error', 'No pudimos completar la acción. Probá de nuevo.');
+    } finally {
+      setRemovingUid(null);
+    }
+  };
+
+  const confirmarSalir = () => {
+    Alert.alert('Salir del grupo', `¿Seguro que querés salir de ${group.name}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => firebaseUser && eliminarMiembro(firebaseUser.uid) },
+    ]);
+  };
+
+  const confirmarEliminar = (m: GroupMemberDoc) => {
+    Alert.alert('Eliminar del grupo', `¿Sacar a ${m.displayName} del grupo?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: () => eliminarMiembro(m.uid) },
+    ]);
+  };
+
   const publicar = async (text: string, photoUris: string[]) => {
     if (!firebaseUser || !userDoc) return;
     const postRef = doc(collection(db, 'groups', group.id, 'posts'));
@@ -673,6 +702,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
               : members.map(m => {
                   const initials = m.displayName.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
                   const esYo = m.uid === firebaseUser?.uid;
+                  const soyAdmin = members.find(x => x.uid === firebaseUser?.uid)?.role === 'admin';
                   return (
                     <TouchableOpacity
                       key={m.uid}
@@ -692,6 +722,21 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
                         </View>
                         <Text style={styles.rowSub}>{m.handicap != null ? `HCP ${m.handicap}` : 'Sin handicap'}</Text>
                       </View>
+                      {esYo ? (
+                        <TouchableOpacity onPress={confirmarSalir} disabled={removingUid === m.uid} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          {removingUid === m.uid
+                            ? <ActivityIndicator size="small" color={COLORS.muted} />
+                            : <Ionicons name="exit-outline" size={20} color={COLORS.muted} />
+                          }
+                        </TouchableOpacity>
+                      ) : soyAdmin && (
+                        <TouchableOpacity onPress={() => confirmarEliminar(m)} disabled={removingUid === m.uid} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                          {removingUid === m.uid
+                            ? <ActivityIndicator size="small" color={COLORS.muted} />
+                            : <Ionicons name="person-remove-outline" size={19} color={COLORS.muted} />
+                          }
+                        </TouchableOpacity>
+                      )}
                     </TouchableOpacity>
                   );
                 })
