@@ -132,7 +132,12 @@ service cloud.firestore {
       match /posts/{postId} {
         allow read: if isGroupMember(groupId);
         allow create: if isGroupMember(groupId) && request.resource.data.authorId == request.auth.uid;
-        allow update, delete: if isSignedIn() &&
+        // El autor o un admin puede editar/borrar el post entero; cualquier miembro puede
+        // tocar solo commentsCount (necesario para comentar posts ajenos).
+        allow update: if isSignedIn() &&
+          (resource.data.authorId == request.auth.uid || isGroupAdmin(groupId) ||
+            (isGroupMember(groupId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["commentsCount"])));
+        allow delete: if isSignedIn() &&
           (resource.data.authorId == request.auth.uid || isGroupAdmin(groupId));
 
         match /comments/{commentId} {

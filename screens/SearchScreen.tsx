@@ -9,10 +9,10 @@ import Svg, { Circle, Path, Ellipse, Line, Polygon } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase/config';
-import { collection, query, where, orderBy, onSnapshot, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, setDoc, addDoc, updateDoc, serverTimestamp, getDocs, limit, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { joinGroup } from '../services/groups';
-import type { GroupDoc, GroupMemberDoc, GroupPostDoc } from '../firebase/types';
+import type { CommentDoc, GroupDoc, GroupMemberDoc, GroupPostDoc, UserDoc } from '../firebase/types';
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
   const d = [
@@ -76,16 +76,6 @@ function formatTs(ts: any): string {
   return ts.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 }
 
-const PLAYERS = [
-  { name: 'Pepe Noceti', username: '@peponoceti', initials: 'PE', bg: '#333', color: '#c8e03a', hcp: 7.3 },
-  { name: 'Carlitos Laprida', username: '@carlitoslaprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', hcp: 15.1 },
-  { name: 'Manu Rivero', username: '@manurivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', hcp: 9.8 },
-  { name: 'Sofía Lagos', username: '@sofilagos', initials: 'SL', bg: '#1a2a3a', color: '#5fa0e0', hcp: 18.4 },
-  { name: 'Tomás Bidegain', username: '@tomibide', initials: 'TB', bg: '#2a1a3a', color: '#b070e0', hcp: 11.2 },
-];
-
-type Player = typeof PLAYERS[0];
-
 type PostType = 'texto' | 'fotos' | 'sistema';
 
 interface Post {
@@ -141,17 +131,16 @@ function Avatar({ initials, bg, color, size = 42 }: { initials: string; bg: stri
 
 // ─── Comments Sheet ───────────────────────────────────────────────────────────
 
-const MOCK_COMMENTS = [
-  { id: '1', autor: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', texto: 'Joya! Me apunto', tiempo: 'hace 1 h' },
-  { id: '2', autor: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', texto: 'Yo también voy', tiempo: 'hace 45 min' },
-  { id: '3', autor: 'Sofía Lagos', initials: 'SL', bg: '#1a2a3a', color: '#5fa0e0', texto: 'No puedo esta semana 😢', tiempo: 'hace 20 min' },
-];
-
-function CommentsSheet({ visible, onClose, count }: { visible: boolean; onClose: () => void; count: number }) {
+function CommentsSheet({ visible, onClose, count, groupId, postId }: { visible: boolean; onClose: () => void; count: number; groupId: string; postId: string }) {
   const navigation = useNavigation<any>();
+  const { firebaseUser, userDoc } = useAuth();
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [kbHeight, setKbHeight] = useState(0);
+  const [comments, setComments] = useState<CommentDoc[]>([]);
+  const [sending, setSending] = useState(false);
+
+  const myInitials = (userDoc?.displayName ?? '??').split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -161,35 +150,66 @@ function CommentsSheet({ visible, onClose, count }: { visible: boolean; onClose:
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
-  const abrirPerfil = (c: typeof MOCK_COMMENTS[0]) =>
-    navigation.navigate('PerfilUsuario', { viewUser: { name: c.autor, initials: c.initials, bg: c.bg, color: c.color } });
+  useEffect(() => {
+    if (!visible) return;
+    const q = query(collection(db, 'groups', groupId, 'posts', postId, 'comments'), orderBy('createdAt', 'asc'));
+    return onSnapshot(q, snap => setComments(snap.docs.map(d => ({ ...d.data(), id: d.id }) as CommentDoc)));
+  }, [visible, groupId, postId]);
+
+  const abrirPerfil = (c: CommentDoc) =>
+    navigation.navigate('PerfilUsuario', { viewUser: { name: c.authorName, initials: c.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
+
+  const enviar = async () => {
+    const value = text.trim();
+    if (!value || !firebaseUser || sending) return;
+    setSending(true);
+    setText('');
+    try {
+      const authorName = userDoc?.displayName ?? 'Vos';
+      const authorInitials = authorName.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+      await addDoc(collection(db, 'groups', groupId, 'posts', postId, 'comments'), {
+        authorId: firebaseUser.uid,
+        authorName,
+        authorInitials,
+        authorAvatarColor: '#0f0f0f',
+        text: value,
+        createdAt: serverTimestamp(),
+      });
+      await updateDoc(doc(db, 'groups', groupId, 'posts', postId), { commentsCount: increment(1) });
+    } catch {
+      setText(value);
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
       <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
       <View style={styles.commentsSheet}>
         <View style={styles.commentsHandle} />
-        <Text style={styles.commentsTitle}>{count} comentarios</Text>
+        <Text style={styles.commentsTitle}>{count} {count === 1 ? 'comentario' : 'comentarios'}</Text>
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {MOCK_COMMENTS.map(c => (
+          {comments.length > 0 ? comments.map(c => (
             <View key={c.id} style={styles.commentRow}>
               <TouchableOpacity onPress={() => abrirPerfil(c)}>
-                <Avatar initials={c.initials} bg={c.bg} color={c.color} size={32} />
+                <Avatar initials={c.authorInitials} bg={COLORS.lime} color="#0f0f0f" size={32} />
               </TouchableOpacity>
               <View style={styles.commentBubble}>
                 <View style={styles.commentMeta}>
                   <TouchableOpacity onPress={() => abrirPerfil(c)}>
-                    <Text style={styles.commentAutor}>{c.autor}</Text>
+                    <Text style={styles.commentAutor}>{c.authorName}</Text>
                   </TouchableOpacity>
-                  <Text style={styles.commentTiempo}>{c.tiempo}</Text>
+                  <Text style={styles.commentTiempo}>{formatTs(c.createdAt)}</Text>
                 </View>
-                <Text style={styles.commentTexto}>{c.texto}</Text>
+                <Text style={styles.commentTexto}>{c.text}</Text>
               </View>
             </View>
-          ))}
+          )) : <Text style={styles.commentsEmpty}>Sin comentarios todavía. ¡Sé el primero!</Text>}
         </ScrollView>
         <View style={[styles.commentInput, { paddingBottom: kbHeight > 0 ? kbHeight + 12 : 12 + insets.bottom }]}>
-          <Avatar initials="JU" bg="#2a1a3a" color="#b070e0" size={32} />
+          <Avatar initials={myInitials} bg={COLORS.lime} color="#0f0f0f" size={32} />
           <TextInput
             style={styles.commentTextInput}
             placeholder="Comentar..."
@@ -197,9 +217,10 @@ function CommentsSheet({ visible, onClose, count }: { visible: boolean; onClose:
             value={text}
             onChangeText={setText}
             returnKeyType="send"
+            onSubmitEditing={enviar}
           />
           {text.length > 0 && (
-            <TouchableOpacity onPress={() => setText('')}>
+            <TouchableOpacity onPress={enviar} disabled={sending}>
               <Ionicons name="send" size={18} color={COLORS.lime} />
             </TouchableOpacity>
           )}
@@ -282,85 +303,6 @@ function FotosPost({ post, onLike, onComment }: { post: Post; onLike: () => void
             {fotos.map((_, i) => <View key={i} style={[styles.photoDot, i === page && styles.photoDotActive]} />)}
           </View>
         )}
-      </View>
-      <PostActions post={post} onLike={onLike} onComment={onComment} />
-    </View>
-  );
-}
-
-function RondaPost({ post, onLike, onComment }: { post: Post; onLike: () => void; onComment: () => void }) {
-  return (
-    <View style={styles.postCard}>
-      <PostHeader post={post} />
-      {post.texto ? <Text style={[styles.postTexto, { marginBottom: 10 }]}>{post.texto}</Text> : null}
-      <View style={styles.rondaCard}>
-        <View style={styles.rondaRow}>
-          <Text style={styles.rondaScore}>79</Text>
-          <View>
-            <Text style={styles.rondaCourse}>Haras Santa María</Text>
-            <Text style={styles.rondaMeta}>-1 vs par · 28 Jun</Text>
-          </View>
-          <TouchableOpacity style={styles.verTarjetaBtn}>
-            <Text style={styles.verTarjetaText}>Ver tarjeta</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      <PostActions post={post} onLike={onLike} onComment={onComment} />
-    </View>
-  );
-}
-
-function VentaPost({ post, onLike, onComment }: { post: Post; onLike: () => void; onComment: () => void }) {
-  const fotos = post.fotos || [];
-  return (
-    <View style={styles.postCard}>
-      <PostHeader post={post} />
-      <View style={styles.ventaContent}>
-        {fotos.length > 0 && (
-          <Image source={{ uri: fotos[0] }} style={styles.ventaImg} resizeMode="cover" />
-        )}
-        <View style={{ flex: 1, gap: 4 }}>
-          <View style={styles.ventaBadge}>
-            <Text style={styles.ventaBadgeText}>En venta</Text>
-          </View>
-          <Text style={styles.postTexto}>{post.texto}</Text>
-          <Text style={styles.ventaPrecio}>{post.precio}</Text>
-          <TouchableOpacity style={styles.contactarBtn}>
-            <Ionicons name="chatbubble-ellipses-outline" size={14} color="#0f0f0f" />
-            <Text style={styles.contactarText}>Contactar</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      <PostActions post={post} onLike={onLike} onComment={onComment} />
-    </View>
-  );
-}
-
-function EventoPost({ post, onLike, onComment, onVoy }: { post: Post; onLike: () => void; onComment: () => void; onVoy: () => void }) {
-  return (
-    <View style={styles.postCard}>
-      <PostHeader post={post} />
-      {post.texto ? <Text style={[styles.postTexto, { marginBottom: 10 }]}>{post.texto}</Text> : null}
-      <View style={styles.eventoCard}>
-        <View style={styles.eventoInfo}>
-          <View style={styles.eventoFechaBlock}>
-            <Text style={styles.eventoFecha}>{post.eventoFecha}</Text>
-            <Text style={styles.eventoHora}>{post.eventoHora}</Text>
-          </View>
-          <View style={styles.eventoSep} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.eventoAsistentes}>{post.asistentes} van a ir</Text>
-            <Text style={styles.eventoAsistentesSub}>Pepe, Carlitos y otro más</Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.voyBtn, post.voy && styles.voyBtnActive]}
-            onPress={onVoy}
-          >
-            <Text style={[styles.voyBtnText, post.voy && styles.voyBtnTextActive]}>
-              {post.voy ? '✓ Voy' : 'Voy'}
-            </Text>
-          </TouchableOpacity>
-        </View>
       </View>
       <PostActions post={post} onLike={onLike} onComment={onComment} />
     </View>
@@ -622,6 +564,8 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
           visible={!!commentsPost}
           onClose={() => setCommentsPost(null)}
           count={commentsPost.comentarios}
+          groupId={group.id}
+          postId={commentsPost.id}
         />
       )}
 
@@ -766,19 +710,20 @@ function GroupRow({ group, isMember, onPress }: { group: GroupDoc; isMember: boo
   );
 }
 
-function PlayerRow({ player }: { player: Player }) {
+function PlayerRow({ user }: { user: UserDoc }) {
   const navigation = useNavigation<any>();
   const [following, setFollowing] = useState(false);
+  const initials = user.displayName.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   return (
     <View style={styles.row}>
       <TouchableOpacity
         style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}
-        onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: player.name, initials: player.initials, bg: player.bg, color: player.color, handicap: player.hcp } })}
+        onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: user.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: user.handicap ?? undefined } })}
       >
-        <Avatar initials={player.initials} bg={player.bg} color={player.color} size={46} />
+        <Avatar initials={initials} bg={COLORS.lime} color="#0f0f0f" size={46} />
         <View style={styles.rowInfo}>
-          <Text style={styles.rowName}>{player.name}</Text>
-          <Text style={styles.rowSub}>{player.username} · HCP {player.hcp}</Text>
+          <Text style={styles.rowName}>{user.displayName}</Text>
+          <Text style={styles.rowSub}>@{user.username}{user.handicap != null ? ` · HCP ${user.handicap}` : ''}</Text>
         </View>
       </TouchableOpacity>
       <TouchableOpacity
@@ -802,6 +747,14 @@ export default function SearchScreen() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [myGroups, setMyGroups] = useState<GroupDoc[]>([]);
   const [clubs, setClubs] = useState<GroupDoc[]>([]);
+  const [usuarios, setUsuarios] = useState<UserDoc[]>([]);
+
+  // Jugadores registrados (hasta 50 por ahora).
+  useEffect(() => {
+    getDocs(query(collection(db, 'users'), limit(50)))
+      .then(snap => setUsuarios(snap.docs.map(d => d.data() as UserDoc)))
+      .catch(() => {});
+  }, []);
 
   // Mis grupos (privados y clubes a los que me sumé).
   useEffect(() => {
@@ -825,8 +778,9 @@ export default function SearchScreen() {
 
   const q = search.toLowerCase();
   const filteredGroups = allGroups.filter(g => g.name.toLowerCase().includes(q));
-  const filteredPlayers = PLAYERS.filter(p =>
-    p.name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)
+  const filteredPlayers = usuarios.filter(u =>
+    u.uid !== firebaseUser?.uid &&
+    (u.displayName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q))
   );
   const isSearching = search.length > 0;
 
@@ -883,7 +837,7 @@ export default function SearchScreen() {
           <>
             <Text style={[styles.sectionTitle, { marginTop: 14 }]}>Jugadores</Text>
             <View style={styles.list}>
-              {filteredPlayers.map((p, i) => <PlayerRow key={i} player={p} />)}
+              {filteredPlayers.map(u => <PlayerRow key={u.uid} user={u} />)}
             </View>
           </>
         )}
@@ -1057,6 +1011,7 @@ const styles = StyleSheet.create({
   commentsSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: SCREEN_H * 0.65, paddingTop: 12 },
   commentsHandle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   commentsTitle: { fontSize: 15, fontWeight: '700', color: COLORS.white, paddingHorizontal: 20, marginBottom: 12 },
+  commentsEmpty: { color: COLORS.muted, fontSize: 13, textAlign: 'center', marginTop: 40, paddingHorizontal: 24 },
   commentRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: '#1e1e1e' },
   commentBubble: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 12, padding: 10 },
   commentMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
