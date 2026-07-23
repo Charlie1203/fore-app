@@ -1,6 +1,11 @@
-import { View, Text, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView as SafeAreaViewCtx } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase/config';
+import { collection, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
+import type { RoundDoc } from '../firebase/types';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -8,96 +13,137 @@ const COLORS = {
   red: '#e07070',
 };
 
-const RANKING = [
-  { pos: 1, name: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', score: 71, vsPar: -1, course: 'Haras Santa María', date: '28 Jun' },
-  { pos: 2, name: 'Juan Noceti', initials: 'JN', bg: '#c8e03a', color: '#0f0f0f', score: 74, vsPar: 2, course: 'Haras Santa María', date: '27 Jun', isMe: true },
-  { pos: 3, name: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', score: 77, vsPar: 5, course: 'Martindale CC', date: '25 Jun' },
-  { pos: 4, name: 'Tomás Bidegain', initials: 'TB', bg: '#2a1a3a', color: '#b070e0', score: 79, vsPar: 7, course: 'San Andrés GC', date: '22 Jun' },
-  { pos: 5, name: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', score: 81, vsPar: 9, course: 'Olivos GC', date: '20 Jun' },
-  { pos: 6, name: 'Sofía Lagos', initials: 'SL', bg: '#1a2a3a', color: '#5fa0e0', score: 84, vsPar: 12, course: 'Martindale CC', date: '18 Jun' },
-];
-
 const MEDAL: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
-function Avatar({ initials, bg, color, size = 40 }: { initials: string; bg: string; color: string; size?: number }) {
+type Entry = { pos: number; round: RoundDoc; isMe: boolean };
+
+function Avatar({ initials, size = 40 }: { initials: string; size?: number }) {
   return (
-    <View style={[styles.avatar, { backgroundColor: bg, width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={[styles.avatarText, { color, fontSize: size * 0.32 }]}>{initials}</Text>
+    <View style={[styles.avatar, { backgroundColor: COLORS.lime, width: size, height: size, borderRadius: size / 2 }]}>
+      <Text style={[styles.avatarText, { color: '#0f0f0f', fontSize: size * 0.32 }]}>{initials}</Text>
     </View>
   );
 }
 
-function PodiumCard({ player }: { player: typeof RANKING[0] }) {
+function PodiumCard({ entry }: { entry: Entry }) {
   const navigation = useNavigation<any>();
-  const isFirst = player.pos === 1;
-  const abrirPerfil = () => player.isMe
+  const { round, isMe } = entry;
+  const isFirst = entry.pos === 1;
+  const abrirPerfil = () => isMe
     ? navigation.navigate('Tabs', { screen: 'Perfil' })
-    : navigation.navigate('PerfilUsuario', { viewUser: { name: player.name, initials: player.initials, bg: player.bg, color: player.color } });
+    : navigation.navigate('PerfilUsuario', { viewUser: { name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
   return (
     <TouchableOpacity style={[styles.podiumCard, isFirst && styles.podiumCardFirst]} onPress={abrirPerfil}>
-      <Text style={styles.podiumMedal}>{MEDAL[player.pos]}</Text>
-      <Avatar initials={player.initials} bg={player.bg} color={player.color} size={isFirst ? 56 : 46} />
-      <Text style={[styles.podiumName, isFirst && { color: COLORS.white, fontSize: 13 }]} numberOfLines={1}>{player.name.split(' ')[0]}</Text>
-      <Text style={[styles.podiumScore, { color: player.vsPar <= 0 ? COLORS.lime : COLORS.muted }]}>{player.score}</Text>
-      <Text style={[styles.podiumVsPar, { color: player.vsPar <= 0 ? COLORS.lime : COLORS.muted }]}>
-        {player.vsPar > 0 ? '+' : ''}{player.vsPar}
+      <Text style={styles.podiumMedal}>{MEDAL[entry.pos]}</Text>
+      <Avatar initials={round.authorInitials} size={isFirst ? 56 : 46} />
+      <Text style={[styles.podiumName, isFirst && { color: COLORS.white, fontSize: 13 }]} numberOfLines={1}>{round.authorName.split(' ')[0]}</Text>
+      <Text style={[styles.podiumScore, { color: round.vsPar <= 0 ? COLORS.lime : COLORS.muted }]}>{round.totalScore}</Text>
+      <Text style={[styles.podiumVsPar, { color: round.vsPar <= 0 ? COLORS.lime : COLORS.muted }]}>
+        {round.vsPar > 0 ? '+' : ''}{round.vsPar}
       </Text>
     </TouchableOpacity>
   );
 }
 
+function formatFecha(ts: any): string {
+  if (!ts?.toDate) return '';
+  return ts.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+}
+
 export default function RankingScreen() {
   const navigation = useNavigation<any>();
+  const { firebaseUser } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [rounds, setRounds] = useState<RoundDoc[]>([]);
   const now = new Date();
   const mes = now.toLocaleString('es', { month: 'long' });
+
+  useEffect(() => {
+    const inicioMes = Timestamp.fromDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    const q = query(
+      collection(db, 'rounds'),
+      where('visibility', '==', 'public'),
+      where('date', '>=', inicioMes),
+      orderBy('date', 'desc'),
+    );
+    return onSnapshot(q, snap => {
+      setRounds(snap.docs.map(d => d.data() as RoundDoc));
+      setLoading(false);
+    }, () => setLoading(false));
+  }, []);
+
+  // Mejor ronda de cada jugador este mes, ordenadas por score.
+  const mejorPorJugador = new Map<string, RoundDoc>();
+  rounds.forEach(r => {
+    const actual = mejorPorJugador.get(r.userId);
+    if (!actual || r.totalScore < actual.totalScore) mejorPorJugador.set(r.userId, r);
+  });
+  const ranking: Entry[] = Array.from(mejorPorJugador.values())
+    .sort((a, b) => a.totalScore - b.totalScore)
+    .map((round, i) => ({ pos: i + 1, round, isMe: round.userId === firebaseUser?.uid }));
+
+  const podio = ranking.slice(0, 3);
+  const resto = ranking.slice(3);
 
   return (
     <SafeAreaViewCtx style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Ranking</Text>
-        <Text style={styles.subtitle}>{mes.charAt(0).toUpperCase() + mes.slice(1)} · Amigos</Text>
+        <Text style={styles.subtitle}>{mes.charAt(0).toUpperCase() + mes.slice(1)}</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-
-        {/* Podio top 3 */}
-        <View style={styles.podium}>
-          <PodiumCard player={RANKING[1]} />
-          <PodiumCard player={RANKING[0]} />
-          <PodiumCard player={RANKING[2]} />
+      {loading ? (
+        <ActivityIndicator color={COLORS.lime} style={{ marginTop: 48 }} />
+      ) : ranking.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>Todavía no hay vueltas cargadas este mes.{'\n'}Cargá la tuya para arrancar el ranking.</Text>
         </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+          {podio.length > 0 && (
+            <View style={styles.podium}>
+              {podio[1] && <PodiumCard entry={podio[1]} />}
+              <PodiumCard entry={podio[0]} />
+              {podio[2] && <PodiumCard entry={podio[2]} />}
+            </View>
+          )}
 
-        {/* Lista 4 en adelante */}
-        <View style={styles.list}>
-          {RANKING.slice(3).map(p => (
-            <TouchableOpacity
-              key={p.pos}
-              style={[styles.row, p.isMe && styles.rowMe]}
-              onPress={() => p.isMe
-                ? navigation.navigate('Tabs', { screen: 'Perfil' })
-                : navigation.navigate('PerfilUsuario', { viewUser: { name: p.name, initials: p.initials, bg: p.bg, color: p.color } })
-              }
-            >
-              <Text style={styles.rowPos}>{p.pos}</Text>
-              <Avatar initials={p.initials} bg={p.bg} color={p.color} size={38} />
-              <View style={styles.rowInfo}>
-                <Text style={[styles.rowName, p.isMe && { color: COLORS.lime }]}>
-                  {p.name}{p.isMe ? ' (vos)' : ''}
-                </Text>
-                <Text style={styles.rowMeta}>{p.course} · {p.date}</Text>
-              </View>
-              <View style={styles.rowScores}>
-                <Text style={styles.rowScore}>{p.score}</Text>
-                <Text style={[styles.rowVsPar, { color: p.vsPar <= 0 ? COLORS.lime : COLORS.muted }]}>
-                  {p.vsPar > 0 ? '+' : ''}{p.vsPar}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+          {resto.length > 0 && (
+            <View style={styles.list}>
+              {resto.map(entry => {
+                const { round, isMe } = entry;
+                return (
+                  <TouchableOpacity
+                    key={round.id}
+                    style={[styles.row, isMe && styles.rowMe]}
+                    onPress={() => isMe
+                      ? navigation.navigate('Tabs', { screen: 'Perfil' })
+                      : navigation.navigate('PerfilUsuario', { viewUser: { name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } })
+                    }
+                  >
+                    <Text style={styles.rowPos}>{entry.pos}</Text>
+                    <Avatar initials={round.authorInitials} size={38} />
+                    <View style={styles.rowInfo}>
+                      <Text style={[styles.rowName, isMe && { color: COLORS.lime }]}>
+                        {round.authorName}{isMe ? ' (vos)' : ''}
+                      </Text>
+                      <Text style={styles.rowMeta}>{round.clubName} · {formatFecha(round.date)}</Text>
+                    </View>
+                    <View style={styles.rowScores}>
+                      <Text style={styles.rowScore}>{round.totalScore}</Text>
+                      <Text style={[styles.rowVsPar, { color: round.vsPar <= 0 ? COLORS.lime : COLORS.muted }]}>
+                        {round.vsPar > 0 ? '+' : ''}{round.vsPar}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
-        <Text style={styles.footnote}>Mejor ronda del mes entre amigos mutuos</Text>
-      </ScrollView>
+          <Text style={styles.footnote}>Mejor ronda del mes entre las vueltas públicas — todavía sin filtrar por amigos.</Text>
+        </ScrollView>
+      )}
     </SafeAreaViewCtx>
   );
 }
@@ -108,6 +154,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '800', color: COLORS.white },
   subtitle: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
   scroll: { paddingBottom: 32 },
+
+  empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
+  emptyText: { fontSize: 13, color: COLORS.muted, textAlign: 'center', lineHeight: 19 },
 
   podium: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 24 },
   podiumCard: { flex: 1, alignItems: 'center', gap: 6, backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 0.5, borderColor: COLORS.border, padding: 12 },
@@ -131,5 +180,5 @@ const styles = StyleSheet.create({
   avatar: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontWeight: '700' },
 
-  footnote: { fontSize: 11, color: COLORS.dim, textAlign: 'center', marginTop: 20 },
+  footnote: { fontSize: 11, color: COLORS.dim, textAlign: 'center', marginTop: 20, paddingHorizontal: 24, lineHeight: 15 },
 });

@@ -2,9 +2,13 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platfo
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import type { Torneo } from './TorneosScreen';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase/config';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import type { GroupDoc } from '../firebase/types';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#222', border2: '#2a2a2a',
@@ -17,12 +21,9 @@ const MODALIDADES = [
   { key: 'Match Play', icon: 'people-outline', desc: 'Competencia hoyo a hoyo contra otro jugador o equipo.' },
 ] as const;
 
-// Mock: grupos a los que pertenece el usuario actual (mismos que en SearchScreen)
-const MIS_GRUPOS = [
-  { id: '1', nombre: 'Haras Santa María', initials: 'HS', bg: '#1a2a0a', color: '#c8e03a' },
-  { id: '2', nombre: 'Los del Jueves', initials: 'LJ', bg: '#2a1a3a', color: '#b070e0' },
-  { id: '3', nombre: 'Martindale CC', initials: 'MC', bg: '#1a2a3a', color: '#5fa0e0' },
-];
+function groupInitials(name: string): string {
+  return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+}
 
 const MAX_RONDAS = 8;
 
@@ -71,10 +72,18 @@ function PickerPopup({ visible, title, onClose, children }: { visible: boolean; 
 export default function CreateTorneoScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { firebaseUser } = useAuth();
   const grupoFijo: string | null = route.params?.grupoFijo ?? null;
   const editing: Torneo | null = route.params?.torneo ?? null;
   const grupoLocked = !!grupoFijo || !!editing;
   const modalidadLocked = !!editing;
+
+  const [misGrupos, setMisGrupos] = useState<GroupDoc[]>([]);
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const q = query(collection(db, 'groups'), where('memberUids', 'array-contains', firebaseUser.uid));
+    return onSnapshot(q, snap => setMisGrupos(snap.docs.map(d => ({ ...d.data(), id: d.id }) as GroupDoc)));
+  }, [firebaseUser?.uid]);
 
   const [nombre, setNombre] = useState(editing?.nombre ?? '');
   const [modalidad, setModalidad] = useState<string | null>(editing?.modalidad ?? null);
@@ -221,15 +230,15 @@ export default function CreateTorneoScreen() {
           <Text style={[styles.popupItemText, { flex: 1 }, !grupo && styles.textActive]}>Abierto</Text>
           {!grupo && <Ionicons name="checkmark" size={18} color={COLORS.lime} />}
         </TouchableOpacity>
-        {MIS_GRUPOS.map((g, i) => (
+        {misGrupos.map((g, i) => (
           <TouchableOpacity
             key={g.id}
-            style={[styles.popupItem, i < MIS_GRUPOS.length - 1 && styles.itemBorder]}
-            onPress={() => { setGrupo(g.nombre); setGrupoOpen(false); }}
+            style={[styles.popupItem, i < misGrupos.length - 1 && styles.itemBorder]}
+            onPress={() => { setGrupo(g.name); setGrupoOpen(false); }}
           >
-            <Avatar initials={g.initials} bg={g.bg} color={g.color} size={28} />
-            <Text style={[styles.popupItemText, { flex: 1 }, grupo === g.nombre && styles.textActive]}>{g.nombre}</Text>
-            {grupo === g.nombre && <Ionicons name="checkmark" size={18} color={COLORS.lime} />}
+            <Avatar initials={groupInitials(g.name)} bg={COLORS.lime} color="#0f0f0f" size={28} />
+            <Text style={[styles.popupItemText, { flex: 1 }, grupo === g.name && styles.textActive]}>{g.name}</Text>
+            {grupo === g.name && <Ionicons name="checkmark" size={18} color={COLORS.lime} />}
           </TouchableOpacity>
         ))}
       </PickerPopup>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,15 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase/config';
+import { collection, getDocs, limit, query as fbQuery } from 'firebase/firestore';
+import type { UserDoc } from '../firebase/types';
 
 const COLORS = {
   bg: '#0f0f0f',
@@ -21,33 +26,31 @@ const COLORS = {
   dim: '#444',
 };
 
-const USERS_MOCK = [
-  { id: '1', initials: 'PE', name: 'Pepe Noceti', username: '@pepe', hcp: '7.3', bg: '#333' },
-  { id: '2', initials: 'CA', name: 'Carlitos Laprida', username: '@carlitos', hcp: '15.1', bg: '#2a3a1a' },
-  { id: '3', initials: 'MR', name: 'Manu Rivero', username: '@manu', hcp: '11.4', bg: '#3a2a1a' },
-  { id: '4', initials: 'JN', name: 'Juan Noceti', username: '@juann', hcp: '12.4', bg: '#1a2a3a' },
-];
-
-const COURSES_MOCK = [
-  { id: '1', name: 'Haras Santa María', location: 'Pilar, Buenos Aires', holes: 18 },
-  { id: '2', name: 'Olivos Golf Club', location: 'Olivos, Buenos Aires', holes: 18 },
-  { id: '3', name: 'San Andrés Golf Club', location: 'General Rodríguez', holes: 18 },
-];
+function initialsOf(name: string): string {
+  return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+}
 
 export default function GlobalSearchScreen() {
   const navigation = useNavigation<any>();
+  const { firebaseUser } = useAuth();
   const [query, setQuery] = useState('');
+  const [usuarios, setUsuarios] = useState<UserDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getDocs(fbQuery(collection(db, 'users'), limit(50)))
+      .then(snap => setUsuarios(snap.docs.map(d => d.data() as UserDoc)))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const otros = usuarios.filter(u => u.uid !== firebaseUser?.uid);
 
   const filteredUsers = query.length > 0
-    ? USERS_MOCK.filter(u =>
-        u.name.toLowerCase().includes(query.toLowerCase()) ||
+    ? otros.filter(u =>
+        u.displayName.toLowerCase().includes(query.toLowerCase()) ||
         u.username.toLowerCase().includes(query.toLowerCase())
       )
-    : USERS_MOCK;
-
-  const filteredCourses = query.length > 0
-    ? COURSES_MOCK.filter(c => c.name.toLowerCase().includes(query.toLowerCase()))
-    : [];
+    : otros;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -75,66 +78,49 @@ export default function GlobalSearchScreen() {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={[]}
-        keyExtractor={() => ''}
-        renderItem={() => null}
-        ListHeaderComponent={
-          <>
-            {/* Jugadores */}
-            {filteredUsers.length > 0 && (
-              <>
-                <Text style={styles.sectionLabel}>{query.length > 0 ? 'JUGADORES' : 'SUGERIDOS'}</Text>
-                {filteredUsers.map(u => (
-                  <TouchableOpacity
-                    key={u.id}
-                    style={styles.row}
-                    onPress={() => u.username === '@juann'
-                      ? navigation.navigate('Tabs', { screen: 'Perfil' })
-                      : navigation.navigate('PerfilUsuario', { viewUser: { name: u.name, initials: u.initials, bg: u.bg, color: COLORS.lime, handicap: parseFloat(u.hcp) } })
-                    }
-                  >
-                    <View style={[styles.avatar, { backgroundColor: u.bg }]}>
-                      <Text style={styles.avatarText}>{u.initials}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.rowName}>{u.name}</Text>
-                      <Text style={styles.rowSub}>{u.username} · HCP {u.hcp}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
-                  </TouchableOpacity>
-                ))}
-              </>
-            )}
-
-            {/* Canchas — solo cuando hay búsqueda */}
-            {filteredCourses.length > 0 && (
-              <>
-                <Text style={[styles.sectionLabel, { marginTop: 20 }]}>CANCHAS</Text>
-                {filteredCourses.map(c => (
-                  <View key={c.id} style={styles.row}>
-                    <View style={[styles.avatar, { backgroundColor: '#1a2a1a' }]}>
-                      <Ionicons name="golf-outline" size={18} color={COLORS.lime} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.rowName}>{c.name}</Text>
-                      <Text style={styles.rowSub}>{c.location} · {c.holes} hoyos</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
-                  </View>
-                ))}
-              </>
-            )}
-
-            {/* Sin resultados */}
-            {query.length > 0 && filteredUsers.length === 0 && filteredCourses.length === 0 && (
-              <Text style={styles.empty}>Sin resultados para "{query}"</Text>
-            )}
-          </>
-        }
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <ActivityIndicator color={COLORS.lime} style={{ marginTop: 48 }} />
+      ) : (
+        <FlatList
+          data={[]}
+          keyExtractor={() => ''}
+          renderItem={() => null}
+          ListHeaderComponent={
+            <>
+              {filteredUsers.length > 0 ? (
+                <>
+                  <Text style={styles.sectionLabel}>{query.length > 0 ? 'JUGADORES' : 'TODOS'}</Text>
+                  {filteredUsers.map(u => {
+                    const initials = initialsOf(u.displayName);
+                    return (
+                      <TouchableOpacity
+                        key={u.uid}
+                        style={styles.row}
+                        onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: u.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: u.handicap ?? undefined } })}
+                      >
+                        <View style={[styles.avatar, { backgroundColor: COLORS.lime }]}>
+                          <Text style={[styles.avatarText, { color: '#0f0f0f' }]}>{initials}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.rowName}>{u.displayName}</Text>
+                          <Text style={styles.rowSub}>@{u.username}{u.handicap != null ? ` · HCP ${u.handicap}` : ''}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </>
+              ) : (
+                <Text style={styles.empty}>
+                  {query.length > 0 ? `Sin resultados para "${query}"` : 'Todavía no hay más jugadores registrados.'}
+                </Text>
+              )}
+            </>
+          }
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </SafeAreaView>
   );
 }

@@ -63,94 +63,18 @@ const COLORS = {
   dark2: '#242424',
 };
 
-const COURSES = [
-  { name: 'Haras Santa María', rounds: 9, bestScore: 74 },
-  { name: 'Martindale CC', rounds: 5, bestScore: 79 },
-  { name: 'San Andrés GC', rounds: 3, bestScore: 81 },
-  { name: 'Olivos GC', rounds: 1, bestScore: 85 },
-];
-
-const ACHIEVEMENTS = [
-  { icon: 'trophy-outline', title: 'Primer eagle', sub: 'Hoyo 14 · Haras Santa María', date: 'Mar 2026' },
-  { icon: 'stats-chart-outline', title: 'Rompió 75', sub: 'Score 74 en Haras Santa María', date: 'Jun 2026' },
-  { icon: 'trending-down-outline', title: 'HCP bajo de 13', sub: 'De 15.2 a 12.4 en 6 meses', date: 'Jun 2026' },
-  { icon: 'checkmark-circle-outline', title: '10 rondas jugadas', sub: 'Primer hito del año', date: 'May 2026' },
-];
-
-const HCP_HISTORY = [
-  { month: 'Ene', value: 15.2 }, { month: 'Feb', value: 14.8 }, { month: 'Mar', value: 14.1 },
-  { month: 'Abr', value: 13.6 }, { month: 'May', value: 13.9 }, { month: 'Jun', value: 13.2 }, { month: 'Jul', value: 12.4 },
-];
-
 const SCREEN_W = Dimensions.get('window').width;
 const SCREEN_H = Dimensions.get('window').height;
-const CHART_W = SCREEN_W - 80;
-const CHART_H = 110;
-const Y_AXIS_W = 32;
 const TAB_BAR_H = 44;
 const BOTTOM_TAB_H = 80;
 
 function HcpChart({ thirdKpi, roundsCount, bestScore }: { thirdKpi: { value: number; label: string }; roundsCount: number; bestScore: number | null }) {
-  const values = HCP_HISTORY.map(h => h.value);
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const min = rawMin - 0.5;
-  const max = rawMax + 0.5;
-  const range = max - min;
-
-  // Plot area: leave Y_AXIS_W on left, DOT_PAD on right so dots don't clip
-  const DOT_PAD = 8;
-  const plotX0 = Y_AXIS_W;
-  const plotX1 = CHART_W - DOT_PAD;
-  const plotW = plotX1 - plotX0;
-  const VPAD = 8;
-  const stepX = plotW / (values.length - 1);
-
-  const toY = (v: number) => VPAD + (1 - (v - min) / range) * (CHART_H - VPAD * 2);
-  const points = values.map((v, i) => ({ x: plotX0 + i * stepX, y: toY(v) }));
-
-  const yLabels = [rawMax, (rawMax + rawMin) / 2, rawMin].map(v => ({
-    v: v.toFixed(1),
-    y: toY(v),
-  }));
-
   return (
     <View style={styles.chartCard}>
       <Text style={styles.chartTitle}>Evolución del handicap</Text>
-      <View style={{ marginTop: 10 }}>
-        <Svg width={CHART_W} height={CHART_H}>
-          {/* Grid lines */}
-          {yLabels.map((l, i) => (
-            <Path key={i} d={`M ${plotX0} ${l.y} H ${CHART_W}`} stroke="#2a2a2a" strokeWidth="1" />
-          ))}
-          {/* Curve */}
-          <Path
-            d={`M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`}
-            stroke={COLORS.lime}
-            strokeWidth="2"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          {/* Dots */}
-          {points.map((p, i) => (
-            <Circle key={i} cx={p.x} cy={p.y} r="3.5" fill={COLORS.lime} />
-          ))}
-        </Svg>
-        {/* Y axis labels — absolute over SVG */}
-        <View style={{ position: 'absolute', left: 0, top: 0, height: CHART_H, width: Y_AXIS_W }}>
-          {yLabels.map((l, i) => (
-            <Text key={i} style={[styles.chartLabel, { position: 'absolute', top: l.y - 6, right: 4, textAlign: 'right' }]}>
-              {l.v}
-            </Text>
-          ))}
-        </View>
-      </View>
-      {/* X labels centered under each dot */}
-      <View style={{ flexDirection: 'row', marginTop: 4, paddingLeft: plotX0 - stepX / 2, paddingRight: DOT_PAD }}>
-        {HCP_HISTORY.map((h, i) => (
-          <Text key={i} style={[styles.chartLabel, { width: stepX, textAlign: 'center' }]}>{h.month}</Text>
-        ))}
+      <View style={styles.chartEmpty}>
+        <Ionicons name="trending-down-outline" size={26} color={COLORS.dim} />
+        <Text style={styles.chartEmptyText}>Todavía no hay suficiente historial para mostrar la evolución.</Text>
       </View>
 
       <View style={styles.kpiFooter}>
@@ -310,35 +234,6 @@ function RoundCard({ round }: { round: RoundDoc }) {
         </View>
       </View>
       <CardFooter likes={round.likesCount} comments={round.commentsCount} />
-    </View>
-  );
-}
-
-function CourseRow({ course }: { course: typeof COURSES[0] }) {
-  return (
-    <View style={styles.courseRow}>
-      <View style={styles.courseIcon}><Text style={{ fontSize: 18 }}>⛳</Text></View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.courseName}>{course.name}</Text>
-        <Text style={styles.courseSub}>{course.rounds} {course.rounds === 1 ? 'ronda' : 'rondas'} jugadas</Text>
-      </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={styles.courseBest}>{course.bestScore}</Text>
-        <Text style={styles.courseBestLbl}>mejor</Text>
-      </View>
-    </View>
-  );
-}
-
-function AchievementRow({ a }: { a: typeof ACHIEVEMENTS[0] }) {
-  return (
-    <View style={styles.achRow}>
-      <View style={styles.achIcon}><Ionicons name={a.icon as any} size={22} color={COLORS.lime} /></View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.achTitle}>{a.title}</Text>
-        <Text style={styles.achSub}>{a.sub}</Text>
-      </View>
-      <Text style={styles.achDate}>{a.date}</Text>
     </View>
   );
 }
@@ -694,7 +589,10 @@ export default function ProfileScreen() {
             contentContainerStyle={[styles.feed, { paddingTop: totalHeaderH, minHeight: SCREEN_H - BOTTOM_TAB_H + headerHeight }]}
             showsVerticalScrollIndicator={false}
           >
-            {ACHIEVEMENTS.map((a, i) => <AchievementRow key={i} a={a} />)}
+            <View style={styles.achievementsEmpty}>
+              <Ionicons name="trophy-outline" size={26} color={COLORS.dim} />
+              <Text style={styles.achievementsEmptyText}>Todavía no tenés logros. Van a ir apareciendo a medida que juegues.</Text>
+            </View>
           </Animated.ScrollView>
         </PagerView>
 
@@ -838,8 +736,8 @@ const styles = StyleSheet.create({
 
   chartCard: { backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, padding: 14 },
   chartTitle: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  chartLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  chartLabel: { fontSize: 9, color: COLORS.muted },
+  chartEmpty: { alignItems: 'center', gap: 8, paddingVertical: 24 },
+  chartEmptyText: { fontSize: 12, color: COLORS.muted, textAlign: 'center', paddingHorizontal: 20, lineHeight: 17 },
 
   divider: { height: 0.5, backgroundColor: '#222', marginHorizontal: 18, marginTop: 20, marginBottom: 4 },
   feed: { paddingBottom: 20 },
@@ -868,11 +766,8 @@ const styles = StyleSheet.create({
   courseBest: { fontSize: 16, fontWeight: '800', color: COLORS.lime },
   courseBestLbl: { fontSize: 9, color: COLORS.muted },
 
-  achRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 18, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  achIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  achTitle: { fontSize: 14, fontWeight: '600', color: COLORS.white },
-  achSub: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
-  achDate: { fontSize: 10, color: COLORS.dim },
+  achievementsEmpty: { alignItems: 'center', gap: 8, paddingTop: 48, paddingHorizontal: 32 },
+  achievementsEmptyText: { fontSize: 13, color: COLORS.muted, textAlign: 'center', lineHeight: 19 },
 
   card: { backgroundColor: COLORS.bg, borderBottomWidth: 8, borderBottomColor: '#1a1a1a', overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingBottom: 6 },

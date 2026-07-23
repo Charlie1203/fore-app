@@ -19,7 +19,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import Svg, { Ellipse, Line, Polygon, Circle, Path } from "react-native-svg";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
 import {
@@ -106,68 +105,6 @@ const COLORS = {
 	red: "#e07070",
 	dark2: "#242424",
 };
-
-const STORIES_OTHERS = [
-	{ initials: "PE", bg: "#333", color: "#aaa", name: "Pepe", photo: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800", seen: false },
-	{ initials: "CA", bg: "#2a3a1a", color: "#c8e03a", name: "Carlitos", photo: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800", seen: false },
-	{ initials: "MR", bg: "#3a2a1a", color: "#e0a03a", name: "Manu R.", photo: null, seen: false },
-];
-
-function StoryViewer({ stories, initialIndex, onClose }: { stories: typeof STORIES_OTHERS; initialIndex: number; onClose: () => void }) {
-	const [index, setIndex] = useState(initialIndex);
-	const story = stories[index];
-
-	const goNext = () => {
-		if (index < stories.length - 1) setIndex(i => i + 1);
-		else onClose();
-	};
-	const goPrev = () => {
-		if (index > 0) setIndex(i => i - 1);
-	};
-
-	if (!story) return null;
-
-	return (
-		<Modal visible animationType="fade" onRequestClose={onClose}>
-			{/* Fondo negro con la hora/notch libres; la tarjeta de la historia va con margen y esquinas redondeadas, como Instagram */}
-			<SafeAreaView style={styles.storyModal} edges={['top', 'bottom']}>
-				<View style={styles.storyCard}>
-					{story.photo
-						? <Image source={{ uri: story.photo }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-						: <View style={[StyleSheet.absoluteFill, { backgroundColor: story.bg, alignItems: 'center', justifyContent: 'center' }]}>
-							<Text style={{ fontSize: 64, fontWeight: '800', color: story.color }}>{story.initials}</Text>
-						</View>
-					}
-
-					{/* Zonas de toque: derecha avanza, izquierda retrocede — como Instagram */}
-					<View style={styles.storyTapZones} pointerEvents="box-none">
-						<TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={goPrev} />
-						<TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={goNext} />
-					</View>
-
-					<View style={[styles.storyOverlay, { paddingTop: 8 }]} pointerEvents="box-none">
-						<View style={styles.storyBarRow}>
-							{stories.map((_, i) => (
-								<View key={i} style={styles.storyBarTrack}>
-									<View style={[styles.storyBarFill, { width: i <= index ? '100%' : '0%' }]} />
-								</View>
-							))}
-						</View>
-						<View style={styles.storyHeader}>
-							<View style={[styles.storyAvatarSmall, { backgroundColor: story.bg }]}>
-								<Text style={[styles.storyAvatarText, { color: story.color }]}>{story.initials}</Text>
-							</View>
-							<Text style={styles.storyName}>{story.name}</Text>
-							<TouchableOpacity onPress={onClose} style={{ marginLeft: 'auto', padding: 4 }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-								<Ionicons name="close" size={26} color="#fff" />
-							</TouchableOpacity>
-						</View>
-					</View>
-				</View>
-			</SafeAreaView>
-		</Modal>
-	);
-}
 
 function Avatar({
 	initials,
@@ -378,17 +315,12 @@ function Scorecard({
 	);
 }
 
-const MOCK_COMMENTS = [
-	{ id: '1', autor: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', texto: 'Joya vuelta!', tiempo: 'hace 1 h' },
-	{ id: '2', autor: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', texto: 'Crack, cuándo repetimos?', tiempo: 'hace 30 min' },
-];
-
 function formatFechaComentario(ts: any): string {
 	if (!ts?.toDate) return 'ahora';
 	return ts.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 }
 
-function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean; roundId?: string; count: number; onClose: () => void }) {
+function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean; roundId: string; count: number; onClose: () => void }) {
 	const navigation = useNavigation<any>();
 	const { firebaseUser, userDoc } = useAuth();
 	const [text, setText] = useState('');
@@ -416,12 +348,8 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 		return unsubscribe;
 	}, [visible, roundId]);
 
-	const abrirPerfil = (c: typeof MOCK_COMMENTS[0] | CommentDoc) => {
-		const name = 'autor' in c ? c.autor : c.authorName;
-		const initials = 'autor' in c ? c.initials : c.authorInitials;
-		const bg = 'autor' in c ? c.bg : COLORS.lime;
-		const color = 'autor' in c ? c.color : '#0f0f0f';
-		navigation.navigate('PerfilUsuario', { viewUser: { name, initials, bg, color } });
+	const abrirPerfil = (c: CommentDoc) => {
+		navigation.navigate('PerfilUsuario', { viewUser: { name: c.authorName, initials: c.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
 	};
 
 	const enviar = async () => {
@@ -467,45 +395,24 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 						keyboardShouldPersistTaps="handled"
 						onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
 					>
-						{roundId ? (
-							comments.length > 0 ? comments.map(c => (
-								<View key={c.id} style={styles.commentRow}>
-									<TouchableOpacity onPress={() => abrirPerfil(c)}>
-										<View style={[styles.commentAvatar, { backgroundColor: COLORS.lime }]}>
-											<Text style={[styles.commentAvatarText, { color: '#0f0f0f' }]}>{c.authorInitials}</Text>
-										</View>
-									</TouchableOpacity>
-									<View style={styles.commentBubble}>
-										<View style={styles.commentMeta}>
-											<TouchableOpacity onPress={() => abrirPerfil(c)}>
-												<Text style={styles.commentAutor}>{c.authorName}</Text>
-											</TouchableOpacity>
-											<Text style={styles.commentTiempo}>{formatFechaComentario(c.createdAt)}</Text>
-										</View>
-										<Text style={styles.commentTexto}>{c.text}</Text>
+						{comments.length > 0 ? comments.map(c => (
+							<View key={c.id} style={styles.commentRow}>
+								<TouchableOpacity onPress={() => abrirPerfil(c)}>
+									<View style={[styles.commentAvatar, { backgroundColor: COLORS.lime }]}>
+										<Text style={[styles.commentAvatarText, { color: '#0f0f0f' }]}>{c.authorInitials}</Text>
 									</View>
-								</View>
-							)) : <Text style={styles.commentsEmpty}>Sin comentarios todavía. ¡Sé el primero!</Text>
-						) : (
-							MOCK_COMMENTS.map(c => (
-								<View key={c.id} style={styles.commentRow}>
-									<TouchableOpacity onPress={() => abrirPerfil(c)}>
-										<View style={[styles.commentAvatar, { backgroundColor: c.bg }]}>
-											<Text style={[styles.commentAvatarText, { color: c.color }]}>{c.initials}</Text>
-										</View>
-									</TouchableOpacity>
-									<View style={styles.commentBubble}>
-										<View style={styles.commentMeta}>
-											<TouchableOpacity onPress={() => abrirPerfil(c)}>
-												<Text style={styles.commentAutor}>{c.autor}</Text>
-											</TouchableOpacity>
-											<Text style={styles.commentTiempo}>{c.tiempo}</Text>
-										</View>
-										<Text style={styles.commentTexto}>{c.texto}</Text>
+								</TouchableOpacity>
+								<View style={styles.commentBubble}>
+									<View style={styles.commentMeta}>
+										<TouchableOpacity onPress={() => abrirPerfil(c)}>
+											<Text style={styles.commentAutor}>{c.authorName}</Text>
+										</TouchableOpacity>
+										<Text style={styles.commentTiempo}>{formatFechaComentario(c.createdAt)}</Text>
 									</View>
+									<Text style={styles.commentTexto}>{c.text}</Text>
 								</View>
-							))
-						)}
+							</View>
+						)) : <Text style={styles.commentsEmpty}>Sin comentarios todavía. ¡Sé el primero!</Text>}
 					</ScrollView>
 					<View style={[styles.commentInput, { paddingBottom: kbHeight > 0 ? kbHeight + 12 : 12 + insets.bottom }]}>
 						<View style={[styles.commentAvatar, { backgroundColor: COLORS.lime }]}>
@@ -514,11 +421,11 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 						<TextInput
 							ref={inputRef}
 							style={styles.commentTextInput}
-							placeholder={roundId ? 'Comentar...' : 'Comentar (demo)'}
+							placeholder="Comentar..."
 							placeholderTextColor="#444"
 							value={text}
 							onChangeText={setText}
-							editable={!!roundId && !sending}
+							editable={!sending}
 							returnKeyType="send"
 							onSubmitEditing={enviar}
 						/>
@@ -541,26 +448,23 @@ function CardFooter({
 	roundId,
 	likes,
 	comments,
-	liked = false,
 }: {
-	roundId?: string;
+	roundId: string;
 	likes: number;
 	comments: number;
-	liked?: boolean;
 }) {
 	const { firebaseUser } = useAuth();
-	const [isLiked, setIsLiked] = useState(liked);
+	const [isLiked, setIsLiked] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const [showComments, setShowComments] = useState(false);
 
 	useEffect(() => {
-		if (!roundId || !firebaseUser) return;
+		if (!firebaseUser) return;
 		getDoc(doc(db, 'rounds', roundId, 'likes', firebaseUser.uid)).then(snap => setIsLiked(snap.exists()));
 	}, [roundId, firebaseUser?.uid]);
 
 	const toggleLike = async () => {
-		if (!roundId || !firebaseUser) { setIsLiked(l => !l); return; }
-		if (busy) return;
+		if (!firebaseUser || busy) return;
 		setBusy(true);
 		const likeRef = doc(db, 'rounds', roundId, 'likes', firebaseUser.uid);
 		const roundRef = doc(db, 'rounds', roundId);
@@ -595,39 +499,6 @@ function CardFooter({
 				</TouchableOpacity>
 			</View>
 		</>
-	);
-}
-
-function HcpCard() {
-	const navigation = useNavigation<any>();
-	const abrirPerfil = () => navigation.navigate('PerfilUsuario', { viewUser: { name: 'Pepe Noceti', initials: 'PE', bg: '#333', color: COLORS.lime } });
-	return (
-		<View style={styles.card}>
-			<TouchableOpacity style={styles.cardHeader} onPress={abrirPerfil}>
-				<Avatar initials="PE" bg="#333" color={COLORS.lime} />
-				<View style={styles.cardMeta}>
-					<Text style={styles.cardName}>Pepe Noceti</Text>
-					<Text style={styles.cardTime}>hace 2 horas</Text>
-				</View>
-				<Text style={styles.dots}>···</Text>
-			</TouchableOpacity>
-			<View style={styles.cardBody}>
-				<View style={styles.hcpRow}>
-					<View style={styles.hcpBadge}>
-						<Text style={styles.hcpNum}>7.3</Text>
-						<Text style={styles.hcpLabel}>HCP</Text>
-					</View>
-					<View style={{ flex: 1 }}>
-						<Text style={styles.bodyText}>
-							<Text style={styles.bold}>Pepe</Text> bajó su handicap a{" "}
-							<Text style={styles.bold}>7.3</Text> — mejor marca personal
-						</Text>
-						<Text style={styles.trend}>▼ −0.8 pts este mes</Text>
-					</View>
-				</View>
-			</View>
-			<CardFooter likes={14} comments={3} liked />
-		</View>
 	);
 }
 
@@ -806,39 +677,6 @@ function RoundCard({ round }: { round: RoundDoc }) {
 	);
 }
 
-function MilestoneCard() {
-	const navigation = useNavigation<any>();
-	const abrirPerfil = () => navigation.navigate('PerfilUsuario', { viewUser: { name: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: COLORS.lime } });
-	return (
-		<View style={styles.card}>
-			<TouchableOpacity style={styles.cardHeader} onPress={abrirPerfil}>
-				<Avatar initials="CA" bg="#2a3a1a" color={COLORS.lime} />
-				<View style={styles.cardMeta}>
-					<Text style={styles.cardName}>Carlitos Laprida</Text>
-					<Text style={styles.cardTime}>ayer</Text>
-				</View>
-				<Text style={styles.dots}>···</Text>
-			</TouchableOpacity>
-			<View style={styles.cardBody}>
-				<View style={styles.milestone}>
-					<View style={styles.milestoneIcon}>
-						<Text style={{ fontSize: 24 }}>🏆</Text>
-					</View>
-					<View style={{ flex: 1 }}>
-						<Text style={[styles.bold, { color: COLORS.white, fontSize: 14 }]}>
-							Primer eagle de su carrera
-						</Text>
-						<Text style={[styles.cardTime, { marginTop: 2 }]}>
-							Hoyo 7 · Martindale CC
-						</Text>
-					</View>
-				</View>
-			</View>
-			<CardFooter likes={21} comments={7} />
-		</View>
-	);
-}
-
 
 export default function FeedScreen() {
 	const route = useRoute<any>();
@@ -846,9 +684,6 @@ export default function FeedScreen() {
 	const { firebaseUser } = useAuth();
 	const toastOpacity = useRef(new Animated.Value(0)).current;
 	const [showToast, setShowToast] = useState(false);
-	const [myStory, setMyStory] = useState<string | null>(null);
-	const [viewingIndex, setViewingIndex] = useState<number | null>(null);
-	const [seenStories, setSeenStories] = useState<Set<string>>(new Set());
 	const [rounds, setRounds] = useState<RoundDoc[]>([]);
 	const [hayNotifsSinLeer, setHayNotifsSinLeer] = useState(false);
 
@@ -857,11 +692,6 @@ export default function FeedScreen() {
 		const q = query(collection(db, 'users', firebaseUser.uid, 'notifications'), where('read', '==', false), limit(1));
 		return onSnapshot(q, snap => setHayNotifsSinLeer(!snap.empty));
 	}, [firebaseUser?.uid]);
-
-	const storiesConNombre = STORIES_OTHERS.filter(s => s.photo);
-	const combinedStories = myStory
-		? [{ initials: 'JN', bg: COLORS.lime, color: '#0f0f0f', name: 'Tu historia', photo: myStory, seen: false }, ...storiesConNombre]
-		: storiesConNombre;
 
 	useEffect(() => {
 		// Feed de rondas públicas — todavía sin filtrar por a quién seguís, eso llega cuando conectemos follows.
@@ -882,30 +712,8 @@ export default function FeedScreen() {
 		]).start(() => setShowToast(false));
 	}, [route.params?.showSuccess]);
 
-	const addMyStory = async () => {
-		const { status } = await ImagePicker.requestCameraPermissionsAsync();
-		const options = { quality: 0.8 as const };
-		let result;
-		if (status === 'granted') {
-			result = await ImagePicker.launchCameraAsync(options);
-		} else {
-			result = await ImagePicker.launchImageLibraryAsync({ ...options, mediaTypes: ImagePicker.MediaTypeOptions.Images });
-		}
-		if (!result.canceled) setMyStory(result.assets[0].uri);
-	};
-
-	const openStoryAt = (idx: number) => {
-		const s = combinedStories[idx];
-		if (s) setSeenStories(prev => new Set(prev).add(s.name));
-		setViewingIndex(idx);
-	};
-
 	return (
 		<SafeAreaView style={styles.container} edges={["top"]}>
-			{viewingIndex !== null && (
-				<StoryViewer stories={combinedStories} initialIndex={viewingIndex} onClose={() => setViewingIndex(null)} />
-			)}
-
 			<View style={styles.header}>
 				<Text style={styles.logo}>
 					FORE<Text style={{ color: COLORS.lime }}>!</Text>
@@ -921,35 +729,17 @@ export default function FeedScreen() {
 				</View>
 			</View>
 			<ScrollView showsVerticalScrollIndicator={false}>
-				<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesRow} contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-					{/* Vos */}
-					<TouchableOpacity style={styles.storyItem} onPress={myStory ? () => openStoryAt(0) : addMyStory}>
-						<View style={[styles.storyRing, { borderColor: myStory ? COLORS.lime : '#333' }]}>
-							<Avatar initials="JN" bg={COLORS.lime} color="#0f0f0f" size={42} />
-							{!myStory && (
-								<View style={styles.storyPlus}>
-									<Text style={styles.storyPlusText}>+</Text>
-								</View>
-							)}
-						</View>
-						<Text style={styles.storyLabel}>Vos</Text>
-					</TouchableOpacity>
-
-					{/* Otros */}
-					{storiesConNombre.map((s, i) => (
-						<TouchableOpacity key={i} style={styles.storyItem} onPress={() => openStoryAt(combinedStories.indexOf(s))}>
-							<View style={[styles.storyRing, { borderColor: seenStories.has(s.name) ? '#444' : COLORS.lime }]}>
-								<Avatar initials={s.initials} bg={s.bg} color={s.color} size={42} />
-							</View>
-							<Text style={styles.storyLabel}>{s.name}</Text>
-						</TouchableOpacity>
-					))}
-				</ScrollView>
-				<View style={styles.divider} />
 				<View style={styles.feed}>
-					<HcpCard />
-					{rounds.map(r => <RoundCard key={r.id} round={r} />)}
-					<MilestoneCard />
+					{rounds.length === 0
+						? (
+							<View style={styles.feedEmpty}>
+								<Ionicons name="golf-outline" size={40} color={COLORS.dim} />
+								<Text style={styles.feedEmptyTitle}>Todavía no hay vueltas</Text>
+								<Text style={styles.feedEmptyText}>Cargá tu primera vuelta o seguí a tus amigos para ver las suyas acá.</Text>
+							</View>
+						)
+						: rounds.map(r => <RoundCard key={r.id} round={r} />)
+					}
 				</View>
 			</ScrollView>
 			{showToast && (
@@ -980,23 +770,6 @@ const styles = StyleSheet.create({
 	logo: { fontSize: 24, fontWeight: "800", color: "#fff", letterSpacing: -0.5 },
 	notifDot: { position: 'absolute', top: -1, right: -1, width: 9, height: 9, borderRadius: 5, backgroundColor: COLORS.lime, borderWidth: 1.5, borderColor: COLORS.bg },
 	headerIcon: { fontSize: 20 },
-	storiesRow: {},
-	storyItem: { alignItems: "center", marginRight: 12, gap: 4 },
-	storyRing: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, alignItems: "center", justifyContent: "center" },
-	storyLabel: { fontSize: 10, color: COLORS.muted },
-	storyPlus: { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, backgroundColor: COLORS.lime, borderWidth: 1.5, borderColor: COLORS.bg, alignItems: 'center', justifyContent: 'center' },
-	storyPlusText: { fontSize: 13, fontWeight: '800', color: '#0f0f0f', lineHeight: 16 },
-	storyModal: { flex: 1, backgroundColor: '#000' },
-	storyCard: { flex: 1, marginTop: 16, marginBottom: 28, marginHorizontal: 8, borderRadius: 22, overflow: 'hidden', backgroundColor: '#111' },
-	storyTapZones: { ...StyleSheet.absoluteFillObject, flexDirection: 'row' },
-	storyOverlay: { position: 'absolute', top: 0, left: 0, right: 0 },
-	storyBarRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 12 },
-	storyBarTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.3)', overflow: 'hidden' },
-	storyBarFill: { height: '100%', backgroundColor: COLORS.lime },
-	storyHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 12 },
-	storyAvatarSmall: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-	storyAvatarText: { fontSize: 12, fontWeight: '800' },
-	storyName: { fontSize: 14, fontWeight: '700', color: '#fff' },
 	divider: {
 		height: 0.5,
 		backgroundColor: "#1e1e1e",
@@ -1004,6 +777,9 @@ const styles = StyleSheet.create({
 		marginBottom: 12,
 	},
 	feed: { paddingBottom: 20 },
+	feedEmpty: { alignItems: 'center', gap: 8, paddingTop: 80, paddingHorizontal: 40 },
+	feedEmptyTitle: { fontSize: 16, fontWeight: '700', color: COLORS.white, marginTop: 4 },
+	feedEmptyText: { fontSize: 13, color: COLORS.muted, textAlign: 'center', lineHeight: 19 },
 	card: {
 		backgroundColor: COLORS.bg,
 		borderBottomWidth: 8,
