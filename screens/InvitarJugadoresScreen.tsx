@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import type { UserDoc } from '../firebase/types';
+import { addParticipantToTournament } from '../services/tournaments';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#222', border2: '#2a2a2a',
@@ -28,7 +29,8 @@ function Avatar({ initials, size = 42 }: { initials: string; size?: number }) {
 export default function InvitarJugadoresScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, userDoc } = useAuth();
+  const torneoId: string = route.params.torneoId;
   const nombreTorneo: string = route.params?.nombreTorneo ?? 'tu torneo';
   // standalone = se abrió desde el detalle de un torneo ya creado, no desde el flujo de creación.
   const standalone: boolean = route.params?.standalone ?? false;
@@ -36,6 +38,7 @@ export default function InvitarJugadoresScreen() {
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [usuarios, setUsuarios] = useState<UserDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     getDocs(query(collection(db, 'users'), limit(50)))
@@ -51,13 +54,26 @@ export default function InvitarJugadoresScreen() {
     (u.displayName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q))
   );
 
-  // Mock: no hay backend todavía, así que "invitar" y "omitir/cancelar" solo pasan a la confirmación.
-  const finalizar = () => {
-    if (standalone) {
-      if (seleccionados.length === 0) { navigation.goBack(); return; }
-      navigation.replace('TorneoCreado', { nombreTorneo, kind: 'invitados', invitados: seleccionados.length });
-    } else {
-      navigation.replace('TorneoCreado', { nombreTorneo, kind: 'creado', invitados: seleccionados.length });
+  const finalizar = async () => {
+    if (saving || !userDoc) return;
+    if (seleccionados.length === 0) {
+      standalone ? navigation.goBack() : navigation.replace('TorneoCreado', { nombreTorneo, kind: 'creado' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const elegidos = usuarios.filter(u => seleccionados.includes(u.uid));
+      await Promise.all(elegidos.map(u =>
+        addParticipantToTournament(torneoId, nombreTorneo, { uid: u.uid, displayName: u.displayName, handicap: u.handicap }, userDoc.displayName)
+      ));
+      if (standalone) {
+        navigation.replace('TorneoCreado', { nombreTorneo, kind: 'invitados', invitados: seleccionados.length });
+      } else {
+        navigation.replace('TorneoCreado', { nombreTorneo, kind: 'creado', invitados: seleccionados.length });
+      }
+    } catch {
+      Alert.alert('Error', 'No pudimos invitar a algunos jugadores. Probá de nuevo.');
+      setSaving(false);
     }
   };
 
@@ -115,15 +131,18 @@ export default function InvitarJugadoresScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity onPress={finalizar} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={() => standalone ? navigation.goBack() : navigation.replace('TorneoCreado', { nombreTorneo, kind: 'creado' })} disabled={saving} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={styles.skipText}>{standalone ? 'Cancelar' : 'Omitir por ahora'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.inviteBtn, seleccionados.length === 0 && { opacity: 0.4 }]}
+          style={[styles.inviteBtn, (seleccionados.length === 0 || saving) && { opacity: 0.4 }]}
           onPress={finalizar}
-          disabled={seleccionados.length === 0}
+          disabled={seleccionados.length === 0 || saving}
         >
-          <Text style={styles.inviteBtnText}>Invitar{seleccionados.length > 0 ? ` (${seleccionados.length})` : ''}</Text>
+          {saving
+            ? <ActivityIndicator size="small" color="#0f0f0f" />
+            : <Text style={styles.inviteBtnText}>Invitar{seleccionados.length > 0 ? ` (${seleccionados.length})` : ''}</Text>
+          }
         </TouchableOpacity>
       </View>
     </SafeAreaView>

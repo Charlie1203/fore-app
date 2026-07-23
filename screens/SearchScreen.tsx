@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from 'react-native-pager-view';
-import type { Torneo } from './TorneosScreen';
+import { estadoDeTorneo } from '../services/tournaments';
 import Svg, { Circle, Path, Ellipse, Line, Polygon } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,8 @@ import { db, storage } from '../firebase/config';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc, addDoc, updateDoc, serverTimestamp, getDocs, limit, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { joinGroup } from '../services/groups';
-import type { CommentDoc, GroupDoc, GroupMemberDoc, GroupPostDoc, UserDoc } from '../firebase/types';
+import type { CommentDoc, GroupDoc, GroupMemberDoc, GroupPostDoc, TournamentDoc, UserDoc } from '../firebase/types';
+import { formatFechaTorneo } from './TorneosScreen';
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
   const d = [
@@ -99,27 +100,6 @@ interface Post {
   pinned?: boolean;
 }
 
-const TORNEOS_MOCK: Torneo[] = [
-  {
-    id: '1', nombre: 'Copa Junio', modalidad: 'Stableford', fecha: 'Jun 2026', estado: 'finalizado', grupo: 'Haras Santa María',
-    adminId: 'pepe', fechasRonda: ['2026-06-07'],
-    participantes: [],
-    leaderboard: [
-      { pos: 1, nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', score: 38, diff: 0 },
-      { pos: 2, nombre: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', score: 35, diff: 0 },
-      { pos: 3, nombre: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', score: 32, diff: 0 },
-    ],
-  },
-  {
-    id: '2', nombre: 'Torneo del Club', modalidad: 'Stroke Play', fecha: 'Jul 2026', estado: 'próximo', grupo: 'Haras Santa María',
-    adminId: 'pepe', fechasRonda: ['2026-07-12'],
-    participantes: [
-      { nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', hcp: 7.3 },
-      { nombre: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', hcp: 15.1 },
-      { nombre: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', hcp: 9.8 },
-    ],
-  },
-];
 
 function Avatar({ initials, bg, color, size = 42 }: { initials: string; bg: string; color: string; size?: number }) {
   return (
@@ -452,6 +432,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
   const [showComposer, setShowComposer] = useState(false);
   const [posts, setPosts] = useState<GroupPostDoc[]>([]);
   const [members, setMembers] = useState<GroupMemberDoc[]>([]);
+  const [torneos, setTorneos] = useState<TournamentDoc[]>([]);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [commentsPost, setCommentsPost] = useState<Post | null>(null);
   const [joining, setJoining] = useState(false);
@@ -464,6 +445,12 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
     if (!isMember) { setPosts([]); return; }
     const q = query(collection(db, 'groups', group.id, 'posts'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, snap => setPosts(snap.docs.map(d => ({ ...d.data(), id: d.id }) as GroupPostDoc)));
+  }, [group.id, isMember]);
+
+  useEffect(() => {
+    if (!isMember) { setTorneos([]); return; }
+    const q = query(collection(db, 'tournaments'), where('groupId', '==', group.id));
+    return onSnapshot(q, snap => setTorneos(snap.docs.map(d => ({ ...d.data(), id: d.id }) as TournamentDoc)));
   }, [group.id, isMember]);
 
   // Miembros: legibles por cualquiera si es club, solo por miembros si es privado.
@@ -584,7 +571,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
           </TouchableOpacity>
         )}
         {isMember && tab === 1 && (
-          <TouchableOpacity style={styles.headerAddBtn} onPress={() => navigation.navigate('CreateTorneo', { grupoFijo: group.name })}>
+          <TouchableOpacity style={styles.headerAddBtn} onPress={() => navigation.navigate('CreateTorneo', { grupoFijoId: group.id, grupoFijoNombre: group.name })}>
             <Ionicons name="add" size={24} color={COLORS.lime} />
           </TouchableOpacity>
         )}
@@ -621,19 +608,25 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
           </ScrollView>
 
           <ScrollView key="1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-            {TORNEOS_MOCK.map(t => (
-              <TouchableOpacity key={t.id} style={styles.torneoRow} onPress={() => navigation.navigate('TorneoDetail', { torneo: t })}>
-                <View style={[styles.torneoEstadoDot, t.estado === 'próximo' ? styles.torneoEstadoDotNext : styles.torneoEstadoDotDone]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.torneoNombre}>{t.nombre}</Text>
-                  <Text style={styles.torneoMeta}>{t.modalidad} · {t.fecha}</Text>
-                </View>
-                {t.estado === 'finalizado'
-                  ? <Text style={styles.torneoGanadorInline}>🏆 {t.leaderboard?.[0]?.nombre}</Text>
-                  : <View style={styles.torneoBadgeNext}><Text style={styles.torneoBadgeNextText}>Próximo</Text></View>
-                }
-              </TouchableOpacity>
-            ))}
+            {torneos.length === 0 ? (
+              <Text style={styles.emptyTabText}>Todavía no hay torneos en este grupo.</Text>
+            ) : torneos.map(t => {
+              const estado = estadoDeTorneo(t.roundDates);
+              return (
+                <TouchableOpacity key={t.id} style={styles.torneoRow} onPress={() => navigation.navigate('TorneoDetail', { torneoId: t.id })}>
+                  <View style={[styles.torneoEstadoDot, estado === 'próximo' ? styles.torneoEstadoDotNext : styles.torneoEstadoDotDone]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.torneoNombre}>{t.name}</Text>
+                    <Text style={styles.torneoMeta}>{t.modality} · {formatFechaTorneo(t.roundDates)}</Text>
+                  </View>
+                  <View style={estado === 'próximo' ? styles.torneoBadgeNext : styles.torneoBadgeDone}>
+                    <Text style={estado === 'próximo' ? styles.torneoBadgeNextText : styles.torneoBadgeDoneText}>
+                      {estado === 'próximo' ? 'Próximo' : estado === 'en curso' ? 'En curso' : 'Finalizado'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
 
           <ScrollView key="2" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -1031,6 +1024,8 @@ const styles = StyleSheet.create({
   torneoGanadorInline: { fontSize: 12, color: COLORS.muted },
   torneoBadgeNext: { backgroundColor: '#1a2a0a', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   torneoBadgeNextText: { fontSize: 11, fontWeight: '700', color: COLORS.lime },
+  torneoBadgeDone: { backgroundColor: '#222', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  torneoBadgeDoneText: { fontSize: 11, fontWeight: '700', color: COLORS.muted },
 
   // Modales
   modal: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end', zIndex: 100 },

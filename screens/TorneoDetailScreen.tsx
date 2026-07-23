@@ -1,10 +1,14 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { MY_UID } from './TorneosScreen';
-import type { Torneo } from './TorneosScreen';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase/config';
+import { collection, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import type { TournamentDoc, TournamentParticipantDoc } from '../firebase/types';
+import { estadoDeTorneo, rondaActualDeTorneo } from '../services/tournaments';
+import { formatFechaTorneo } from './TorneosScreen';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -13,25 +17,24 @@ const COLORS = {
   lime: '#c8e03a', white: '#f0f0f0', muted: '#666', dim: '#444', dark2: '#242424',
 };
 
-function Avatar({ initials, bg, color, size = 36 }: { initials: string; bg: string; color: string; size?: number }) {
+function Avatar({ initials, size = 36 }: { initials: string; size?: number }) {
   return (
-    <View style={[{ backgroundColor: bg, width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }]}>
-      <Text style={{ color, fontSize: size * 0.32, fontWeight: '700' }}>{initials}</Text>
+    <View style={[{ backgroundColor: COLORS.lime, width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }]}>
+      <Text style={{ color: '#0f0f0f', fontSize: size * 0.32, fontWeight: '700' }}>{initials}</Text>
     </View>
   );
 }
 
-function DetailNav({ torneo, onBack, badge, onEdit }: { torneo: Torneo; onBack: () => void; badge: React.ReactNode; onEdit?: () => void }) {
+function DetailNav({ torneo, onBack, badge, isAdmin, onEdit }: { torneo: TournamentDoc; onBack: () => void; badge: React.ReactNode; isAdmin: boolean; onEdit?: () => void }) {
   const insets = useSafeAreaInsets();
-  const isAdmin = torneo.adminId === MY_UID;
   return (
     <View style={[styles.detailNav, { paddingTop: insets.top + 10 }]}>
       <TouchableOpacity onPress={onBack} style={{ padding: 2 }}>
         <Ionicons name="chevron-back" size={22} color={COLORS.white} />
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
-        <Text style={styles.detailNavTitle} numberOfLines={1}>{torneo.nombre}</Text>
-        <Text style={styles.detailNavSub}>{torneo.modalidad} · {torneo.fecha}{torneo.grupo ? ` · ${torneo.grupo}` : ''}</Text>
+        <Text style={styles.detailNavTitle} numberOfLines={1}>{torneo.name}</Text>
+        <Text style={styles.detailNavSub}>{torneo.modality} · {formatFechaTorneo(torneo.roundDates)}{torneo.groupName ? ` · ${torneo.groupName}` : ''}</Text>
       </View>
       {badge}
       {isAdmin && (
@@ -49,15 +52,15 @@ const MODALIDAD_INFO: Record<string, { icon: string; desc: string }> = {
   'Match Play': { icon: 'people-outline', desc: 'Competencia hoyo a hoyo contra otro jugador o equipo.' },
 };
 
-function TorneoProximoContent({ torneo }: { torneo: Torneo }) {
+function TorneoProximoContent({ torneo, participantes, isAdmin }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean }) {
   const navigation = useNavigation<any>();
-  const isAdmin = torneo.adminId === MY_UID;
-  const modalidadInfo = MODALIDAD_INFO[torneo.modalidad] ?? { icon: 'trophy-outline', desc: '' };
+  const modalidadInfo = MODALIDAD_INFO[torneo.modality] ?? { icon: 'trophy-outline', desc: '' };
   return (
     <View style={styles.container}>
       <DetailNav
         torneo={torneo}
         onBack={() => navigation.goBack()}
+        isAdmin={isAdmin}
         badge={<View style={styles.estadoBadge}><Text style={styles.estadoBadgeText}>Próximo</Text></View>}
         onEdit={() => navigation.navigate('CreateTorneo', { torneo })}
       />
@@ -68,29 +71,29 @@ function TorneoProximoContent({ torneo }: { torneo: Torneo }) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.infoLabel}>Modalidad</Text>
-            <Text style={styles.infoValue}>{torneo.modalidad}</Text>
+            <Text style={styles.infoValue}>{torneo.modality}</Text>
             {!!modalidadInfo.desc && <Text style={styles.infoDesc}>{modalidadInfo.desc}</Text>}
           </View>
         </View>
 
         <View style={styles.participantesHeader}>
-          <Text style={styles.sectionLabel}>Participantes ({torneo.participantes.length})</Text>
+          <Text style={styles.sectionLabel}>Participantes ({participantes.length})</Text>
           {isAdmin && (
-            <TouchableOpacity onPress={() => navigation.navigate('InvitarJugadores', { nombreTorneo: torneo.nombre, standalone: true })}>
+            <TouchableOpacity onPress={() => navigation.navigate('InvitarJugadores', { torneoId: torneo.id, nombreTorneo: torneo.name, standalone: true })}>
               <Text style={styles.invitarLink}>+ Invitar</Text>
             </TouchableOpacity>
           )}
         </View>
-        {torneo.participantes.map((p, i) => (
+        {participantes.map(p => (
           <TouchableOpacity
-            key={i}
+            key={p.uid}
             style={styles.participanteRow}
-            onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: p.nombre, initials: p.initials, bg: p.bg, color: p.color, handicap: p.hcp } })}
+            onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: p.displayName, initials: p.initials, bg: COLORS.lime, color: '#0f0f0f', handicap: p.handicap } })}
           >
-            <Avatar initials={p.initials} bg={p.bg} color={p.color} size={40} />
+            <Avatar initials={p.initials} size={40} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.participanteNombre}>{p.nombre}</Text>
-              <Text style={styles.participanteSub}>HCP {p.hcp}</Text>
+              <Text style={styles.participanteNombre}>{p.displayName}</Text>
+              <Text style={styles.participanteSub}>{p.handicap != null ? `HCP ${p.handicap}` : 'Sin HCP cargado'}</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
           </TouchableOpacity>
@@ -99,8 +102,6 @@ function TorneoProximoContent({ torneo }: { torneo: Torneo }) {
     </View>
   );
 }
-
-type LeaderRow = { pos: number; nombre: string; initials: string; bg: string; color: string; score: number; diff: number };
 
 function TabBar({ tabs, tab, onPress }: { tabs: string[]; tab: number; onPress: (i: number) => void }) {
   return (
@@ -114,69 +115,20 @@ function TabBar({ tabs, tab, onPress }: { tabs: string[]; tab: number; onPress: 
   );
 }
 
-function LeaderList({ rows, showDiff }: { rows: LeaderRow[]; showDiff?: boolean }) {
-  const navigation = useNavigation<any>();
-  if (rows.length === 0) return (
-    <Text style={{ color: COLORS.muted, fontSize: 13, textAlign: 'center', marginTop: 48 }}>
-      Sin tarjetas cargadas
-    </Text>
-  );
+function LeaderboardEmpty() {
   return (
-    <>
-      {rows.map((p, i) => (
-        <TouchableOpacity
-          key={i}
-          style={[styles.leaderRow, p.pos === 1 && styles.leaderRowFirst]}
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: p.nombre, initials: p.initials, bg: p.bg, color: p.color } })}
-        >
-          <Text style={[styles.leaderPos, p.pos === 1 && { color: COLORS.lime }]}>{p.pos}</Text>
-          <Avatar initials={p.initials} bg={p.bg} color={p.color} size={38} />
-          <Text style={styles.leaderNombre}>{p.nombre}</Text>
-          <View style={styles.leaderScores}>
-            <Text style={[styles.leaderScore, p.pos === 1 && { color: COLORS.lime }]}>{p.score}</Text>
-            {showDiff && (
-              <Text style={[styles.leaderDiff, { color: p.diff <= 0 ? COLORS.lime : COLORS.muted }]}>
-                {p.diff > 0 ? '+' : ''}{p.diff}
-              </Text>
-            )}
-          </View>
-          <Ionicons name="chevron-forward" size={14} color={COLORS.dim} style={{ marginLeft: 4 }} />
-        </TouchableOpacity>
-      ))}
-    </>
-  );
-}
-
-function Podio({ lb, isStableford }: { lb: LeaderRow[]; isStableford: boolean }) {
-  const navigation = useNavigation<any>();
-  const orden = [lb[1], lb[0], lb[2]].filter(Boolean);
-  const heights = { 1: 72, 2: 52, 3: 40 };
-  return (
-    <View style={styles.podio}>
-      {orden.map(p => (
-        <TouchableOpacity
-          key={p.pos}
-          style={styles.podioItem}
-          onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: p.nombre, initials: p.initials, bg: p.bg, color: p.color } })}
-        >
-          <Avatar initials={p.initials} bg={p.bg} color={p.color} size={p.pos === 1 ? 50 : 40} />
-          <Text style={styles.podioNombre} numberOfLines={1}>{p.nombre.split(' ')[0]}</Text>
-          <Text style={[styles.podioScore, p.pos === 1 && { color: COLORS.lime }]}>
-            {p.score}{isStableford ? ' pts' : ''}
-          </Text>
-          <View style={[styles.podioPedestal, { height: heights[p.pos as 1|2|3] ?? 40 }, p.pos === 1 && styles.podioPedestalFirst]}>
-            <Text style={[styles.podioPedNum, p.pos === 1 && { color: COLORS.lime }]}>{p.pos}</Text>
-          </View>
-        </TouchableOpacity>
-      ))}
+    <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 40, gap: 8 }}>
+      <Ionicons name="golf-outline" size={32} color={COLORS.dim} />
+      <Text style={{ color: COLORS.muted, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>
+        Sin tarjetas cargadas todavía.
+      </Text>
     </View>
   );
 }
 
-function TorneoEnCursoContent({ torneo }: { torneo: Torneo }) {
+function TorneoEnCursoContent({ torneo, participantes, isAdmin }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean }) {
   const navigation = useNavigation<any>();
-  const totalRondas = torneo.rondas ?? 1;
+  const totalRondas = torneo.roundDates.length || 1;
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
   const [tab, setTab] = useState(0);
   const pagerRef = useRef<ScrollView>(null);
@@ -196,6 +148,7 @@ function TorneoEnCursoContent({ torneo }: { torneo: Torneo }) {
       <DetailNav
         torneo={torneo}
         onBack={() => navigation.goBack()}
+        isAdmin={isAdmin}
         badge={
           <View style={[styles.estadoBadge, styles.estadoBadgeEnCurso]}>
             <View style={styles.estadoBadgeDot} />
@@ -213,23 +166,19 @@ function TorneoEnCursoContent({ torneo }: { torneo: Torneo }) {
         onMomentumScrollEnd={onScroll}
         style={{ flex: 1 }}
       >
-        {tabs.map((_, i) => {
-          const rows = i === 0 ? torneo.leaderboard ?? [] : torneo.leaderboardPorRonda?.[i - 1] ?? [];
-          return (
-            <ScrollView key={i} style={{ width: SCREEN_W }} contentContainerStyle={{ paddingBottom: 40 }}>
-              <LeaderList rows={rows} showDiff />
-            </ScrollView>
-          );
-        })}
+        {tabs.map((_, i) => (
+          <ScrollView key={i} style={{ width: SCREEN_W }} contentContainerStyle={{ paddingBottom: 40 }}>
+            <LeaderboardEmpty />
+          </ScrollView>
+        ))}
       </ScrollView>
     </View>
   );
 }
 
-function TorneoFinalizadoContent({ torneo }: { torneo: Torneo }) {
+function TorneoFinalizadoContent({ torneo, isAdmin }: { torneo: TournamentDoc; isAdmin: boolean }) {
   const navigation = useNavigation<any>();
-  const isStableford = torneo.modalidad === 'Stableford';
-  const totalRondas = torneo.rondas ?? (torneo.leaderboardPorRonda?.length ?? 1);
+  const totalRondas = torneo.roundDates.length || 1;
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
   const [tab, setTab] = useState(0);
   const pagerRef = useRef<ScrollView>(null);
@@ -249,6 +198,7 @@ function TorneoFinalizadoContent({ torneo }: { torneo: Torneo }) {
       <DetailNav
         torneo={torneo}
         onBack={() => navigation.goBack()}
+        isAdmin={isAdmin}
         badge={
           <View style={[styles.estadoBadge, styles.estadoBadgeFinalizado]}>
             <Text style={styles.estadoBadgeText}>Finalizado</Text>
@@ -264,17 +214,9 @@ function TorneoFinalizadoContent({ torneo }: { torneo: Torneo }) {
         onMomentumScrollEnd={onScroll}
         style={{ flex: 1 }}
       >
-        {/* General */}
-        <ScrollView style={{ width: SCREEN_W }} contentContainerStyle={{ paddingBottom: 40 }}>
-          {torneo.leaderboard && torneo.leaderboard.length >= 2 && (
-            <Podio lb={torneo.leaderboard} isStableford={isStableford} />
-          )}
-          <LeaderList rows={torneo.leaderboard ?? []} />
-        </ScrollView>
-        {/* Por ronda */}
-        {Array.from({ length: totalRondas }, (_, i) => (
+        {tabs.map((_, i) => (
           <ScrollView key={i} style={{ width: SCREEN_W }} contentContainerStyle={{ paddingBottom: 40 }}>
-            <LeaderList rows={torneo.leaderboardPorRonda?.[i] ?? []} />
+            <LeaderboardEmpty />
           </ScrollView>
         ))}
       </ScrollView>
@@ -284,11 +226,40 @@ function TorneoFinalizadoContent({ torneo }: { torneo: Torneo }) {
 
 export default function TorneoDetailScreen() {
   const route = useRoute<any>();
-  const torneo: Torneo = route.params.torneo;
+  const navigation = useNavigation<any>();
+  const { firebaseUser } = useAuth();
+  const torneoId: string = route.params.torneoId;
 
-  if (torneo.estado === 'próximo') return <TorneoProximoContent torneo={torneo} />;
-  if (torneo.estado === 'en curso') return <TorneoEnCursoContent torneo={torneo} />;
-  return <TorneoFinalizadoContent torneo={torneo} />;
+  const [torneo, setTorneo] = useState<TournamentDoc | null>(null);
+  const [participantes, setParticipantes] = useState<TournamentParticipantDoc[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    return onSnapshot(doc(db, 'tournaments', torneoId), snap => {
+      if (snap.exists()) setTorneo({ ...snap.data(), id: snap.id } as TournamentDoc);
+      setLoading(false);
+    }, () => setLoading(false));
+  }, [torneoId]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'tournaments', torneoId, 'participants'), orderBy('joinedAt', 'asc'));
+    return onSnapshot(q, snap => setParticipantes(snap.docs.map(d => d.data() as TournamentParticipantDoc)));
+  }, [torneoId]);
+
+  if (loading || !torneo) {
+    return (
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator color={COLORS.lime} />
+      </View>
+    );
+  }
+
+  const isAdmin = torneo.createdBy === firebaseUser?.uid;
+  const estado = estadoDeTorneo(torneo.roundDates);
+
+  if (estado === 'próximo') return <TorneoProximoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} />;
+  if (estado === 'en curso') return <TorneoEnCursoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} />;
+  return <TorneoFinalizadoContent torneo={torneo} isAdmin={isAdmin} />;
 }
 
 const styles = StyleSheet.create({
@@ -321,20 +292,4 @@ const styles = StyleSheet.create({
   participanteRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   participanteNombre: { fontSize: 14, fontWeight: '600', color: COLORS.white },
   participanteSub: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
-
-  podio: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 8, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 0 },
-  podioItem: { flex: 1, alignItems: 'center', gap: 4 },
-  podioNombre: { fontSize: 12, fontWeight: '600', color: COLORS.muted, marginTop: 6 },
-  podioScore: { fontSize: 16, fontWeight: '800', color: COLORS.white, marginBottom: 8 },
-  podioPedestal: { width: '100%', backgroundColor: '#1a1a1a', borderTopLeftRadius: 4, borderTopRightRadius: 4, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 8 },
-  podioPedestalFirst: { backgroundColor: '#1a2a0a' },
-  podioPedNum: { fontSize: 13, fontWeight: '800', color: COLORS.dim },
-
-  leaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
-  leaderRowFirst: { backgroundColor: '#0f1a0a' },
-  leaderPos: { fontSize: 13, fontWeight: '700', color: COLORS.dim, width: 20, textAlign: 'center' },
-  leaderNombre: { flex: 1, fontSize: 14, fontWeight: '600', color: COLORS.white },
-  leaderScores: { alignItems: 'flex-end' },
-  leaderScore: { fontSize: 18, fontWeight: '800', color: COLORS.white },
-  leaderDiff: { fontSize: 11, fontWeight: '700' },
 });

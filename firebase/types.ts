@@ -29,7 +29,7 @@ export interface UsernameDoc {
 // users/{uid}/notifications/{notifId}
 export interface NotificationDoc {
 	id: string;
-	type: 'group_added'; // se amplía a medida que aparezcan más eventos
+	type: 'group_added' | 'tournament_added'; // se amplía a medida que aparezcan más eventos
 	icon: string; // nombre de Ionicons
 	text: string;
 	read: boolean;
@@ -176,19 +176,21 @@ export interface AttendeeDoc {
 }
 
 // tournaments/{tournamentId}
-export type TournamentModality = 'Stroke Play' | 'Stableford' | 'Match Play' | 'Better Ball' | 'Scramble';
-export type TournamentStatus = 'próximo' | 'en curso' | 'finalizado';
+// El estado (próximo/en curso/finalizado) y la ronda actual se derivan de roundDates,
+// no se guardan — así nunca quedan desincronizados de la fecha real.
+export type TournamentModality = 'Stroke Play' | 'Stableford' | 'Match Play';
 
 export interface TournamentDoc {
 	id: string;
 	name: string;
 	modality: TournamentModality;
-	status: TournamentStatus;
 	groupId: string | null; // null = torneo libre/abierto
-	roundsTotal: number;
-	currentRound: number | null;
-	date: Timestamp;
+	groupName: string | null;
 	createdBy: string;
+	createdByName: string;
+	roundDates: (string | null)[]; // ISO yyyy-mm-dd, null = "a definir"
+	participantUids: string[]; // denormalizado para poder consultar "mis torneos" con array-contains
+	participantsCount: number;
 	createdAt: Timestamp;
 }
 
@@ -196,18 +198,9 @@ export interface TournamentDoc {
 export interface TournamentParticipantDoc {
 	uid: string;
 	displayName: string;
-	handicap: number;
+	initials: string;
+	handicap: number | null;
 	joinedAt: Timestamp;
-}
-
-// tournaments/{tournamentId}/leaderboard/{uid}
-export interface TournamentLeaderboardDoc {
-	uid: string;
-	displayName: string;
-	position: number;
-	score: number;
-	diff: number;
-	updatedAt: Timestamp;
 }
 
 // achievements/{achievementId}

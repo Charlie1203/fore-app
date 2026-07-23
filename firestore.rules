@@ -156,14 +156,20 @@ service cloud.firestore {
     }
 
     match /tournaments/{tournamentId} {
-      allow read: if isSignedIn() &&
-        (resource.data.groupId == null || isGroupMember(resource.data.groupId));
+      // Torneos de grupo: los ve cualquier miembro del grupo. Torneos abiertos (sin grupo):
+      // solo el creador y los participantes ya invitados.
+      allow read: if isSignedIn() && (
+        (resource.data.groupId != null && isGroupMember(resource.data.groupId)) ||
+        (resource.data.groupId == null && request.auth.uid in resource.data.participantUids)
+      );
       allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.createdBy == request.auth.uid;
 
       match /participants/{uid} {
         allow read: if isSignedIn();
-        allow write: if isSignedIn() && request.auth.uid == uid;
+        // El propio jugador puede unirse/actualizarse; el creador del torneo puede sumar a otros.
+        allow write: if isSignedIn() && (request.auth.uid == uid ||
+          get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.createdBy == request.auth.uid);
       }
       match /leaderboard/{uid} {
         allow read: if isSignedIn();

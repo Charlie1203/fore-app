@@ -1,144 +1,44 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase/config';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import type { TournamentDoc } from '../firebase/types';
+import { estadoDeTorneo, rondaActualDeTorneo } from '../services/tournaments';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
   lime: '#c8e03a', white: '#f0f0f0', muted: '#666', dim: '#444', dark2: '#242424',
 };
 
-type Estado = 'próximo' | 'en curso' | 'finalizado';
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-interface Torneo {
-  id: string;
-  nombre: string;
-  modalidad: string;
-  fecha: string;
-  estado: Estado;
-  grupo: string | null;
-  adminId: string;
-  fechasRonda: string[];
-  participantes: { nombre: string; initials: string; bg: string; color: string; hcp: number }[];
-  leaderboard?: { pos: number; nombre: string; initials: string; bg: string; color: string; score: number; diff: number }[];
-  leaderboardPorRonda?: { pos: number; nombre: string; initials: string; bg: string; color: string; score: number; diff: number }[][];
-  rondaActual?: number;
-  rondas?: number;
+export function formatFechaTorneo(roundDates: (string | null)[]): string {
+  const fechas = roundDates.filter((d): d is string => !!d).map(d => new Date(d));
+  if (fechas.length === 0) return 'A definir';
+  const primera = fechas.sort((a, b) => a.getTime() - b.getTime())[0];
+  return `${MESES[primera.getMonth()]} ${primera.getFullYear()}`;
 }
-
-// Mock: el usuario actual es admin del torneo 1
-export const MY_UID = 'juann';
-
-const TORNEOS: Torneo[] = [
-  {
-    id: '1',
-    nombre: 'Open de Verano',
-    modalidad: 'Stableford',
-    fecha: 'Jul 2026',
-    estado: 'próximo',
-    grupo: null,
-    adminId: 'juann',
-    fechasRonda: ['2026-07-12', '2026-07-13'],
-    participantes: [
-      { nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', hcp: 7.3 },
-      { nombre: 'Juan Noceti', initials: 'JN', bg: '#c8e03a', color: '#0f0f0f', hcp: 12.1 },
-      { nombre: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', hcp: 15.1 },
-    ],
-  },
-  {
-    id: '2',
-    nombre: 'Torneo del Club',
-    modalidad: 'Stroke Play',
-    fecha: 'Jul 2026',
-    estado: 'en curso',
-    grupo: 'Haras Santa María',
-    adminId: 'pepe',
-    fechasRonda: ['2026-07-05', '2026-07-06'],
-    rondaActual: 1,
-    rondas: 2,
-    participantes: [
-      { nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', hcp: 7.3 },
-      { nombre: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', hcp: 9.8 },
-      { nombre: 'Sofía Lagos', initials: 'SL', bg: '#1a2a3a', color: '#5fa0e0', hcp: 18.4 },
-      { nombre: 'Tomás Bidegain', initials: 'TB', bg: '#2a1a3a', color: '#b070e0', hcp: 11.2 },
-    ],
-    leaderboard: [
-      { pos: 1, nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', score: 71, diff: -1 },
-      { pos: 2, nombre: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', score: 74, diff: 2 },
-      { pos: 3, nombre: 'Sofía Lagos', initials: 'SL', bg: '#1a2a3a', color: '#5fa0e0', score: 77, diff: 5 },
-      { pos: 4, nombre: 'Tomás Bidegain', initials: 'TB', bg: '#2a1a3a', color: '#b070e0', score: 79, diff: 7 },
-    ],
-    leaderboardPorRonda: [
-      [
-        { pos: 1, nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', score: 71, diff: -1 },
-        { pos: 2, nombre: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', score: 74, diff: 2 },
-        { pos: 3, nombre: 'Sofía Lagos', initials: 'SL', bg: '#1a2a3a', color: '#5fa0e0', score: 77, diff: 5 },
-        { pos: 4, nombre: 'Tomás Bidegain', initials: 'TB', bg: '#2a1a3a', color: '#b070e0', score: 79, diff: 7 },
-      ],
-    ],
-  },
-  {
-    id: '3',
-    nombre: 'Copa Junio',
-    modalidad: 'Stableford',
-    fecha: 'Jun 2026',
-    estado: 'finalizado',
-    grupo: 'Haras Santa María',
-    adminId: 'pepe',
-    fechasRonda: ['2026-06-07'],
-    rondas: 1,
-    participantes: [],
-    leaderboard: [
-      { pos: 1, nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', score: 38, diff: 0 },
-      { pos: 2, nombre: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', score: 35, diff: 0 },
-      { pos: 3, nombre: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', score: 32, diff: 0 },
-      { pos: 4, nombre: 'Tomás Bidegain', initials: 'TB', bg: '#2a1a3a', color: '#b070e0', score: 29, diff: 0 },
-    ],
-    leaderboardPorRonda: [
-      [
-        { pos: 1, nombre: 'Pepe Noceti', initials: 'PE', bg: '#333', color: '#c8e03a', score: 38, diff: 0 },
-        { pos: 2, nombre: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', score: 35, diff: 0 },
-        { pos: 3, nombre: 'Manu Rivero', initials: 'MR', bg: '#3a2a1a', color: '#e0a03a', score: 32, diff: 0 },
-        { pos: 4, nombre: 'Tomás Bidegain', initials: 'TB', bg: '#2a1a3a', color: '#b070e0', score: 29, diff: 0 },
-      ],
-    ],
-  },
-  {
-    id: '4',
-    nombre: 'Copa Invierno',
-    modalidad: 'Match Play',
-    fecha: 'Jun 2026',
-    estado: 'finalizado',
-    grupo: 'Los del Jueves',
-    adminId: 'carlitos',
-    fechasRonda: ['2026-06-14'],
-    participantes: [],
-    leaderboard: [
-      { pos: 1, nombre: 'Carlitos Laprida', initials: 'CA', bg: '#2a3a1a', color: '#c8e03a', score: 3, diff: 0 },
-      { pos: 2, nombre: 'Juan Noceti', initials: 'JN', bg: '#c8e03a', color: '#0f0f0f', score: 1, diff: 0 },
-    ],
-  },
-];
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
-function TorneoRow({ torneo, onPress }: { torneo: Torneo; onPress: () => void }) {
-  const dotColor = torneo.estado === 'próximo' ? COLORS.dim : torneo.estado === 'en curso' ? COLORS.lime : COLORS.dim;
-  const ganador = torneo.leaderboard?.[0];
+function TorneoRow({ torneo, onPress }: { torneo: TournamentDoc; onPress: () => void }) {
+  const estado = estadoDeTorneo(torneo.roundDates);
+  const dotColor = estado === 'en curso' ? COLORS.lime : COLORS.dim;
   return (
     <TouchableOpacity style={styles.torneoRow} onPress={onPress}>
       <View style={[styles.dot, { backgroundColor: dotColor }]} />
       <View style={{ flex: 1 }}>
-        <Text style={styles.torneoNombre}>{torneo.nombre}</Text>
+        <Text style={styles.torneoNombre}>{torneo.name}</Text>
         <Text style={styles.torneoMeta}>
-          {torneo.modalidad} · {torneo.fecha}{torneo.grupo ? ` · ${torneo.grupo}` : ' · Público'}
+          {torneo.modality} · {formatFechaTorneo(torneo.roundDates)}{torneo.groupName ? ` · ${torneo.groupName}` : ' · Abierto'}
         </Text>
-        {torneo.estado === 'finalizado' && ganador && (
-          <Text style={styles.torneoGanador}>🏆 {ganador.nombre}</Text>
-        )}
-        {torneo.estado === 'en curso' && (
+        {estado === 'en curso' && (
           <Text style={[styles.torneoMeta, { color: COLORS.lime, marginTop: 2 }]}>
-            Ronda {torneo.rondaActual}/{torneo.rondas} en curso
+            Ronda {rondaActualDeTorneo(torneo.roundDates)}/{torneo.roundDates.length} en curso
           </Text>
         )}
       </View>
@@ -149,16 +49,26 @@ function TorneoRow({ torneo, onPress }: { torneo: Torneo; onPress: () => void })
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export type { Torneo };
-
 export default function TorneosScreen() {
   const navigation = useNavigation<any>();
+  const { firebaseUser } = useAuth();
+  const [torneos, setTorneos] = useState<TournamentDoc[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const proximos = TORNEOS.filter(t => t.estado === 'próximo');
-  const enCurso = TORNEOS.filter(t => t.estado === 'en curso');
-  const finalizados = TORNEOS.filter(t => t.estado === 'finalizado');
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const q = query(collection(db, 'tournaments'), where('participantUids', 'array-contains', firebaseUser.uid));
+    return onSnapshot(q, snap => {
+      setTorneos(snap.docs.map(d => ({ ...d.data(), id: d.id }) as TournamentDoc));
+      setLoading(false);
+    }, () => setLoading(false));
+  }, [firebaseUser?.uid]);
 
-  const abrir = (torneo: Torneo) => navigation.navigate('TorneoDetail', { torneo });
+  const proximos = torneos.filter(t => estadoDeTorneo(t.roundDates) === 'próximo');
+  const enCurso = torneos.filter(t => estadoDeTorneo(t.roundDates) === 'en curso');
+  const finalizados = torneos.filter(t => estadoDeTorneo(t.roundDates) === 'finalizado');
+
+  const abrir = (torneo: TournamentDoc) => navigation.navigate('TorneoDetail', { torneoId: torneo.id });
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -169,27 +79,36 @@ export default function TorneosScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {enCurso.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>En curso</Text>
-            {enCurso.map(t => <TorneoRow key={t.id} torneo={t} onPress={() => abrir(t)} />)}
-          </>
-        )}
-        {proximos.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Próximos</Text>
-            {proximos.map(t => <TorneoRow key={t.id} torneo={t} onPress={() => abrir(t)} />)}
-          </>
-        )}
-        {finalizados.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Finalizados</Text>
-            {finalizados.map(t => <TorneoRow key={t.id} torneo={t} onPress={() => abrir(t)} />)}
-          </>
-        )}
-      </ScrollView>
-
+      {loading ? (
+        <ActivityIndicator color={COLORS.lime} style={{ marginTop: 48 }} />
+      ) : torneos.length === 0 ? (
+        <View style={styles.empty}>
+          <Ionicons name="trophy-outline" size={40} color={COLORS.dim} />
+          <Text style={styles.emptyTitle}>Todavía no tenés torneos</Text>
+          <Text style={styles.emptyText}>Creá uno o esperá a que te inviten a alguno.</Text>
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+          {enCurso.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>En curso</Text>
+              {enCurso.map(t => <TorneoRow key={t.id} torneo={t} onPress={() => abrir(t)} />)}
+            </>
+          )}
+          {proximos.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Próximos</Text>
+              {proximos.map(t => <TorneoRow key={t.id} torneo={t} onPress={() => abrir(t)} />)}
+            </>
+          )}
+          {finalizados.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Finalizados</Text>
+              {finalizados.map(t => <TorneoRow key={t.id} torneo={t} onPress={() => abrir(t)} />)}
+            </>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -201,6 +120,10 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 10, paddingBottom: 8 },
   title: { fontSize: 24, fontWeight: '800', color: COLORS.white },
   sectionTitle: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 8 },
+
+  empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: 40, gap: 8 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: COLORS.white, marginTop: 4 },
+  emptyText: { fontSize: 13, color: COLORS.muted, textAlign: 'center', lineHeight: 18 },
 
   torneoRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   dot: { width: 8, height: 8, borderRadius: 4 },

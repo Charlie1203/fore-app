@@ -1,14 +1,14 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform, Modal, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import type { Torneo } from './TorneosScreen';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import type { GroupDoc } from '../firebase/types';
+import { collection, query, where, onSnapshot, getDocs, updateDoc, doc } from 'firebase/firestore';
+import type { GroupDoc, GroupMemberDoc, TournamentDoc, TournamentModality } from '../firebase/types';
+import { createTournament, addParticipantToTournament } from '../services/tournaments';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#222', border2: '#2a2a2a',
@@ -23,6 +23,10 @@ const MODALIDADES = [
 
 function groupInitials(name: string): string {
   return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+}
+
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 
 const MAX_RONDAS = 8;
@@ -72,10 +76,11 @@ function PickerPopup({ visible, title, onClose, children }: { visible: boolean; 
 export default function CreateTorneoScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { firebaseUser } = useAuth();
-  const grupoFijo: string | null = route.params?.grupoFijo ?? null;
-  const editing: Torneo | null = route.params?.torneo ?? null;
-  const grupoLocked = !!grupoFijo || !!editing;
+  const { firebaseUser, userDoc } = useAuth();
+  const grupoFijoId: string | null = route.params?.grupoFijoId ?? null;
+  const grupoFijoNombre: string | null = route.params?.grupoFijoNombre ?? null;
+  const editing: TournamentDoc | null = route.params?.torneo ?? null;
+  const grupoLocked = !!grupoFijoId || !!editing;
   const modalidadLocked = !!editing;
 
   const [misGrupos, setMisGrupos] = useState<GroupDoc[]>([]);
@@ -85,16 +90,18 @@ export default function CreateTorneoScreen() {
     return onSnapshot(q, snap => setMisGrupos(snap.docs.map(d => ({ ...d.data(), id: d.id }) as GroupDoc)));
   }, [firebaseUser?.uid]);
 
-  const [nombre, setNombre] = useState(editing?.nombre ?? '');
-  const [modalidad, setModalidad] = useState<string | null>(editing?.modalidad ?? null);
-  const [grupo, setGrupo] = useState<string | null>(editing ? (editing.grupo ?? null) : grupoFijo);
+  const [nombre, setNombre] = useState(editing?.name ?? '');
+  const [modalidad, setModalidad] = useState<string | null>(editing?.modality ?? null);
+  const [grupoId, setGrupoId] = useState<string | null>(editing ? editing.groupId : grupoFijoId);
+  const [grupoNombre, setGrupoNombre] = useState<string | null>(editing ? editing.groupName : grupoFijoNombre);
   const [grupoOpen, setGrupoOpen] = useState(false);
   const [fechas, setFechas] = useState<(Date | null)[]>(
-    editing && editing.fechasRonda.length > 0 ? editing.fechasRonda.map(d => new Date(d)) : [null]
+    editing && editing.roundDates.length > 0 ? editing.roundDates.map(d => d ? new Date(d) : null) : [null]
   );
   const [pickerIdx, setPickerIdx] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const canCreate = nombre.trim() && modalidad;
+  const canCreate = !!nombre.trim() && !!modalidad && !saving;
 
   const setRondas = (n: number) => {
     const next = Math.max(1, Math.min(MAX_RONDAS, n));
@@ -104,6 +111,47 @@ export default function CreateTorneoScreen() {
   const formatDate = (d: Date | null) =>
     d ? d.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short' }) : 'A definir';
 
+  const onSubmit = async () => {
+    if (!canCreate || !userDoc) return;
+    setSaving(true);
+    const isoFechas = fechas.map(f => f ? toIsoDate(f) : null);
+    try {
+      if (editing) {
+        await updateDoc(doc(db, 'tournaments', editing.id), {
+          name: nombre.trim(),
+          roundDates: isoFechas,
+        });
+        navigation.replace('TorneoCreado', { nombreTorneo: nombre.trim(), kind: 'editado' });
+        return;
+      }
+
+      const torneoId = await createTournament({
+        name: nombre.trim(),
+        modality: modalidad as TournamentModality,
+        groupId: grupoId,
+        groupName: grupoNombre,
+        roundDates: isoFechas,
+      }, userDoc);
+
+      if (grupoId) {
+        // Torneo de grupo: se suman automáticamente todos los miembros.
+        const membersSnap = await getDocs(collection(db, 'groups', grupoId, 'members'));
+        const miembros = membersSnap.docs.map(d => d.data() as GroupMemberDoc).filter(m => m.uid !== userDoc.uid);
+        await Promise.all(miembros.map(m =>
+          addParticipantToTournament(torneoId, nombre.trim(), { uid: m.uid, displayName: m.displayName, handicap: m.handicap }, userDoc.displayName)
+        ));
+        navigation.replace('TorneoCreado', { nombreTorneo: nombre.trim(), kind: 'creado', grupo: grupoNombre });
+      } else {
+        // navigate (no replace): si vuelve para atrás desde Invitar, el torneo ya existe pero se puede seguir editando.
+        navigation.navigate('InvitarJugadores', { torneoId, nombreTorneo: nombre.trim() });
+      }
+    } catch {
+      Alert.alert('Error', 'No pudimos guardar el torneo. Probá de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -111,20 +159,11 @@ export default function CreateTorneoScreen() {
           <Ionicons name="arrow-back" size={22} color={COLORS.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{editing ? 'Editar torneo' : 'Nuevo torneo'}</Text>
-        <TouchableOpacity
-          disabled={!canCreate}
-          onPress={() => {
-            if (editing) {
-              navigation.replace('TorneoCreado', { nombreTorneo: nombre.trim(), kind: 'editado' });
-            } else if (grupo) {
-              navigation.replace('TorneoCreado', { nombreTorneo: nombre.trim(), kind: 'creado', grupo });
-            } else {
-              // navigate (no replace): si vuelve para atrás desde Invitar, el torneo todavía no se creó.
-              navigation.navigate('InvitarJugadores', { nombreTorneo: nombre.trim() });
-            }
-          }}
-        >
-          <Text style={[styles.createBtn, !canCreate && { opacity: 0.3 }]}>{editing ? 'Guardar' : 'Crear'}</Text>
+        <TouchableOpacity disabled={!canCreate} onPress={onSubmit}>
+          {saving
+            ? <ActivityIndicator size="small" color={COLORS.lime} />
+            : <Text style={[styles.createBtn, !canCreate && { opacity: 0.3 }]}>{editing ? 'Guardar' : 'Crear'}</Text>
+          }
         </TouchableOpacity>
       </View>
 
@@ -182,9 +221,9 @@ export default function CreateTorneoScreen() {
           </Text>
           <View style={{ marginTop: 8 }}>
             {grupoLocked ? (
-              <LockedField value={grupo ?? 'Abierto'} />
+              <LockedField value={grupoNombre ?? 'Abierto'} />
             ) : (
-              <FieldButton value={grupo ?? 'Abierto'} placeholder="Abierto" onPress={() => setGrupoOpen(true)} />
+              <FieldButton value={grupoNombre ?? 'Abierto'} placeholder="Abierto" onPress={() => setGrupoOpen(true)} />
             )}
           </View>
         </View>
@@ -223,22 +262,22 @@ export default function CreateTorneoScreen() {
       </ScrollView>
 
       <PickerPopup visible={grupoOpen} title="Grupo" onClose={() => setGrupoOpen(false)}>
-        <TouchableOpacity style={[styles.popupItem, styles.itemBorder]} onPress={() => { setGrupo(null); setGrupoOpen(false); }}>
+        <TouchableOpacity style={[styles.popupItem, styles.itemBorder]} onPress={() => { setGrupoId(null); setGrupoNombre(null); setGrupoOpen(false); }}>
           <View style={styles.popupIconWrap}>
             <Ionicons name="globe-outline" size={16} color={COLORS.muted} />
           </View>
-          <Text style={[styles.popupItemText, { flex: 1 }, !grupo && styles.textActive]}>Abierto</Text>
-          {!grupo && <Ionicons name="checkmark" size={18} color={COLORS.lime} />}
+          <Text style={[styles.popupItemText, { flex: 1 }, !grupoId && styles.textActive]}>Abierto</Text>
+          {!grupoId && <Ionicons name="checkmark" size={18} color={COLORS.lime} />}
         </TouchableOpacity>
         {misGrupos.map((g, i) => (
           <TouchableOpacity
             key={g.id}
             style={[styles.popupItem, i < misGrupos.length - 1 && styles.itemBorder]}
-            onPress={() => { setGrupo(g.name); setGrupoOpen(false); }}
+            onPress={() => { setGrupoId(g.id); setGrupoNombre(g.name); setGrupoOpen(false); }}
           >
             <Avatar initials={groupInitials(g.name)} bg={COLORS.lime} color="#0f0f0f" size={28} />
-            <Text style={[styles.popupItemText, { flex: 1 }, grupo === g.name && styles.textActive]}>{g.name}</Text>
-            {grupo === g.name && <Ionicons name="checkmark" size={18} color={COLORS.lime} />}
+            <Text style={[styles.popupItemText, { flex: 1 }, grupoId === g.id && styles.textActive]}>{g.name}</Text>
+            {grupoId === g.id && <Ionicons name="checkmark" size={18} color={COLORS.lime} />}
           </TouchableOpacity>
         ))}
       </PickerPopup>
