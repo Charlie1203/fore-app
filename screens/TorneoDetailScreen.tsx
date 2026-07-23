@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -25,8 +25,32 @@ function Avatar({ initials, size = 36 }: { initials: string; size?: number }) {
   );
 }
 
+function SettingsMenu({ visible, onClose, onEdit, onDelete, editLabel, deleteLabel }: {
+  visible: boolean; onClose: () => void; onEdit?: () => void; onDelete: () => void; editLabel: string; deleteLabel: string;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={onClose}>
+        <View style={styles.menuCard}>
+          {onEdit && (
+            <TouchableOpacity style={styles.menuItem} onPress={() => { onClose(); onEdit(); }}>
+              <Ionicons name="pencil-outline" size={17} color={COLORS.white} />
+              <Text style={styles.menuItemText}>{editLabel}</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[styles.menuItem, onEdit && styles.menuItemBorder]} onPress={() => { onClose(); onDelete(); }}>
+            <Ionicons name="trash-outline" size={17} color={COLORS.red} />
+            <Text style={[styles.menuItemText, { color: COLORS.red }]}>{deleteLabel}</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 function DetailNav({ torneo, onBack, badge, isAdmin, onEdit, onDelete, deleting }: { torneo: TournamentDoc; onBack: () => void; badge: React.ReactNode; isAdmin: boolean; onEdit?: () => void; onDelete?: () => void; deleting?: boolean }) {
   const insets = useSafeAreaInsets();
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <View style={[styles.detailNav, { paddingTop: insets.top + 10 }]}>
       <TouchableOpacity onPress={onBack} style={{ padding: 2 }}>
@@ -37,18 +61,23 @@ function DetailNav({ torneo, onBack, badge, isAdmin, onEdit, onDelete, deleting 
         <Text style={styles.detailNavSub}>{torneo.modality} · {formatFechaTorneo(torneo.roundDates)}{torneo.groupName ? ` · ${torneo.groupName}` : ''}</Text>
       </View>
       {badge}
-      {isAdmin && onEdit && (
-        <TouchableOpacity onPress={onEdit} style={{ marginLeft: 10, padding: 2 }}>
-          <Ionicons name="pencil-outline" size={18} color={COLORS.lime} />
-        </TouchableOpacity>
-      )}
       {isAdmin && (
-        <TouchableOpacity onPress={onDelete} disabled={deleting} style={{ marginLeft: 10, padding: 2 }}>
+        <TouchableOpacity onPress={() => setMenuOpen(true)} disabled={deleting} style={{ marginLeft: 10, padding: 2 }}>
           {deleting
             ? <ActivityIndicator size="small" color={COLORS.muted} />
-            : <Ionicons name="trash-outline" size={18} color={COLORS.red} />
+            : <Ionicons name="settings-outline" size={19} color={COLORS.muted} />
           }
         </TouchableOpacity>
+      )}
+      {isAdmin && onDelete && (
+        <SettingsMenu
+          visible={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          editLabel="Editar torneo"
+          deleteLabel="Eliminar torneo"
+        />
       )}
     </View>
   );
@@ -389,6 +418,12 @@ const styles = StyleSheet.create({
   detailNav: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   detailNavTitle: { fontSize: 16, fontWeight: '700', color: COLORS.white },
   detailNavSub: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
+
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'flex-end', paddingTop: 60, paddingRight: 18 },
+  menuCard: { backgroundColor: '#1e1e1e', borderRadius: 12, borderWidth: 0.5, borderColor: '#2a2a2a', overflow: 'hidden', minWidth: 170 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 13 },
+  menuItemBorder: { borderTopWidth: 0.5, borderTopColor: '#2a2a2a' },
+  menuItemText: { fontSize: 14, fontWeight: '600', color: COLORS.white },
 
   estadoBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#222' },
   estadoBadgeEnCurso: { backgroundColor: '#1a2a0a', flexDirection: 'row', alignItems: 'center', gap: 5 },

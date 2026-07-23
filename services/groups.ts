@@ -83,6 +83,11 @@ export async function removeMemberFromGroup(groupId: string, uid: string): Promi
 	});
 }
 
+/** El admin edita el nombre del grupo. */
+export async function updateGroupName(groupId: string, name: string): Promise<void> {
+	await updateDoc(doc(db, 'groups', groupId), { name });
+}
+
 /** El admin elimina el grupo. Borra también los miembros; posts y torneos vinculados quedan huérfanos. */
 export async function deleteGroup(groupId: string): Promise<void> {
 	const membersSnap = await getDocs(collection(db, 'groups', groupId, 'members'));

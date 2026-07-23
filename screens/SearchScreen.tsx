@@ -425,6 +425,25 @@ const uploadGroupPostPhoto = async (uri: string, groupId: string, postId: string
   return getDownloadURL(photoRef);
 };
 
+function GroupSettingsMenu({ visible, onClose, onEdit, onDelete }: { visible: boolean; onClose: () => void; onEdit: () => void; onDelete: () => void }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={onClose}>
+        <View style={styles.menuCard}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => { onClose(); onEdit(); }}>
+            <Ionicons name="pencil-outline" size={17} color={COLORS.white} />
+            <Text style={styles.menuItemText}>Editar grupo</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuItem, styles.menuItemBorder]} onPress={() => { onClose(); onDelete(); }}>
+            <Ionicons name="trash-outline" size={17} color="#e07070" />
+            <Text style={[styles.menuItemText, { color: '#e07070' }]}>Eliminar grupo</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: boolean; onBack: () => void }) {
   const navigation = useNavigation<any>();
   const { firebaseUser, userDoc } = useAuth();
@@ -438,6 +457,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
   const [joining, setJoining] = useState(false);
   const [joiningTorneoId, setJoiningTorneoId] = useState<string | null>(null);
   const [deletingGroup, setDeletingGroup] = useState(false);
+  const [groupMenuOpen, setGroupMenuOpen] = useState(false);
 
   const pagerRef = useRef<PagerView>(null);
   const tabRef = useRef(0);
@@ -638,12 +658,20 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
           </TouchableOpacity>
         )}
         {soyAdminDelGrupo && (
-          <TouchableOpacity style={styles.headerAddBtn} onPress={onEliminarGrupo} disabled={deletingGroup}>
+          <TouchableOpacity style={styles.headerAddBtn} onPress={() => setGroupMenuOpen(true)} disabled={deletingGroup}>
             {deletingGroup
               ? <ActivityIndicator size="small" color={COLORS.muted} />
-              : <Ionicons name="trash-outline" size={20} color="#e07070" />
+              : <Ionicons name="settings-outline" size={20} color={COLORS.muted} />
             }
           </TouchableOpacity>
+        )}
+        {soyAdminDelGrupo && (
+          <GroupSettingsMenu
+            visible={groupMenuOpen}
+            onClose={() => setGroupMenuOpen(false)}
+            onEdit={() => navigation.navigate('CreateGrupo', { group })}
+            onDelete={onEliminarGrupo}
+          />
         )}
       </View>
 
@@ -1001,6 +1029,11 @@ const styles = StyleSheet.create({
 
   // Detail
   detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 10, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'flex-end', paddingTop: 60, paddingRight: 18 },
+  menuCard: { backgroundColor: '#1e1e1e', borderRadius: 12, borderWidth: 0.5, borderColor: '#2a2a2a', overflow: 'hidden', minWidth: 170 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 13 },
+  menuItemBorder: { borderTopWidth: 0.5, borderTopColor: '#2a2a2a' },
+  menuItemText: { fontSize: 14, fontWeight: '600', color: COLORS.white },
   headerAddBtn: { padding: 2 },
   backBtn: { padding: 2 },
   detailTitle: { fontSize: 17, fontWeight: '700', color: COLORS.white, flex: 1 },

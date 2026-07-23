@@ -1,10 +1,11 @@
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { createGroup } from '../services/groups';
+import { createGroup, updateGroupName } from '../services/groups';
+import type { GroupDoc } from '../firebase/types';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#222', border2: '#2a2a2a',
@@ -13,8 +14,10 @@ const COLORS = {
 
 export default function CreateGrupoScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { userDoc } = useAuth();
-  const [nombre, setNombre] = useState('');
+  const editing: GroupDoc | null = route.params?.group ?? null;
+  const [nombre, setNombre] = useState(editing?.name ?? '');
   const [saving, setSaving] = useState(false);
 
   const canCreate = nombre.trim().length > 0 && !saving;
@@ -23,11 +26,16 @@ export default function CreateGrupoScreen() {
     if (!canCreate || !userDoc) return;
     setSaving(true);
     try {
+      if (editing) {
+        await updateGroupName(editing.id, nombre.trim());
+        navigation.goBack();
+        return;
+      }
       const groupId = await createGroup(nombre.trim(), userDoc);
       // replace: si vuelve atrás desde "agregar gente", el grupo ya quedó creado.
       navigation.replace('AgregarMiembros', { groupId, groupName: nombre.trim(), fromCreate: true });
     } catch {
-      Alert.alert('Error', 'No se pudo crear el grupo. Probá de nuevo.');
+      Alert.alert('Error', editing ? 'No se pudo guardar el cambio. Probá de nuevo.' : 'No se pudo crear el grupo. Probá de nuevo.');
       setSaving(false);
     }
   };
@@ -38,11 +46,11 @@ export default function CreateGrupoScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={COLORS.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nuevo grupo</Text>
+        <Text style={styles.headerTitle}>{editing ? 'Editar grupo' : 'Nuevo grupo'}</Text>
         <TouchableOpacity disabled={!canCreate} onPress={handleCreate}>
           {saving
             ? <ActivityIndicator size="small" color={COLORS.lime} />
-            : <Text style={[styles.createBtn, !canCreate && { opacity: 0.3 }]}>Crear</Text>
+            : <Text style={[styles.createBtn, !canCreate && { opacity: 0.3 }]}>{editing ? 'Guardar' : 'Crear'}</Text>
           }
         </TouchableOpacity>
       </View>
