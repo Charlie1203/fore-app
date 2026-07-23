@@ -88,11 +88,12 @@ function StepCancha({ club, course, onNext }: {
   const filtered = search.length > 0 ? CLUBS.filter(c => c.name.toLowerCase().includes(search.toLowerCase())) : [];
   const clubData = CLUBS.find(c => c.name === selectedClub);
 
-  const canConfirm = selectedClub && (clubData && clubData.courses.length === 1 ? true : !!selectedCourse);
+  const canConfirm = !!selectedClub && (clubData && clubData.courses.length === 1 ? true : !!selectedCourse);
 
   const handleConfirm = () => {
+    if (!canConfirm || !selectedClub) return;
     const finalCourse = selectedCourse || (clubData?.courses[0] ?? '');
-    onNext(selectedClub!, finalCourse);
+    onNext(selectedClub, finalCourse);
   };
 
   return (
