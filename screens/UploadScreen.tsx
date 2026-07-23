@@ -1,6 +1,6 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Animated, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,20 +37,30 @@ const CLUBS = [
 
 const DEFAULT_PARS = [4, 4, 5, 3, 4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 3, 4, 4, 5];
 
-function StepIndicator({ step }: { step: number }) {
+type Step = 1 | 2 | 3 | 4;
+const STEP_TITLES: Record<Step, string> = {
+  1: 'Cargar tarjeta',
+  2: 'Ida · hoyos 1-9',
+  3: 'Vuelta · hoyos 10-18',
+  4: 'Publicar',
+};
+
+function StepIndicator({ step }: { step: Step }) {
   return (
     <View style={styles.stepRow}>
-      <View style={[styles.stepDot, step >= 1 && styles.stepDotActive]} />
-      <View style={[styles.stepLine, step >= 2 && styles.stepLineActive]} />
-      <View style={[styles.stepDot, step >= 2 && styles.stepDotActive]} />
+      {[1, 2, 3, 4].map(n => (
+        <View key={n} style={{ flexDirection: 'row', alignItems: 'center', flex: n < 4 ? 1 : undefined }}>
+          <View style={[styles.stepDot, step >= n && styles.stepDotActive]} />
+          {n < 4 && <View style={[styles.stepLine, step > n && styles.stepLineActive]} />}
+        </View>
+      ))}
     </View>
   );
 }
 
-function ClubPickerModal({ club, course, onSelect, onClose }: {
+function StepCancha({ club, course, onNext }: {
   club: string; course: string;
-  onSelect: (club: string, course: string) => void;
-  onClose: () => void;
+  onNext: (club: string, course: string) => void;
 }) {
   const [selectedClub, setSelectedClub] = useState<string | null>(club || null);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(course || null);
@@ -63,69 +73,58 @@ function ClubPickerModal({ club, course, onSelect, onClose }: {
 
   const handleConfirm = () => {
     const finalCourse = selectedCourse || (clubData?.courses[0] ?? '');
-    onSelect(selectedClub!, finalCourse);
-    onClose();
+    onNext(selectedClub!, finalCourse);
   };
 
   return (
-    <View style={styles.modalOverlay}>
-      <View style={styles.pickerSheet}>
-        <View style={styles.pickerHandle} />
-        <View style={styles.pickerHeader}>
-          <Text style={styles.pickerTitle}>¿Dónde jugaste?</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={20} color={COLORS.muted} />
-          </TouchableOpacity>
-        </View>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.stepContent}>
+      <Text style={styles.stepTitle}>¿Dónde jugaste?</Text>
 
-        <View style={[styles.searchBox, { marginHorizontal: 18, marginBottom: 12 }]}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar club..."
-            placeholderTextColor={COLORS.dim}
-            value={search}
-            onChangeText={setSearch}
-          />
-        </View>
+      <View style={styles.searchBox}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar club..."
+          placeholderTextColor={COLORS.dim}
+          value={search}
+          onChangeText={setSearch}
+        />
+      </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 20, gap: 6 }}>
-          {filtered.map(c => (
+      {filtered.map(c => (
+        <TouchableOpacity
+          key={c.name}
+          style={[styles.option, selectedClub === c.name && styles.optionSelected]}
+          onPress={() => { setSelectedClub(c.name); setSelectedCourse(null); }}
+        >
+          <Text style={[styles.optionText, selectedClub === c.name && styles.optionTextSelected]}>{c.name}</Text>
+          {selectedClub === c.name && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
+        </TouchableOpacity>
+      ))}
+
+      {clubData && clubData.courses.length > 1 && (
+        <>
+          <Text style={[styles.label, { marginTop: 16 }]}>Cancha</Text>
+          {clubData.courses.map(cr => (
             <TouchableOpacity
-              key={c.name}
-              style={[styles.option, selectedClub === c.name && styles.optionSelected]}
-              onPress={() => { setSelectedClub(c.name); setSelectedCourse(null); }}
+              key={cr}
+              style={[styles.option, selectedCourse === cr && styles.optionSelected]}
+              onPress={() => setSelectedCourse(cr)}
             >
-              <Text style={[styles.optionText, selectedClub === c.name && styles.optionTextSelected]}>{c.name}</Text>
-              {selectedClub === c.name && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
+              <Text style={[styles.optionText, selectedCourse === cr && styles.optionTextSelected]}>{cr}</Text>
+              {selectedCourse === cr && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
             </TouchableOpacity>
           ))}
+        </>
+      )}
 
-          {clubData && clubData.courses.length > 1 && (
-            <>
-              <Text style={[styles.label, { marginTop: 16 }]}>Cancha</Text>
-              {clubData.courses.map(cr => (
-                <TouchableOpacity
-                  key={cr}
-                  style={[styles.option, selectedCourse === cr && styles.optionSelected]}
-                  onPress={() => setSelectedCourse(cr)}
-                >
-                  <Text style={[styles.optionText, selectedCourse === cr && styles.optionTextSelected]}>{cr}</Text>
-                  {selectedCourse === cr && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
-                </TouchableOpacity>
-              ))}
-            </>
-          )}
-        </ScrollView>
-
-        {canConfirm && (
-          <View style={{ paddingHorizontal: 18, paddingBottom: 24, paddingTop: 8 }}>
-            <TouchableOpacity style={styles.nextBtn} onPress={handleConfirm}>
-              <Text style={styles.nextBtnText}>Confirmar</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    </View>
+      <TouchableOpacity
+        style={[styles.nextBtn, !canConfirm && { opacity: 0.4 }]}
+        onPress={handleConfirm}
+        disabled={!canConfirm}
+      >
+        <Text style={styles.nextBtnText}>Continuar →</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
@@ -159,43 +158,29 @@ function HoleRow({ num, par, score, onInc, onDec }: {
   );
 }
 
-function Step2({ club, course, onClubChange, onPublish }: {
-  club: string; course: string;
-  onClubChange: (club: string, course: string) => void;
-  onPublish: (scores: number[]) => void;
+function StepNueve({ club, course, label, offset, scores, onInc, onDec, footer }: {
+  club: string; course: string; label: string; offset: 0 | 9;
+  scores: number[];
+  onInc: (i: number) => void; onDec: (i: number) => void;
+  footer: React.ReactNode;
 }) {
-  const [scores, setScores] = useState(DEFAULT_PARS.map(p => p));
-  const [showPicker, setShowPicker] = useState(false);
-
-  const inc = (i: number) => setScores(s => s.map((v, idx) => idx === i ? v + 1 : v));
-  const dec = (i: number) => setScores(s => s.map((v, idx) => idx === i ? Math.max(1, v - 1) : v));
-
-  const totalScore = scores.reduce((a, b) => a + b, 0);
-  const totalPar = DEFAULT_PARS.reduce((a, b) => a + b, 0);
+  const pars = DEFAULT_PARS.slice(offset, offset + 9);
+  const holeScores = scores.slice(offset, offset + 9);
+  const totalScore = holeScores.reduce((a, b) => a + b, 0);
+  const totalPar = pars.reduce((a, b) => a + b, 0);
   const vsPar = totalScore - totalPar;
 
   return (
-    <>
-      {showPicker && (
-        <ClubPickerModal
-          club={club} course={course}
-          onSelect={(c, cr) => onClubChange(c, cr)}
-          onClose={() => setShowPicker(false)}
-        />
-      )}
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.stepContent}>
-      <TouchableOpacity style={styles.coursePill} onPress={() => setShowPicker(true)}>
+      <View style={styles.coursePill}>
         <Ionicons name="location-outline" size={14} color={COLORS.muted} />
-        <Text style={styles.coursePillText}>
-          {club ? `${club}${course ? ` · ${course}` : ''}` : 'Elegir cancha...'}
-        </Text>
-        <Ionicons name="pencil-outline" size={13} color={COLORS.dim} />
-      </TouchableOpacity>
+        <Text style={styles.coursePillText}>{club} · {course}</Text>
+      </View>
 
       <View style={styles.totalBox}>
         <View style={styles.totalItem}>
           <Text style={styles.totalVal}>{totalScore}</Text>
-          <Text style={styles.totalLbl}>Score</Text>
+          <Text style={styles.totalLbl}>Score {label}</Text>
         </View>
         <View style={styles.totalDivider} />
         <View style={styles.totalItem}>
@@ -206,25 +191,15 @@ function Step2({ club, course, onClubChange, onPublish }: {
         </View>
       </View>
 
-      <Text style={styles.label}>Frente</Text>
+      <Text style={styles.label}>{label}</Text>
       <View style={styles.holeGroup}>
-        {DEFAULT_PARS.slice(0, 9).map((par, i) => (
-          <HoleRow key={i} num={i + 1} par={par} score={scores[i]} onInc={() => inc(i)} onDec={() => dec(i)} />
+        {pars.map((par, i) => (
+          <HoleRow key={i} num={offset + i + 1} par={par} score={holeScores[i]} onInc={() => onInc(offset + i)} onDec={() => onDec(offset + i)} />
         ))}
       </View>
 
-      <Text style={[styles.label, { marginTop: 16 }]}>Vuelta</Text>
-      <View style={styles.holeGroup}>
-        {DEFAULT_PARS.slice(9).map((par, i) => (
-          <HoleRow key={i} num={i + 10} par={par} score={scores[i + 9]} onInc={() => inc(i + 9)} onDec={() => dec(i + 9)} />
-        ))}
-      </View>
-
-      <TouchableOpacity style={styles.nextBtn} onPress={() => onPublish(scores)}>
-        <Text style={styles.nextBtnText}>Continuar →</Text>
-      </TouchableOpacity>
+      {footer}
     </ScrollView>
-    </>
   );
 }
 
@@ -233,8 +208,8 @@ const TORNEOS_ACTIVOS = [
   { id: '2', nombre: 'Torneo del Club', modalidad: 'Stroke Play' },
 ];
 
-function Step3({ scores, club, course, saving, onDone }: {
-  scores: number[]; club: string; course: string; saving: boolean;
+function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
+  scores: number[]; holesPlayed: 9 | 18; club: string; course: string; saving: boolean;
   onDone: (opts: { photos: string[]; shareOnFeed: boolean }) => void;
 }) {
   const [shareOnFeed, setShareOnFeed] = useState(false);
@@ -243,10 +218,11 @@ function Step3({ scores, club, course, saving, onDone }: {
   const [torneoIds, setTorneoIds] = useState<string[]>([]);
   const [showTorneos, setShowTorneos] = useState(false);
 
-  const totalScore = scores.reduce((a, b) => a + b, 0);
-  const totalPar = DEFAULT_PARS.reduce((a, b) => a + b, 0);
+  const jugados = scores.slice(0, holesPlayed);
+  const pares = DEFAULT_PARS.slice(0, holesPlayed);
+  const totalScore = jugados.reduce((a, b) => a + b, 0);
+  const totalPar = pares.reduce((a, b) => a + b, 0);
   const vsPar = totalScore - totalPar;
-  const birdies = scores.filter((s, i) => s - DEFAULT_PARS[i] === -1).length;
 
   const pickFromGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -277,7 +253,7 @@ function Step3({ scores, club, course, saving, onDone }: {
       <View style={styles.summaryPill}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Ionicons name="location-outline" size={12} color={COLORS.muted} />
-          <Text style={styles.summaryPillCourse}>{club} · {course}</Text>
+          <Text style={styles.summaryPillCourse}>{club} · {course}{holesPlayed === 9 ? ' · 9 hoyos' : ''}</Text>
         </View>
         <View style={styles.summaryPillStats}>
           <Text style={styles.summaryPillScore}>{totalScore}</Text>
@@ -398,29 +374,47 @@ const uploadRoundPhoto = async (uri: string, uid: string, roundId: string, index
 export default function UploadScreen() {
   const navigation = useNavigation<any>();
   const { firebaseUser, userDoc } = useAuth();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<Step>(1);
   const [club, setClub] = useState('');
   const [course, setCourse] = useState('');
   const [scores, setScores] = useState(DEFAULT_PARS.map(p => p));
+  const [holesPlayed, setHolesPlayed] = useState<9 | 18>(18);
   const [saving, setSaving] = useState(false);
 
-  const handleScoresDone = (s: number[]) => { setScores(s); setStep(2); };
+  const inc = (i: number) => setScores(s => s.map((v, idx) => idx === i ? v + 1 : v));
+  const dec = (i: number) => setScores(s => s.map((v, idx) => idx === i ? Math.max(1, v - 1) : v));
 
-  const handleDone = async ({ photos, shareOnFeed }: { photos: string[]; shareOnFeed: boolean }) => {
+  const goBack = () => {
+    if (step === 4) setStep(holesPlayed === 18 ? 3 : 2);
+    else if (step === 3) setStep(2);
+    else if (step === 2) setStep(1);
+  };
+
+  const reset = () => {
+    setStep(1);
+    setClub('');
+    setCourse('');
+    setScores(DEFAULT_PARS.map(p => p));
+    setHolesPlayed(18);
+  };
+
+  const guardarRonda = async (holes: 9 | 18, { photos, shareOnFeed }: { photos: string[]; shareOnFeed: boolean }) => {
     if (!firebaseUser) return;
     setSaving(true);
     try {
-      const totalScore = scores.reduce((a, b) => a + b, 0);
-      const totalPar = DEFAULT_PARS.reduce((a, b) => a + b, 0);
-      let eagles = 0, birdies = 0, pares = 0, bogeys = 0, doublesPlus = 0;
-      const holes: HoleResult[] = scores.map((score, i) => {
-        const diff = score - DEFAULT_PARS[i];
+      const jugados = scores.slice(0, holes);
+      const pares = DEFAULT_PARS.slice(0, holes);
+      const totalScore = jugados.reduce((a, b) => a + b, 0);
+      const totalPar = pares.reduce((a, b) => a + b, 0);
+      let eagles = 0, birdies = 0, parCount = 0, bogeys = 0, doublesPlus = 0;
+      const holeResults: HoleResult[] = jugados.map((score, i) => {
+        const diff = score - pares[i];
         if (diff <= -2) eagles++;
         else if (diff === -1) birdies++;
-        else if (diff === 0) pares++;
+        else if (diff === 0) parCount++;
         else if (diff === 1) bogeys++;
         else doublesPlus++;
-        return { number: i + 1, score, par: DEFAULT_PARS[i] };
+        return { number: i + 1, score, par: pares[i] };
       });
 
       const roundRef = doc(collection(db, 'rounds'));
@@ -440,11 +434,11 @@ export default function UploadScreen() {
         courseName: course,
         clubName: club,
         date: serverTimestamp(),
-        holes,
+        holes: holeResults,
         totalScore,
         totalPar,
         vsPar: totalScore - totalPar,
-        eagles, birdies, pars: pares, bogeys, doublesPlus,
+        eagles, birdies: birdies, pars: parCount, bogeys, doublesPlus,
         photos: photoUrls,
         visibility: shareOnFeed ? 'public' : 'private',
         likesCount: 0,
@@ -452,12 +446,9 @@ export default function UploadScreen() {
         createdAt: serverTimestamp(),
       });
 
-      setStep(1);
-      setClub('');
-      setCourse('');
-      setScores(DEFAULT_PARS.map(p => p));
+      reset();
       navigation.navigate('Inicio', { showSuccess: Date.now() });
-    } catch (e) {
+    } catch {
       Alert.alert('Error', 'No se pudo guardar la vuelta. Intentá de nuevo.');
     } finally {
       setSaving(false);
@@ -469,23 +460,57 @@ export default function UploadScreen() {
       <View style={styles.header}>
         <View style={styles.headerInner}>
           {step > 1 && (
-            <TouchableOpacity onPress={() => setStep(step - 1)}>
+            <TouchableOpacity onPress={goBack}>
               <Text style={styles.backBtn}>← Atrás</Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.headerTitle}>Cargar vuelta</Text>
+          <Text style={styles.headerTitle}>{STEP_TITLES[step]}</Text>
         </View>
         <View style={{ paddingHorizontal: 18 }}><StepIndicator step={step} /></View>
       </View>
 
       {step === 1 && (
-        <Step2
+        <StepCancha
           club={club} course={course}
-          onClubChange={(c, cr) => { setClub(c); setCourse(cr); }}
-          onPublish={handleScoresDone}
+          onNext={(c, cr) => { setClub(c); setCourse(cr); setStep(2); }}
         />
       )}
-      {step === 2 && <Step3 scores={scores} club={club} course={course} saving={saving} onDone={handleDone} />}
+
+      {step === 2 && (
+        <StepNueve
+          club={club} course={course} label="Ida" offset={0}
+          scores={scores} onInc={inc} onDec={dec}
+          footer={
+            <View style={{ marginTop: 24, gap: 12 }}>
+              <TouchableOpacity style={styles.nextBtn} onPress={() => { setHolesPlayed(18); setStep(3); }}>
+                <Text style={styles.nextBtnText}>Continuar a la vuelta →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setHolesPlayed(9); setStep(4); }}>
+                <Text style={styles.skipLink}>Jugué solo 9 hoyos, guardar así</Text>
+              </TouchableOpacity>
+            </View>
+          }
+        />
+      )}
+
+      {step === 3 && (
+        <StepNueve
+          club={club} course={course} label="Vuelta" offset={9}
+          scores={scores} onInc={inc} onDec={dec}
+          footer={
+            <TouchableOpacity style={[styles.nextBtn, { marginTop: 24 }]} onPress={() => { setHolesPlayed(18); setStep(4); }}>
+              <Text style={styles.nextBtnText}>Continuar →</Text>
+            </TouchableOpacity>
+          }
+        />
+      )}
+
+      {step === 4 && (
+        <StepPublicar
+          scores={scores} holesPlayed={holesPlayed} club={club} course={course} saving={saving}
+          onDone={opts => guardarRonda(holesPlayed, opts)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -499,14 +524,13 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center' },
   stepDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.dim },
   stepDotActive: { backgroundColor: COLORS.lime },
-  stepLine: { flex: 1, height: 2, backgroundColor: COLORS.dim },
+  stepLine: { flex: 1, height: 2, backgroundColor: COLORS.dim, marginHorizontal: 4 },
   stepLineActive: { backgroundColor: COLORS.lime },
   stepContent: { paddingHorizontal: 18, paddingBottom: 40 },
   stepTitle: { fontSize: 18, fontWeight: '700', color: COLORS.white, marginBottom: 20 },
   label: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  searchBox: { borderBottomWidth: 0.5, borderBottomColor: COLORS.border, marginBottom: 4 },
+  searchBox: { borderBottomWidth: 0.5, borderBottomColor: COLORS.border, marginBottom: 12 },
   searchInput: { paddingVertical: 12, paddingHorizontal: 0, fontSize: 14, color: COLORS.white },
-  optionList: { gap: 0 },
   option: { paddingVertical: 14, paddingHorizontal: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   optionSelected: { },
   shareToggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 0.5, borderBottomColor: COLORS.border, marginBottom: 16 },
@@ -516,22 +540,14 @@ const styles = StyleSheet.create({
   shareToggleBoxOn: { backgroundColor: COLORS.lime, borderColor: COLORS.lime },
   optionText: { fontSize: 14, color: COLORS.white },
   optionTextSelected: { color: COLORS.lime, fontWeight: '700' },
-  checkmark: { color: COLORS.lime, fontSize: 16, fontWeight: '700' },
-  sectionLabelUpload: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   torneoNoneRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   torneoRowText: { fontSize: 14, color: COLORS.muted },
   torneoRowSub: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
   nextBtn: { backgroundColor: COLORS.lime, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 },
   nextBtnText: { fontSize: 15, fontWeight: '800', color: '#0f0f0f' },
+  skipLink: { fontSize: 13, color: COLORS.muted, textAlign: 'center', fontWeight: '600' },
   coursePill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14, marginBottom: 4, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
   coursePillText: { flex: 1, fontSize: 14, color: COLORS.white, fontWeight: '600' },
-  coursePillEdit: { fontSize: 12 },
-  modalOverlay: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end', zIndex: 100 },
-  pickerSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '80%', paddingTop: 12 },
-  pickerHandle: { width: 36, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  pickerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, marginBottom: 12 },
-  pickerTitle: { fontSize: 18, fontWeight: '800', color: COLORS.white },
-  pickerClose: { fontSize: 16, color: COLORS.muted, padding: 4 },
   totalBox: { flexDirection: 'row', paddingVertical: 20, marginBottom: 8, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
   totalItem: { flex: 1, alignItems: 'center' },
   totalVal: { fontSize: 32, fontWeight: '800', color: COLORS.white },
@@ -553,24 +569,15 @@ const styles = StyleSheet.create({
   summaryPillStats: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
   summaryPillScore: { fontSize: 32, fontWeight: '800', color: COLORS.white },
   summaryPillVsPar: { fontSize: 18, fontWeight: '700' },
-  summaryPillBirdies: { fontSize: 12, color: COLORS.lime, fontWeight: '600' },
-  optionSub: { fontSize: 11, color: COLORS.dim, marginTop: 2 },
-  labelOptional: { color: COLORS.dim, fontWeight: '400', textTransform: 'none' },
   commentBox: { borderBottomWidth: 0.5, borderBottomColor: COLORS.border, paddingVertical: 12 },
   commentInput: { fontSize: 14, color: COLORS.white, minHeight: 80, textAlignVertical: 'top' },
   commentCount: { fontSize: 10, color: COLORS.dim, textAlign: 'right', marginTop: 4 },
-  toast: { position: 'absolute', bottom: 40, left: 24, right: 24, backgroundColor: '#1e2e0a', borderWidth: 1, borderColor: COLORS.lime, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
-  toastEmoji: { fontSize: 36 },
-  toastTitle: { fontSize: 16, fontWeight: '800', color: COLORS.white },
-  toastSub: { fontSize: 12, color: COLORS.lime, marginTop: 2 },
 
   photosRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   photoThumb: { width: 72, height: 72, borderRadius: 10, overflow: 'hidden' },
   photoThumbImg: { width: 72, height: 72 },
   photoRemove: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
-  photoRemoveText: { color: '#fff', fontSize: 14, lineHeight: 18, fontWeight: '700' },
   photoAddGroup: { flexDirection: 'row', gap: 8 },
   photoAdd: { width: 72, height: 72, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  photoAddIcon: { fontSize: 22, lineHeight: 26 },
   photoAddText: { fontSize: 10, color: COLORS.dim },
 });
