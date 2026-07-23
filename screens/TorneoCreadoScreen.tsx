@@ -25,7 +25,7 @@ export default function TorneoCreadoScreen() {
       ? `Invitaste a ${invitados} ${invitados === 1 ? 'jugador' : 'jugadores'} a ${nombreTorneo}.`
       : `${nombreTorneo} ya está listo.\n${
           grupo
-            ? `Se le compartió a todos los participantes de ${grupo}.`
+            ? `Ya aparece en la pestaña Torneos de ${grupo} para que cada uno se sume.`
             : invitados > 0
               ? `Invitaste a ${invitados} ${invitados === 1 ? 'jugador' : 'jugadores'}.`
               : 'Podés invitar jugadores más tarde desde el torneo.'

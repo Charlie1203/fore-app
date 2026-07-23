@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
 import { collection, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import type { TournamentDoc, TournamentParticipantDoc } from '../firebase/types';
-import { estadoDeTorneo, rondaActualDeTorneo } from '../services/tournaments';
+import { estadoDeTorneo, joinTournament } from '../services/tournaments';
 import { formatFechaTorneo } from './TorneosScreen';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -52,7 +52,7 @@ const MODALIDAD_INFO: Record<string, { icon: string; desc: string }> = {
   'Match Play': { icon: 'people-outline', desc: 'Competencia hoyo a hoyo contra otro jugador o equipo.' },
 };
 
-function TorneoProximoContent({ torneo, participantes, isAdmin }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean }) {
+function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, joining, onJoin }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean; isParticipante: boolean; joining: boolean; onJoin: () => void }) {
   const navigation = useNavigation<any>();
   const modalidadInfo = MODALIDAD_INFO[torneo.modality] ?? { icon: 'trophy-outline', desc: '' };
   return (
@@ -75,6 +75,15 @@ function TorneoProximoContent({ torneo, participantes, isAdmin }: { torneo: Tour
             {!!modalidadInfo.desc && <Text style={styles.infoDesc}>{modalidadInfo.desc}</Text>}
           </View>
         </View>
+
+        {!isAdmin && !isParticipante && (
+          <TouchableOpacity style={styles.joinCard} onPress={onJoin} disabled={joining}>
+            {joining
+              ? <ActivityIndicator size="small" color="#0f0f0f" />
+              : <Text style={styles.joinCardText}>Unirme a este torneo</Text>
+            }
+          </TouchableOpacity>
+        )}
 
         <View style={styles.participantesHeader}>
           <Text style={styles.sectionLabel}>Participantes ({participantes.length})</Text>
@@ -126,7 +135,7 @@ function LeaderboardEmpty() {
   );
 }
 
-function TorneoEnCursoContent({ torneo, participantes, isAdmin }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean }) {
+function TorneoEnCursoContent({ torneo, isAdmin, isParticipante, joining, onJoin }: { torneo: TournamentDoc; isAdmin: boolean; isParticipante: boolean; joining: boolean; onJoin: () => void }) {
   const navigation = useNavigation<any>();
   const totalRondas = torneo.roundDates.length || 1;
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
@@ -157,6 +166,14 @@ function TorneoEnCursoContent({ torneo, participantes, isAdmin }: { torneo: Tour
         }
         onEdit={() => navigation.navigate('CreateTorneo', { torneo })}
       />
+      {!isAdmin && !isParticipante && (
+        <TouchableOpacity style={[styles.joinCard, { marginTop: 14 }]} onPress={onJoin} disabled={joining}>
+          {joining
+            ? <ActivityIndicator size="small" color="#0f0f0f" />
+            : <Text style={styles.joinCardText}>Unirme a este torneo</Text>
+          }
+        </TouchableOpacity>
+      )}
       <TabBar tabs={tabs} tab={tab} onPress={onTabPress} />
       <ScrollView
         ref={pagerRef}
@@ -226,13 +243,13 @@ function TorneoFinalizadoContent({ torneo, isAdmin }: { torneo: TournamentDoc; i
 
 export default function TorneoDetailScreen() {
   const route = useRoute<any>();
-  const navigation = useNavigation<any>();
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, userDoc } = useAuth();
   const torneoId: string = route.params.torneoId;
 
   const [torneo, setTorneo] = useState<TournamentDoc | null>(null);
   const [participantes, setParticipantes] = useState<TournamentParticipantDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     return onSnapshot(doc(db, 'tournaments', torneoId), snap => {
@@ -255,10 +272,23 @@ export default function TorneoDetailScreen() {
   }
 
   const isAdmin = torneo.createdBy === firebaseUser?.uid;
+  const isParticipante = !!firebaseUser && torneo.participantUids.includes(firebaseUser.uid);
   const estado = estadoDeTorneo(torneo.roundDates);
 
-  if (estado === 'próximo') return <TorneoProximoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} />;
-  if (estado === 'en curso') return <TorneoEnCursoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} />;
+  const onJoin = async () => {
+    if (!userDoc || joining) return;
+    setJoining(true);
+    try {
+      await joinTournament(torneoId, userDoc);
+    } catch {
+      Alert.alert('Error', 'No te pudimos sumar al torneo. Probá de nuevo.');
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  if (estado === 'próximo') return <TorneoProximoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} />;
+  if (estado === 'en curso') return <TorneoEnCursoContent torneo={torneo} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} />;
   return <TorneoFinalizadoContent torneo={torneo} isAdmin={isAdmin} />;
 }
 
@@ -286,6 +316,9 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 11, color: COLORS.lime, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' },
   infoValue: { fontSize: 17, fontWeight: '800', color: COLORS.white, marginTop: 2 },
   infoDesc: { fontSize: 12, color: COLORS.muted, marginTop: 3, lineHeight: 16 },
+
+  joinCard: { marginHorizontal: 18, marginTop: 18, backgroundColor: COLORS.lime, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  joinCardText: { fontSize: 14, fontWeight: '800', color: '#0f0f0f' },
 
   participantesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 18, paddingBottom: 8 },
   invitarLink: { fontSize: 12, fontWeight: '700', color: COLORS.lime },

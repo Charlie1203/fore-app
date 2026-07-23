@@ -6,9 +6,9 @@ import { useState, useEffect } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
-import { collection, query, where, onSnapshot, getDocs, updateDoc, doc } from 'firebase/firestore';
-import type { GroupDoc, GroupMemberDoc, TournamentDoc, TournamentModality } from '../firebase/types';
-import { createTournament, addParticipantToTournament } from '../services/tournaments';
+import { collection, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
+import type { GroupDoc, TournamentDoc, TournamentModality } from '../firebase/types';
+import { createTournament } from '../services/tournaments';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#222', border2: '#2a2a2a',
@@ -134,12 +134,8 @@ export default function CreateTorneoScreen() {
       }, userDoc);
 
       if (grupoId) {
-        // Torneo de grupo: se suman automáticamente todos los miembros.
-        const membersSnap = await getDocs(collection(db, 'groups', grupoId, 'members'));
-        const miembros = membersSnap.docs.map(d => d.data() as GroupMemberDoc).filter(m => m.uid !== userDoc.uid);
-        await Promise.all(miembros.map(m =>
-          addParticipantToTournament(torneoId, nombre.trim(), { uid: m.uid, displayName: m.displayName, handicap: m.handicap }, userDoc.displayName)
-        ));
+        // Torneo de grupo: no se suma a nadie automáticamente. Aparece en la pestaña
+        // Torneos del grupo y cada miembro decide si se une.
         navigation.replace('TorneoCreado', { nombreTorneo: nombre.trim(), kind: 'creado', grupo: grupoNombre });
       } else {
         // navigate (no replace): si vuelve para atrás desde Invitar, el torneo ya existe pero se puede seguir editando.

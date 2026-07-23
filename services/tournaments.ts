@@ -38,6 +38,21 @@ export async function createTournament(params: {
 	return ref.id;
 }
 
+/** El propio jugador se une a un torneo (por ejemplo, desde la pestaña Torneos de un grupo). */
+export async function joinTournament(tournamentId: string, user: UserDoc): Promise<void> {
+	await setDoc(doc(db, 'tournaments', tournamentId, 'participants', user.uid), {
+		uid: user.uid,
+		displayName: user.displayName,
+		initials: initialsOf(user.displayName),
+		handicap: user.handicap ?? null,
+		joinedAt: serverTimestamp(),
+	});
+	await updateDoc(doc(db, 'tournaments', tournamentId), {
+		participantUids: arrayUnion(user.uid),
+		participantsCount: increment(1),
+	});
+}
+
 /** Suma un participante al torneo y le deja una notificación. */
 export async function addParticipantToTournament(
 	tournamentId: string,

@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import PagerView from 'react-native-pager-view';
-import { estadoDeTorneo } from '../services/tournaments';
 import Svg, { Circle, Path, Ellipse, Line, Polygon } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +11,7 @@ import { db, storage } from '../firebase/config';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc, addDoc, updateDoc, serverTimestamp, getDocs, limit, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { joinGroup } from '../services/groups';
+import { estadoDeTorneo, joinTournament } from '../services/tournaments';
 import type { CommentDoc, GroupDoc, GroupMemberDoc, GroupPostDoc, TournamentDoc, UserDoc } from '../firebase/types';
 import { formatFechaTorneo } from './TorneosScreen';
 
@@ -436,9 +436,22 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [commentsPost, setCommentsPost] = useState<Post | null>(null);
   const [joining, setJoining] = useState(false);
+  const [joiningTorneoId, setJoiningTorneoId] = useState<string | null>(null);
 
   const pagerRef = useRef<PagerView>(null);
   const tabRef = useRef(0);
+
+  const onUnirseATorneo = async (torneoId: string) => {
+    if (!userDoc || joiningTorneoId) return;
+    setJoiningTorneoId(torneoId);
+    try {
+      await joinTournament(torneoId, userDoc);
+    } catch {
+      Alert.alert('Error', 'No te pudimos sumar al torneo. Probá de nuevo.');
+    } finally {
+      setJoiningTorneoId(null);
+    }
+  };
 
   // Las reglas solo dejan leer posts a miembros — no suscribirse si no lo sos.
   useEffect(() => {
@@ -612,6 +625,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
               <Text style={styles.emptyTabText}>Todavía no hay torneos en este grupo.</Text>
             ) : torneos.map(t => {
               const estado = estadoDeTorneo(t.roundDates);
+              const soyParticipante = !!firebaseUser && t.participantUids.includes(firebaseUser.uid);
               return (
                 <TouchableOpacity key={t.id} style={styles.torneoRow} onPress={() => navigation.navigate('TorneoDetail', { torneoId: t.id })}>
                   <View style={[styles.torneoEstadoDot, estado === 'próximo' ? styles.torneoEstadoDotNext : styles.torneoEstadoDotDone]} />
@@ -619,11 +633,24 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
                     <Text style={styles.torneoNombre}>{t.name}</Text>
                     <Text style={styles.torneoMeta}>{t.modality} · {formatFechaTorneo(t.roundDates)}</Text>
                   </View>
-                  <View style={estado === 'próximo' ? styles.torneoBadgeNext : styles.torneoBadgeDone}>
-                    <Text style={estado === 'próximo' ? styles.torneoBadgeNextText : styles.torneoBadgeDoneText}>
-                      {estado === 'próximo' ? 'Próximo' : estado === 'en curso' ? 'En curso' : 'Finalizado'}
-                    </Text>
-                  </View>
+                  {soyParticipante || estado === 'finalizado' ? (
+                    <View style={estado === 'próximo' ? styles.torneoBadgeNext : styles.torneoBadgeDone}>
+                      <Text style={estado === 'próximo' ? styles.torneoBadgeNextText : styles.torneoBadgeDoneText}>
+                        {soyParticipante ? (estado === 'próximo' ? 'Anotado' : estado === 'en curso' ? 'En curso' : 'Finalizado') : 'Finalizado'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.unirseBtn}
+                      disabled={joiningTorneoId === t.id}
+                      onPress={() => onUnirseATorneo(t.id)}
+                    >
+                      {joiningTorneoId === t.id
+                        ? <ActivityIndicator size="small" color="#0f0f0f" />
+                        : <Text style={styles.unirseBtnText}>Unirse</Text>
+                      }
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -1026,6 +1053,8 @@ const styles = StyleSheet.create({
   torneoBadgeNextText: { fontSize: 11, fontWeight: '700', color: COLORS.lime },
   torneoBadgeDone: { backgroundColor: '#222', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
   torneoBadgeDoneText: { fontSize: 11, fontWeight: '700', color: COLORS.muted },
+  unirseBtn: { backgroundColor: COLORS.lime, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7, minWidth: 64, alignItems: 'center' },
+  unirseBtnText: { fontSize: 12, fontWeight: '800', color: '#0f0f0f' },
 
   // Modales
   modal: { position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end', zIndex: 100 },
