@@ -77,6 +77,7 @@ function StepCancha({ club, course, onNext }: {
       const list: { club: string; course: string }[] = [];
       snap.docs.forEach(d => {
         const r = d.data() as RoundDoc;
+        if (!r.clubName || !r.courseName) return; // vueltas viejas cargadas sin cancha
         const key = `${r.clubName}__${r.courseName}`;
         if (!seen.has(key) && list.length < 3) { seen.add(key); list.push({ club: r.clubName, course: r.courseName }); }
       });
