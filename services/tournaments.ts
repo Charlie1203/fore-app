@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, serverTimestamp, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { TournamentModality, UserDoc } from '../firebase/types';
 
@@ -89,6 +89,14 @@ export async function removeParticipantFromTournament(tournamentId: string, uid:
 		participantUids: arrayRemove(uid),
 		participantsCount: increment(-1),
 	});
+}
+
+/** El creador elimina el torneo. Borra primero a los participantes: la regla de esa
+ * subcolección lee el doc del torneo para validar al admin, así que tiene que borrarse último. */
+export async function deleteTournament(tournamentId: string): Promise<void> {
+	const participantsSnap = await getDocs(collection(db, 'tournaments', tournamentId, 'participants'));
+	await Promise.all(participantsSnap.docs.map(d => deleteDoc(d.ref)));
+	await deleteDoc(doc(db, 'tournaments', tournamentId));
 }
 
 export type TorneoEstado = 'próximo' | 'en curso' | 'finalizado';

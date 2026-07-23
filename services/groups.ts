@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, serverTimestamp, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { UserDoc } from '../firebase/types';
 
@@ -81,4 +81,11 @@ export async function removeMemberFromGroup(groupId: string, uid: string): Promi
 		memberUids: arrayRemove(uid),
 		membersCount: increment(-1),
 	});
+}
+
+/** El admin elimina el grupo. Borra también los miembros; posts y torneos vinculados quedan huérfanos. */
+export async function deleteGroup(groupId: string): Promise<void> {
+	const membersSnap = await getDocs(collection(db, 'groups', groupId, 'members'));
+	await deleteDoc(doc(db, 'groups', groupId));
+	await Promise.all(membersSnap.docs.map(d => deleteDoc(d.ref)));
 }

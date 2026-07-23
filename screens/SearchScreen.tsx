@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase/config';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc, addDoc, updateDoc, serverTimestamp, getDocs, limit, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { joinGroup, removeMemberFromGroup } from '../services/groups';
+import { joinGroup, removeMemberFromGroup, deleteGroup } from '../services/groups';
 import { estadoDeTorneo, joinTournament } from '../services/tournaments';
 import type { CommentDoc, GroupDoc, GroupMemberDoc, GroupPostDoc, TournamentDoc, UserDoc } from '../firebase/types';
 import { formatFechaTorneo } from './TorneosScreen';
@@ -437,9 +437,29 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
   const [commentsPost, setCommentsPost] = useState<Post | null>(null);
   const [joining, setJoining] = useState(false);
   const [joiningTorneoId, setJoiningTorneoId] = useState<string | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState(false);
 
   const pagerRef = useRef<PagerView>(null);
   const tabRef = useRef(0);
+  const soyAdminDelGrupo = members.find(m => m.uid === firebaseUser?.uid)?.role === 'admin';
+
+  const onEliminarGrupo = () => {
+    Alert.alert('Eliminar grupo', `¿Seguro que querés eliminar ${group.name}? Esta acción no se puede deshacer.`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar', style: 'destructive', onPress: async () => {
+          setDeletingGroup(true);
+          try {
+            await deleteGroup(group.id);
+            onBack();
+          } catch {
+            Alert.alert('Error', 'No pudimos eliminar el grupo. Probá de nuevo.');
+            setDeletingGroup(false);
+          }
+        },
+      },
+    ]);
+  };
 
   const onUnirseATorneo = async (torneoId: string) => {
     if (!userDoc || joiningTorneoId) return;
@@ -617,6 +637,14 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
             <Ionicons name="add" size={24} color={COLORS.lime} />
           </TouchableOpacity>
         )}
+        {soyAdminDelGrupo && (
+          <TouchableOpacity style={styles.headerAddBtn} onPress={onEliminarGrupo} disabled={deletingGroup}>
+            {deletingGroup
+              ? <ActivityIndicator size="small" color={COLORS.muted} />
+              : <Ionicons name="trash-outline" size={20} color="#e07070" />
+            }
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Tabs fijos */}
@@ -686,7 +714,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
           </ScrollView>
 
           <ScrollView key="2" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-            {members.find(m => m.uid === firebaseUser?.uid)?.role === 'admin' && (
+            {soyAdminDelGrupo && (
               <TouchableOpacity
                 style={styles.addMemberRow}
                 onPress={() => navigation.navigate('AgregarMiembros', { groupId: group.id, groupName: group.name })}
@@ -702,7 +730,6 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
               : members.map(m => {
                   const initials = m.displayName.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
                   const esYo = m.uid === firebaseUser?.uid;
-                  const soyAdmin = members.find(x => x.uid === firebaseUser?.uid)?.role === 'admin';
                   return (
                     <TouchableOpacity
                       key={m.uid}
@@ -729,7 +756,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
                             : <Ionicons name="exit-outline" size={20} color={COLORS.muted} />
                           }
                         </TouchableOpacity>
-                      ) : soyAdmin && (
+                      ) : soyAdminDelGrupo && (
                         <TouchableOpacity onPress={() => confirmarEliminar(m)} disabled={removingUid === m.uid} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                           {removingUid === m.uid
                             ? <ActivityIndicator size="small" color={COLORS.muted} />

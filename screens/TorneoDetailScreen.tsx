@@ -7,14 +7,14 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
 import { collection, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import type { TournamentDoc, TournamentParticipantDoc } from '../firebase/types';
-import { estadoDeTorneo, joinTournament, removeParticipantFromTournament } from '../services/tournaments';
+import { estadoDeTorneo, joinTournament, removeParticipantFromTournament, deleteTournament } from '../services/tournaments';
 import { formatFechaTorneo } from './TorneosScreen';
 
 const SCREEN_W = Dimensions.get('window').width;
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
-  lime: '#c8e03a', white: '#f0f0f0', muted: '#666', dim: '#444', dark2: '#242424',
+  lime: '#c8e03a', white: '#f0f0f0', muted: '#666', dim: '#444', dark2: '#242424', red: '#e07070',
 };
 
 function Avatar({ initials, size = 36 }: { initials: string; size?: number }) {
@@ -25,7 +25,7 @@ function Avatar({ initials, size = 36 }: { initials: string; size?: number }) {
   );
 }
 
-function DetailNav({ torneo, onBack, badge, isAdmin, onEdit }: { torneo: TournamentDoc; onBack: () => void; badge: React.ReactNode; isAdmin: boolean; onEdit?: () => void }) {
+function DetailNav({ torneo, onBack, badge, isAdmin, onEdit, onDelete, deleting }: { torneo: TournamentDoc; onBack: () => void; badge: React.ReactNode; isAdmin: boolean; onEdit?: () => void; onDelete?: () => void; deleting?: boolean }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.detailNav, { paddingTop: insets.top + 10 }]}>
@@ -37,9 +37,17 @@ function DetailNav({ torneo, onBack, badge, isAdmin, onEdit }: { torneo: Tournam
         <Text style={styles.detailNavSub}>{torneo.modality} · {formatFechaTorneo(torneo.roundDates)}{torneo.groupName ? ` · ${torneo.groupName}` : ''}</Text>
       </View>
       {badge}
-      {isAdmin && (
+      {isAdmin && onEdit && (
         <TouchableOpacity onPress={onEdit} style={{ marginLeft: 10, padding: 2 }}>
           <Ionicons name="pencil-outline" size={18} color={COLORS.lime} />
+        </TouchableOpacity>
+      )}
+      {isAdmin && (
+        <TouchableOpacity onPress={onDelete} disabled={deleting} style={{ marginLeft: 10, padding: 2 }}>
+          {deleting
+            ? <ActivityIndicator size="small" color={COLORS.muted} />
+            : <Ionicons name="trash-outline" size={18} color={COLORS.red} />
+          }
         </TouchableOpacity>
       )}
     </View>
@@ -52,7 +60,7 @@ const MODALIDAD_INFO: Record<string, { icon: string; desc: string }> = {
   'Match Play': { icon: 'people-outline', desc: 'Competencia hoyo a hoyo contra otro jugador o equipo.' },
 };
 
-function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, joining, onJoin }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean; isParticipante: boolean; joining: boolean; onJoin: () => void }) {
+function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, joining, onJoin, onDelete, deleting }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean; isParticipante: boolean; joining: boolean; onJoin: () => void; onDelete: () => void; deleting: boolean }) {
   const navigation = useNavigation<any>();
   const { firebaseUser } = useAuth();
   const modalidadInfo = MODALIDAD_INFO[torneo.modality] ?? { icon: 'trophy-outline', desc: '' };
@@ -92,6 +100,8 @@ function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, 
         isAdmin={isAdmin}
         badge={<View style={styles.estadoBadge}><Text style={styles.estadoBadgeText}>Próximo</Text></View>}
         onEdit={() => navigation.navigate('CreateTorneo', { torneo })}
+        onDelete={onDelete}
+        deleting={deleting}
       />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.infoCard}>
@@ -186,7 +196,7 @@ function LeaderboardEmpty() {
   );
 }
 
-function TorneoEnCursoContent({ torneo, isAdmin, isParticipante, joining, onJoin }: { torneo: TournamentDoc; isAdmin: boolean; isParticipante: boolean; joining: boolean; onJoin: () => void }) {
+function TorneoEnCursoContent({ torneo, isAdmin, isParticipante, joining, onJoin, onDelete, deleting }: { torneo: TournamentDoc; isAdmin: boolean; isParticipante: boolean; joining: boolean; onJoin: () => void; onDelete: () => void; deleting: boolean }) {
   const navigation = useNavigation<any>();
   const totalRondas = torneo.roundDates.length || 1;
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
@@ -216,6 +226,8 @@ function TorneoEnCursoContent({ torneo, isAdmin, isParticipante, joining, onJoin
           </View>
         }
         onEdit={() => navigation.navigate('CreateTorneo', { torneo })}
+        onDelete={onDelete}
+        deleting={deleting}
       />
       {!isAdmin && !isParticipante && (
         <TouchableOpacity style={[styles.joinCard, { marginTop: 14 }]} onPress={onJoin} disabled={joining}>
@@ -244,7 +256,7 @@ function TorneoEnCursoContent({ torneo, isAdmin, isParticipante, joining, onJoin
   );
 }
 
-function TorneoFinalizadoContent({ torneo, isAdmin }: { torneo: TournamentDoc; isAdmin: boolean }) {
+function TorneoFinalizadoContent({ torneo, isAdmin, onDelete, deleting }: { torneo: TournamentDoc; isAdmin: boolean; onDelete: () => void; deleting: boolean }) {
   const navigation = useNavigation<any>();
   const totalRondas = torneo.roundDates.length || 1;
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
@@ -272,6 +284,8 @@ function TorneoFinalizadoContent({ torneo, isAdmin }: { torneo: TournamentDoc; i
             <Text style={styles.estadoBadgeText}>Finalizado</Text>
           </View>
         }
+        onDelete={onDelete}
+        deleting={deleting}
       />
       <TabBar tabs={tabs} tab={tab} onPress={onTabPress} />
       <ScrollView
@@ -294,6 +308,7 @@ function TorneoFinalizadoContent({ torneo, isAdmin }: { torneo: TournamentDoc; i
 
 export default function TorneoDetailScreen() {
   const route = useRoute<any>();
+  const navigation = useNavigation<any>();
   const { firebaseUser, userDoc } = useAuth();
   const torneoId: string = route.params.torneoId;
 
@@ -301,6 +316,7 @@ export default function TorneoDetailScreen() {
   const [participantes, setParticipantes] = useState<TournamentParticipantDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     return onSnapshot(doc(db, 'tournaments', torneoId), snap => {
@@ -338,9 +354,27 @@ export default function TorneoDetailScreen() {
     }
   };
 
-  if (estado === 'próximo') return <TorneoProximoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} />;
-  if (estado === 'en curso') return <TorneoEnCursoContent torneo={torneo} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} />;
-  return <TorneoFinalizadoContent torneo={torneo} isAdmin={isAdmin} />;
+  const onDelete = () => {
+    Alert.alert('Eliminar torneo', `¿Seguro que querés eliminar ${torneo.name}? Esta acción no se puede deshacer.`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar', style: 'destructive', onPress: async () => {
+          setDeleting(true);
+          try {
+            await deleteTournament(torneoId);
+            navigation.goBack();
+          } catch {
+            Alert.alert('Error', 'No pudimos eliminar el torneo. Probá de nuevo.');
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  if (estado === 'próximo') return <TorneoProximoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} onDelete={onDelete} deleting={deleting} />;
+  if (estado === 'en curso') return <TorneoEnCursoContent torneo={torneo} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} onDelete={onDelete} deleting={deleting} />;
+  return <TorneoFinalizadoContent torneo={torneo} isAdmin={isAdmin} onDelete={onDelete} deleting={deleting} />;
 }
 
 const styles = StyleSheet.create({
