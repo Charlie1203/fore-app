@@ -1,14 +1,14 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Image, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase/config';
-import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { HoleResult } from '../firebase/types';
+import type { HoleResult, RoundDoc } from '../firebase/types';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -62,11 +62,29 @@ function StepCancha({ club, course, onNext }: {
   club: string; course: string;
   onNext: (club: string, course: string) => void;
 }) {
+  const { firebaseUser } = useAuth();
   const [selectedClub, setSelectedClub] = useState<string | null>(club || null);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(course || null);
   const [search, setSearch] = useState('');
+  const [recientes, setRecientes] = useState<{ club: string; course: string }[]>([]);
+  const [loadingRecientes, setLoadingRecientes] = useState(true);
 
-  const filtered = CLUBS.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+  useEffect(() => {
+    if (!firebaseUser) { setLoadingRecientes(false); return; }
+    const q = query(collection(db, 'rounds'), where('userId', '==', firebaseUser.uid), orderBy('date', 'desc'), limit(15));
+    getDocs(q).then(snap => {
+      const seen = new Set<string>();
+      const list: { club: string; course: string }[] = [];
+      snap.docs.forEach(d => {
+        const r = d.data() as RoundDoc;
+        const key = `${r.clubName}__${r.courseName}`;
+        if (!seen.has(key) && list.length < 3) { seen.add(key); list.push({ club: r.clubName, course: r.courseName }); }
+      });
+      setRecientes(list);
+    }).finally(() => setLoadingRecientes(false));
+  }, [firebaseUser?.uid]);
+
+  const filtered = search.length > 0 ? CLUBS.filter(c => c.name.toLowerCase().includes(search.toLowerCase())) : [];
   const clubData = CLUBS.find(c => c.name === selectedClub);
 
   const canConfirm = selectedClub && (clubData && clubData.courses.length === 1 ? true : !!selectedCourse);
@@ -89,6 +107,29 @@ function StepCancha({ club, course, onNext }: {
           onChangeText={setSearch}
         />
       </View>
+
+      {search.length === 0 && !loadingRecientes && recientes.length === 0 && (
+        <Text style={styles.hintText}>Buscá tu club para empezar.</Text>
+      )}
+
+      {search.length === 0 && !loadingRecientes && recientes.length > 0 && (
+        <>
+          <Text style={styles.label}>Jugaste recientemente</Text>
+          {recientes.map(r => (
+            <TouchableOpacity
+              key={`${r.club}__${r.course}`}
+              style={[styles.option, selectedClub === r.club && selectedCourse === r.course && styles.optionSelected]}
+              onPress={() => { setSelectedClub(r.club); setSelectedCourse(r.course); }}
+            >
+              <View>
+                <Text style={[styles.optionText, selectedClub === r.club && selectedCourse === r.course && styles.optionTextSelected]}>{r.club}</Text>
+                <Text style={styles.optionSub}>{r.course}</Text>
+              </View>
+              {selectedClub === r.club && selectedCourse === r.course && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
+            </TouchableOpacity>
+          ))}
+        </>
+      )}
 
       {filtered.map(c => (
         <TouchableOpacity
@@ -527,12 +568,14 @@ const styles = StyleSheet.create({
   stepLine: { flex: 1, height: 2, backgroundColor: COLORS.dim, marginHorizontal: 4 },
   stepLineActive: { backgroundColor: COLORS.lime },
   stepContent: { paddingHorizontal: 18, paddingBottom: 40 },
-  stepTitle: { fontSize: 18, fontWeight: '700', color: COLORS.white, marginBottom: 20 },
+  stepTitle: { fontSize: 18, fontWeight: '700', color: COLORS.white, marginTop: 18, marginBottom: 20 },
   label: { fontSize: 11, color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   searchBox: { borderBottomWidth: 0.5, borderBottomColor: COLORS.border, marginBottom: 12 },
   searchInput: { paddingVertical: 12, paddingHorizontal: 0, fontSize: 14, color: COLORS.white },
   option: { paddingVertical: 14, paddingHorizontal: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   optionSelected: { },
+  optionSub: { fontSize: 11, color: COLORS.dim, marginTop: 2 },
+  hintText: { fontSize: 13, color: COLORS.muted, textAlign: 'center', marginTop: 24 },
   shareToggleRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 0.5, borderBottomColor: COLORS.border, marginBottom: 16 },
   shareToggleTitle: { fontSize: 15, fontWeight: '600', color: COLORS.white },
   shareToggleSub: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
