@@ -114,7 +114,6 @@ function StepCancha({ club, course, onNext }: {
 
       {search.length === 0 && !loadingRecientes && recientes.length > 0 && (
         <>
-          <Text style={styles.label}>Jugaste recientemente</Text>
           {recientes.map(r => (
             <TouchableOpacity
               key={`${r.club}__${r.course}`}
