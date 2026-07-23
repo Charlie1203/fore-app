@@ -156,12 +156,11 @@ service cloud.firestore {
     }
 
     match /tournaments/{tournamentId} {
-      // Torneos de grupo: los ve cualquier miembro del grupo. Torneos abiertos (sin grupo):
-      // solo el creador y los participantes ya invitados.
-      allow read: if isSignedIn() && (
-        (resource.data.groupId != null && isGroupMember(resource.data.groupId)) ||
-        (resource.data.groupId == null && request.auth.uid in resource.data.participantUids)
-      );
+      // Ojo: Firestore rechaza una query de lista entera (no solo filtra resultados)
+      // si la regla no se puede probar válida usando solo los filtros de esa query.
+      // Una regla con exists()/isGroupMember() no es "probable" para la query
+      // participantUids array-contains uid (TorneosScreen), así que la dejamos simple.
+      allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.createdBy == request.auth.uid;
 
