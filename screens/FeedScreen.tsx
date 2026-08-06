@@ -14,6 +14,7 @@
 	ActivityIndicator,
 	Keyboard,
 	Share,
+	Alert,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -589,11 +590,31 @@ function formatFechaRonda(ts: any): string {
 	return ts.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 }
 
+function PostMenu({ visible, onClose, onDelete, deleting }: { visible: boolean; onClose: () => void; onDelete: () => void; deleting: boolean }) {
+	return (
+		<Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+			<TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={onClose}>
+				<View style={styles.menuCard}>
+					<TouchableOpacity style={styles.menuItem} onPress={() => { onClose(); onDelete(); }} disabled={deleting}>
+						{deleting
+							? <ActivityIndicator size="small" color={COLORS.red} />
+							: <Ionicons name="trash-outline" size={17} color={COLORS.red} />
+						}
+						<Text style={[styles.menuItemText, { color: COLORS.red }]}>Eliminar publicación</Text>
+					</TouchableOpacity>
+				</View>
+			</TouchableOpacity>
+		</Modal>
+	);
+}
+
 function RoundCard({ round }: { round: RoundDoc }) {
 	const navigation = useNavigation<any>();
 	const { firebaseUser } = useAuth();
 	const [expanded, setExpanded] = useState(false);
 	const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+	const [menuOpen, setMenuOpen] = useState(false);
+	const [deleting, setDeleting] = useState(false);
 	const hasPhotos = round.photos.length > 0;
 	const esPropio = round.userId === firebaseUser?.uid;
 
@@ -604,17 +625,41 @@ function RoundCard({ round }: { round: RoundDoc }) {
 	const vsParLabel = round.vsPar === 0 ? 'E' : `${round.vsPar > 0 ? '+' : ''}${round.vsPar}`;
 	const shareText = `${round.authorName} jugó ${round.totalScore} (${vsParLabel}) en ${round.clubName}${round.courseName ? ` · ${round.courseName}` : ''} — Fore!`;
 
+	const onDelete = () => {
+		Alert.alert('Eliminar publicación', '¿Seguro que querés eliminar esta vuelta? Esta acción no se puede deshacer.', [
+			{ text: 'Cancelar', style: 'cancel' },
+			{
+				text: 'Eliminar', style: 'destructive', onPress: async () => {
+					setDeleting(true);
+					try {
+						await deleteDoc(doc(db, 'rounds', round.id));
+					} catch {
+						Alert.alert('Error', 'No pudimos eliminar la publicación. Probá de nuevo.');
+						setDeleting(false);
+					}
+				},
+			},
+		]);
+	};
+
 	return (
 		<View style={styles.card}>
-			<TouchableOpacity style={styles.cardHeader} onPress={abrirPerfil}>
-				<Avatar initials={round.authorInitials} bg={COLORS.lime} color="#0f0f0f" photoURL={round.authorPhotoURL} />
-				<View style={styles.cardMeta}>
-					<Text style={styles.cardName} numberOfLines={1}>{round.authorName}</Text>
-					<Text style={styles.cardCourse} numberOfLines={1}>{round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
-					<Text style={styles.cardTime}>{formatFechaRonda(round.date)}</Text>
-				</View>
-				<Text style={styles.dots}>···</Text>
-			</TouchableOpacity>
+			<View style={styles.cardHeader}>
+				<TouchableOpacity style={styles.cardHeaderMain} onPress={abrirPerfil}>
+					<Avatar initials={round.authorInitials} bg={COLORS.lime} color="#0f0f0f" photoURL={round.authorPhotoURL} />
+					<View style={styles.cardMeta}>
+						<Text style={styles.cardName} numberOfLines={1}>{round.authorName}</Text>
+						<Text style={styles.cardCourse} numberOfLines={1}>{round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
+						<Text style={styles.cardTime}>{formatFechaRonda(round.date)}</Text>
+					</View>
+				</TouchableOpacity>
+				{esPropio && (
+					<TouchableOpacity onPress={() => setMenuOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+						<Text style={styles.dots}>···</Text>
+					</TouchableOpacity>
+				)}
+			</View>
+			<PostMenu visible={menuOpen} onClose={() => setMenuOpen(false)} onDelete={onDelete} deleting={deleting} />
 
 			<View style={styles.cardBody}>
 				<RoundStats holes={round.holes} score={round.totalScore} vsPar={round.vsPar} />
@@ -779,13 +824,18 @@ const styles = StyleSheet.create({
 		paddingTop: 16,
 		paddingBottom: 10,
 	},
+	cardHeaderMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, minWidth: 0 },
 	avatar: { borderRadius: 999, alignItems: "center", justifyContent: "center" },
 	avatarText: { fontWeight: "700" },
 	cardMeta: { flex: 1, minWidth: 0 },
 	cardName: { fontSize: 14, fontWeight: "700", color: COLORS.white },
 	cardCourse: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
 	cardTime: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
-	dots: { fontSize: 18, color: COLORS.dim },
+	dots: { fontSize: 18, color: COLORS.dim, paddingHorizontal: 4 },
+	menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'flex-end', paddingTop: 60, paddingRight: 18 },
+	menuCard: { backgroundColor: '#1e1e1e', borderRadius: 12, borderWidth: 0.5, borderColor: '#2a2a2a', overflow: 'hidden', minWidth: 180 },
+	menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 13 },
+	menuItemText: { fontSize: 14, fontWeight: '600', color: COLORS.white },
 	cardBody: { paddingHorizontal: 16, paddingBottom: 12 },
 	commentsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
 	commentsSheet: { backgroundColor: '#161616', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: SCREEN_H * 0.65 },
