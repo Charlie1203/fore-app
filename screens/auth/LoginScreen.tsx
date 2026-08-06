@@ -8,7 +8,6 @@ import {
 	ActivityIndicator,
 	KeyboardAvoidingView,
 	Platform,
-	ScrollView,
 	Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -89,7 +88,7 @@ export default function LoginScreen() {
 				style={{ flex: 1 }}
 				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 			>
-				<ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+				<View style={styles.scroll}>
 					<Image source={require('../../assets/images/logo-full.png')} style={styles.logoImg} resizeMode="contain" />
 
 					<Text style={styles.welcome}>Bienvenido a FORE!</Text>
@@ -159,7 +158,7 @@ export default function LoginScreen() {
 							¿No tenés cuenta? <Text style={{ color: COLORS.lime }}>Registrate</Text>
 						</Text>
 					</TouchableOpacity>
-				</ScrollView>
+				</View>
 			</KeyboardAvoidingView>
 		</SafeAreaView>
 	);
@@ -167,11 +166,11 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: COLORS.bg },
-	scroll: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: 40 },
-	logoImg: { width: '100%', height: 320, alignSelf: 'center', marginBottom: 4 },
-	welcome: { fontSize: 16, fontWeight: '800', color: COLORS.white, textAlign: 'center', marginTop: 16 },
-	subtitle: { fontSize: 12, color: COLORS.muted, textAlign: 'center', marginTop: 4, marginBottom: 28 },
-	form: { gap: 12 },
+	scroll: { flex: 1, justifyContent: 'center', padding: 24, paddingTop: 20 },
+	logoImg: { width: '100%', height: 220, alignSelf: 'center', marginBottom: 4 },
+	welcome: { fontSize: 16, fontWeight: '800', color: COLORS.white, textAlign: 'center', marginTop: 8 },
+	subtitle: { fontSize: 12, color: COLORS.muted, textAlign: 'center', marginTop: 4, marginBottom: 18 },
+	form: { gap: 10 },
 	optionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
 	rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 	checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: COLORS.lime, alignItems: 'center', justifyContent: 'center' },
@@ -187,7 +186,7 @@ const styles = StyleSheet.create({
 		marginTop: 8,
 	},
 	primaryBtnText: { color: COLORS.bg, fontSize: 15, fontWeight: '800' },
-	dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
+	dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
 	dividerLine: { flex: 1, height: 0.5, backgroundColor: COLORS.border },
 	dividerText: { fontSize: 12, color: COLORS.muted },
 	socialRow: { flexDirection: 'row', gap: 12 },
@@ -196,6 +195,6 @@ const styles = StyleSheet.create({
 		backgroundColor: COLORS.card, borderWidth: 0.5, borderColor: COLORS.border, borderRadius: 12, paddingVertical: 13,
 	},
 	socialBtnText: { color: COLORS.white, fontSize: 14, fontWeight: '600' },
-	footerLink: { marginTop: 28, alignItems: 'center' },
+	footerLink: { marginTop: 16, alignItems: 'center' },
 	footerText: { color: COLORS.muted, fontSize: 13 },
 });

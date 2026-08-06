@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
 	View,
 	Text,
+	Image,
 	TouchableOpacity,
 	StyleSheet,
 	ActivityIndicator,
@@ -158,9 +159,7 @@ export default function RegisterScreen() {
 		<SafeAreaView style={styles.container} edges={['top', 'bottom']}>
 			<KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 				<ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-					<Text style={styles.logo}>
-						FORE<Text style={{ color: COLORS.lime }}>!</Text>
-					</Text>
+					<Image source={require('../../assets/images/logo-full.png')} style={styles.logoImg} resizeMode="contain" />
 					<Text style={styles.subtitle}>
 						{step === 'credentials' ? 'Creá tu cuenta' : 'Elegí tu nombre de usuario'}
 					</Text>
@@ -259,7 +258,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: COLORS.bg },
 	scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-	logo: { fontSize: 40, fontWeight: '800', color: COLORS.white, textAlign: 'center' },
+	logoImg: { width: '100%', height: 140, alignSelf: 'center' },
 	subtitle: { fontSize: 14, color: COLORS.muted, textAlign: 'center', marginTop: 8, marginBottom: 20 },
 	stepsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 24, gap: 6 },
 	stepDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.border },
