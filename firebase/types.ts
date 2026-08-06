@@ -37,13 +37,11 @@ export interface NotificationDoc {
 }
 
 // follows/{followerUid}_{followingUid}
+// A propósito sin nombre/initials desnormalizados: FollowListScreen busca el
+// UserDoc real de cada uid, así nunca muestra un nombre viejo si alguien lo cambia.
 export interface FollowDoc {
 	followerUid: string;
-	followerName: string;
-	followerInitials: string;
 	followingUid: string;
-	followingName: string;
-	followingInitials: string;
 	createdAt: Timestamp;
 }
 

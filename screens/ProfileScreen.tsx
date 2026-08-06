@@ -414,13 +414,19 @@ export default function ProfileScreen() {
   const pagerRef = useRef<PagerView>(null);
 
   useEffect(() => {
-    if (!isOwnProfile || !firebaseUser) { setRounds([]); return; }
-    const q = query(collection(db, 'rounds'), where('userId', '==', firebaseUser.uid), orderBy('date', 'desc'));
+    // El propio uid puede leer también sus rondas privadas; para un perfil ajeno
+    // solo se pueden ver las públicas — la query tiene que reflejar eso o Firestore
+    // la rechaza entera (no la filtra resultado por resultado).
+    const targetUid = isOwnProfile ? firebaseUser?.uid : viewUser?.uid;
+    if (!targetUid) { setRounds([]); return; }
+    const q = isOwnProfile
+      ? query(collection(db, 'rounds'), where('userId', '==', targetUid), orderBy('date', 'desc'))
+      : query(collection(db, 'rounds'), where('userId', '==', targetUid), where('visibility', '==', 'public'), orderBy('date', 'desc'));
     const unsubscribe = onSnapshot(q, snap => {
       setRounds(snap.docs.map(d => d.data() as RoundDoc));
     });
     return unsubscribe;
-  }, [isOwnProfile, firebaseUser?.uid]);
+  }, [isOwnProfile, firebaseUser?.uid, viewUser?.uid]);
 
   // Trae el doc real del usuario visto para tener contadores/handicap al día, no lo que se pasó al navegar.
   useEffect(() => {
@@ -449,7 +455,7 @@ export default function ProfileScreen() {
       ]);
     } else {
       setFollowBusy(true);
-      try { await followUser({ uid: firebaseUser.uid, displayName: userDoc.displayName }, { uid: viewUser.uid, displayName: viewUser.name }); }
+      try { await followUser(firebaseUser.uid, viewUser.uid); }
       catch { Alert.alert('Error', 'No pudimos completar la acción. Probá de nuevo.'); }
       finally { setFollowBusy(false); }
     }

@@ -835,7 +835,7 @@ function GroupRow({ group, isMember, onPress }: { group: GroupDoc; isMember: boo
 
 function PlayerRow({ user }: { user: UserDoc }) {
   const navigation = useNavigation<any>();
-  const { firebaseUser, userDoc } = useAuth();
+  const { firebaseUser } = useAuth();
   const [following, setFollowing] = useState(false);
   const [busy, setBusy] = useState(false);
   const initials = user.displayName.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -846,11 +846,11 @@ function PlayerRow({ user }: { user: UserDoc }) {
   }, [firebaseUser?.uid, user.uid]);
 
   const toggleFollow = async () => {
-    if (!firebaseUser || !userDoc || busy) return;
+    if (!firebaseUser || busy) return;
     setBusy(true);
     try {
       if (following) await unfollowUser(firebaseUser.uid, user.uid);
-      else await followUser({ uid: firebaseUser.uid, displayName: userDoc.displayName }, { uid: user.uid, displayName: user.displayName });
+      else await followUser(firebaseUser.uid, user.uid);
     } catch {
       Alert.alert('Error', 'No pudimos completar la acción. Probá de nuevo.');
     } finally {
