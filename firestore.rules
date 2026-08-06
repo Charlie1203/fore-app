@@ -58,15 +58,23 @@ service cloud.firestore {
                   && (resource.data.visibility == "public" || resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       // El dueño puede editar cualquier campo; cualquier otro usuario firmado solo puede
-      // tocar likesCount o commentsCount (para poder likear/comentar rondas ajenas).
+      // tocar likesCount, commentsCount o sharesCount (para poder likear/comentar/compartir
+      // rondas ajenas).
       allow update: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(["likesCount"]) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["commentsCount"])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["commentsCount"]) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["sharesCount"])
       );
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
 
       match /likes/{uid} {
+        allow read: if isSignedIn();
+        allow create, delete: if isSignedIn() && request.auth.uid == uid;
+        allow update: if false;
+      }
+
+      match /saves/{uid} {
         allow read: if isSignedIn();
         allow create, delete: if isSignedIn() && request.auth.uid == uid;
         allow update: if false;

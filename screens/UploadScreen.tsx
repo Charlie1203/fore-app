@@ -486,6 +486,7 @@ export default function UploadScreen() {
         visibility: shareOnFeed ? 'public' : 'private',
         likesCount: 0,
         commentsCount: 0,
+        sharesCount: 0,
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, 'users', firebaseUser.uid), { roundsCount: increment(1) });

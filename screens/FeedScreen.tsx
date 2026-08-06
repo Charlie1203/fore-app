@@ -13,11 +13,11 @@
 	Platform,
 	ActivityIndicator,
 	Keyboard,
+	Share,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import Svg, { Ellipse, Line, Polygon, Circle, Path } from "react-native-svg";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase/config";
@@ -29,70 +29,6 @@ import type { RoundDoc, CommentDoc, FollowDoc } from "../firebase/types";
 
 const SCREEN_W = Dimensions.get("window").width;
 const SCREEN_H = Dimensions.get("window").height;
-
-function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
-	const d = [
-		"M 11,9.5 a 1.1,0.7 0 0,1 2.2,0",
-		"M 14,9.5 a 1.1,0.7 0 0,1 2.2,0",
-		"M 17,10 a 1.1,0.7 0 0,1 2.2,0",
-		"M 9,12.5 a 1.1,0.7 0 0,1 2.2,0",
-		"M 12,12.5 a 1.1,0.7 0 0,1 2.2,0",
-		"M 15,12.5 a 1.1,0.7 0 0,1 2.2,0",
-		"M 18,13 a 1.1,0.7 0 0,1 2.2,0",
-		"M 8,15.5 a 1.1,0.7 0 0,1 2.2,0",
-		"M 11,15.5 a 1.1,0.7 0 0,1 2.2,0",
-		"M 14,15.5 a 1.1,0.7 0 0,1 2.2,0",
-		"M 17,16 a 1.1,0.7 0 0,1 2.2,0",
-		"M 8,18.5 a 1.1,0.7 0 0,1 2.2,0",
-		"M 11,18.5 a 1.1,0.7 0 0,1 2.2,0",
-		"M 14,18.5 a 1.1,0.7 0 0,1 2.2,0",
-	].join(" ");
-	return (
-		<Svg width={size} height={size} viewBox="0 0 24 24">
-			<Circle
-				cx="12"
-				cy="12"
-				r="10"
-				stroke={color}
-				strokeWidth="1.6"
-				fill="none"
-			/>
-			<Path
-				d={d}
-				stroke={color}
-				strokeWidth="1.3"
-				fill="none"
-				strokeLinecap="round"
-			/>
-		</Svg>
-	);
-}
-
-function GolfFlagIcon({ color, size = 17 }: { color: string; size?: number }) {
-	return (
-		<Svg width={size} height={size} viewBox="0 2 24 24">
-			<Ellipse
-				cx="12"
-				cy="20"
-				rx="7"
-				ry="2.5"
-				stroke={color}
-				strokeWidth="1.8"
-				fill="none"
-			/>
-			<Line
-				x1="12"
-				y1="20"
-				x2="12"
-				y2="4"
-				stroke={color}
-				strokeWidth="1.8"
-				strokeLinecap="round"
-			/>
-			<Polygon points="12,4 21,8 12,12" fill={color} />
-		</Svg>
-	);
-}
 
 const COLORS = {
 	bg: "#0f0f0f",
@@ -256,10 +192,6 @@ function Scorecard({
 	score: number;
 	vsPar: number;
 }) {
-	const eagles = holes.filter((h) => h.score - h.par <= -2).length;
-	const birdies = holes.filter((h) => h.score - h.par === -1).length;
-	const pares = holes.filter((h) => h.score - h.par === 0).length;
-	const bogeys = holes.filter((h) => h.score - h.par >= 1).length;
 	return (
 		<View style={styles.scorecard}>
 			<View style={styles.scHeader}>
@@ -283,38 +215,6 @@ function Scorecard({
 				{holes.slice(9, 18).map((h, i) => (
 					<HoleCell key={i} num={i + 10} score={h.score} par={h.par} />
 				))}
-			</View>
-			<View style={styles.scSummary}>
-				{eagles > 0 && (
-					<View style={styles.scItem}>
-						<Text style={[styles.scVal, { color: COLORS.lime }]}>{eagles}</Text>
-						<Text style={styles.scLbl}>Eagles</Text>
-					</View>
-				)}
-				<View style={styles.scItem}>
-					<Text style={[styles.scVal, { color: COLORS.lime }]}>{birdies}</Text>
-					<Text style={styles.scLbl}>Birdies</Text>
-				</View>
-				<View style={styles.scItem}>
-					<Text style={styles.scVal}>{pares}</Text>
-					<Text style={styles.scLbl}>Pares</Text>
-				</View>
-				<View style={styles.scItem}>
-					<Text style={[styles.scVal, { color: COLORS.red }]}>{bogeys}</Text>
-					<Text style={styles.scLbl}>Bogeys</Text>
-				</View>
-				<View style={styles.scItem}>
-					<Text
-						style={[
-							styles.scVal,
-							{ color: vsPar <= 0 ? COLORS.lime : COLORS.red },
-						]}
-					>
-						{vsPar > 0 ? "+" : ""}
-						{vsPar}
-					</Text>
-					<Text style={styles.scLbl}>vs par</Text>
-				</View>
 			</View>
 		</View>
 	);
@@ -453,19 +353,25 @@ function CardFooter({
 	roundId,
 	likes,
 	comments,
+	shares,
+	shareText,
 }: {
 	roundId: string;
 	likes: number;
 	comments: number;
+	shares: number;
+	shareText: string;
 }) {
 	const { firebaseUser } = useAuth();
 	const [isLiked, setIsLiked] = useState(false);
+	const [isSaved, setIsSaved] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const [showComments, setShowComments] = useState(false);
 
 	useEffect(() => {
 		if (!firebaseUser) return;
 		getDoc(doc(db, 'rounds', roundId, 'likes', firebaseUser.uid)).then(snap => setIsLiked(snap.exists()));
+		getDoc(doc(db, 'rounds', roundId, 'saves', firebaseUser.uid)).then(snap => setIsSaved(snap.exists()));
 	}, [roundId, firebaseUser?.uid]);
 
 	const toggleLike = async () => {
@@ -492,33 +398,63 @@ function CardFooter({
 		}
 	};
 
+	const toggleSave = async () => {
+		if (!firebaseUser) return;
+		const wasSaved = isSaved;
+		setIsSaved(!wasSaved);
+		const saveRef = doc(db, 'rounds', roundId, 'saves', firebaseUser.uid);
+		try {
+			if (wasSaved) await deleteDoc(saveRef);
+			else await setDoc(saveRef, { uid: firebaseUser.uid, createdAt: serverTimestamp() });
+		} catch {
+			setIsSaved(wasSaved);
+		}
+	};
+
+	const onShare = async () => {
+		try {
+			const result = await Share.share({ message: shareText });
+			if (result.action === Share.sharedAction) {
+				await updateDoc(doc(db, 'rounds', roundId), { sharesCount: increment(1) });
+			}
+		} catch {
+			// el usuario canceló o el share sheet falló — no hay nada que revertir
+		}
+	};
+
 	return (
 		<>
 			<CommentsSheet visible={showComments} roundId={roundId} count={comments} onClose={() => setShowComments(false)} />
 			<View style={styles.cardFooter}>
 				<TouchableOpacity style={styles.action} onPress={toggleLike} disabled={busy}>
-					<GolfFlagIcon color={isLiked ? COLORS.lime : COLORS.dim} size={17} />
-					<Text style={[styles.actionText, isLiked && { color: COLORS.lime }]}>{likes}</Text>
+					<Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={21} color={isLiked ? COLORS.lime : COLORS.dim} />
+					{likes > 0 && <Text style={[styles.actionText, isLiked && { color: COLORS.lime }]}>{likes}</Text>}
 				</TouchableOpacity>
 				<TouchableOpacity style={styles.action} onPress={() => setShowComments(true)}>
-					<GolfBallIcon color={COLORS.dim} size={16} />
-					<Text style={styles.actionText}>{comments}</Text>
+					<Ionicons name="chatbubble-outline" size={18} color={COLORS.dim} />
+					{comments > 0 && <Text style={styles.actionText}>{comments}</Text>}
+				</TouchableOpacity>
+				<TouchableOpacity style={styles.action} onPress={onShare}>
+					<Ionicons name="paper-plane-outline" size={19} color={COLORS.dim} />
+					{shares > 0 && <Text style={styles.actionText}>{shares}</Text>}
+				</TouchableOpacity>
+				<View style={{ flex: 1 }} />
+				<TouchableOpacity onPress={toggleSave}>
+					<Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={19} color={isSaved ? COLORS.lime : COLORS.dim} />
 				</TouchableOpacity>
 			</View>
 		</>
 	);
 }
 
-function RoundSummary({
+function RoundStats({
 	holes,
 	score,
 	vsPar,
-	onExpand,
 }: {
 	holes: { score: number; par: number }[];
 	score: number;
 	vsPar: number;
-	onExpand: () => void;
 }) {
 	const eagles = holes.filter((h) => h.score - h.par <= -2).length;
 	const birdies = holes.filter((h) => h.score - h.par === -1).length;
@@ -527,92 +463,84 @@ function RoundSummary({
 	const doubles = holes.filter((h) => h.score - h.par >= 2).length;
 
 	return (
-		<View style={styles.summaryBox}>
-			<View style={styles.summaryScores}>
-				<View style={styles.summaryMain}>
-					<Text style={styles.summaryBigScore}>{score}</Text>
-					<Text
-						style={[
-							styles.summaryVsPar,
-							{ color: vsPar <= 0 ? COLORS.lime : COLORS.red },
-						]}
-					>
-						{vsPar > 0 ? "+" : ""}
-						{vsPar}
-					</Text>
+		<View style={styles.summaryScores}>
+			<View style={styles.summaryMain}>
+				<Text style={styles.summaryBigScore}>{score}</Text>
+				<View style={styles.summaryDivider} />
+				<Text style={[styles.summaryVsPar, { color: vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
+					{vsPar === 0 ? "E" : `${vsPar > 0 ? "+" : ""}${vsPar}`}
+				</Text>
+			</View>
+			<View style={styles.summaryStats}>
+				<View style={styles.summaryItem}>
+					<Text style={styles.summaryLbl}>Águilas</Text>
+					<Text style={[styles.summaryVal, { color: COLORS.lime }]}>{eagles}</Text>
 				</View>
-				<View style={styles.summaryStats}>
-					{eagles > 0 && (
-						<View style={styles.summaryItem}>
-							<Text style={[styles.summaryVal, { color: COLORS.lime }]}>
-								{eagles}
-							</Text>
-							<Text style={styles.summaryLbl}>Eagles</Text>
-						</View>
-					)}
-					<View style={styles.summaryItem}>
-						<Text style={[styles.summaryVal, { color: COLORS.lime }]}>
-							{birdies}
-						</Text>
-						<Text style={styles.summaryLbl}>Birdies</Text>
-					</View>
-					<View style={styles.summaryItem}>
-						<Text style={styles.summaryVal}>{pares}</Text>
-						<Text style={styles.summaryLbl}>Pares</Text>
-					</View>
-					<View style={styles.summaryItem}>
-						<Text style={[styles.summaryVal, { color: COLORS.red }]}>
-							{bogeys}
-						</Text>
-						<Text style={styles.summaryLbl}>Bogeys</Text>
-					</View>
-					{doubles > 0 && (
-						<View style={styles.summaryItem}>
-							<Text style={[styles.summaryVal, { color: "#ff6060" }]}>
-								{doubles}
-							</Text>
-							<Text style={styles.summaryLbl}>Dobles+</Text>
-						</View>
-					)}
+				<View style={styles.summaryItem}>
+					<Text style={styles.summaryLbl}>Birdies</Text>
+					<Text style={[styles.summaryVal, { color: COLORS.lime }]}>{birdies}</Text>
+				</View>
+				<View style={styles.summaryItem}>
+					<Text style={styles.summaryLbl}>Pares</Text>
+					<Text style={styles.summaryVal}>{pares}</Text>
+				</View>
+				<View style={styles.summaryItem}>
+					<Text style={styles.summaryLbl}>Bogeys</Text>
+					<Text style={[styles.summaryVal, { color: COLORS.red }]}>{bogeys}</Text>
+				</View>
+				<View style={styles.summaryItem}>
+					<Text style={styles.summaryLbl}>Doble+</Text>
+					<Text style={[styles.summaryVal, { color: "#ff6060" }]}>{doubles}</Text>
 				</View>
 			</View>
-			<TouchableOpacity style={styles.expandBtn} onPress={onExpand}>
-				<Text style={styles.expandBtnText}>Ver tarjeta</Text>
-				<Ionicons name="chevron-down" size={13} color={COLORS.lime} />
-			</TouchableOpacity>
 		</View>
 	);
 }
 
-function PhotoCarousel({ photos }: { photos: string[] }) {
-	const [index, setIndex] = useState(0);
+function PhotoGrid({ photos, onPress }: { photos: string[]; onPress: (index: number) => void }) {
+	const maxVisible = 4;
+	const showOverlay = photos.length > maxVisible;
+	const visible = photos.slice(0, maxVisible);
 	return (
-		<View>
-			<ScrollView
-				horizontal
-				pagingEnabled
-				showsHorizontalScrollIndicator={false}
-				onMomentumScrollEnd={e => {
-					setIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W));
-				}}
-			>
-				{photos.map((uri, i) => (
-					<Image
-						key={i}
-						source={{ uri }}
-						style={{ width: SCREEN_W, height: SCREEN_W * 0.65 }}
-						resizeMode="cover"
-					/>
-				))}
-			</ScrollView>
-			{photos.length > 1 && (
-				<View style={styles.photoDots}>
-					{photos.map((_, i) => (
-						<View key={i} style={[styles.photoDot, i === index && styles.photoDotActive]} />
-					))}
-				</View>
-			)}
+		<View style={styles.photoGridRow}>
+			{visible.map((uri, i) => {
+				const isOverlayTile = showOverlay && i === maxVisible - 1;
+				return (
+					<TouchableOpacity key={i} style={styles.photoGridTile} onPress={() => onPress(i)} activeOpacity={0.85}>
+						<Image source={{ uri }} style={styles.photoGridImg} resizeMode="cover" />
+						{isOverlayTile && (
+							<View style={styles.photoGridOverlay}>
+								<Text style={styles.photoGridOverlayNum}>+{photos.length - maxVisible + 1}</Text>
+								<Text style={styles.photoGridOverlayLbl}>fotos</Text>
+							</View>
+						)}
+					</TouchableOpacity>
+				);
+			})}
 		</View>
+	);
+}
+
+function PhotoLightbox({ visible, photos, initialIndex, onClose }: { visible: boolean; photos: string[]; initialIndex: number; onClose: () => void }) {
+	if (!visible) return null;
+	return (
+		<Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+			<View style={styles.lightboxOverlay}>
+				<TouchableOpacity style={styles.lightboxClose} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+					<Ionicons name="close" size={28} color="#fff" />
+				</TouchableOpacity>
+				<ScrollView
+					horizontal
+					pagingEnabled
+					showsHorizontalScrollIndicator={false}
+					contentOffset={{ x: initialIndex * SCREEN_W, y: 0 }}
+				>
+					{photos.map((uri, i) => (
+						<Image key={i} source={{ uri }} style={{ width: SCREEN_W, height: SCREEN_H }} resizeMode="contain" />
+					))}
+				</ScrollView>
+			</View>
+		</Modal>
 	);
 }
 
@@ -625,6 +553,7 @@ function RoundCard({ round }: { round: RoundDoc }) {
 	const navigation = useNavigation<any>();
 	const { firebaseUser } = useAuth();
 	const [expanded, setExpanded] = useState(false);
+	const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 	const hasPhotos = round.photos.length > 0;
 	const esPropio = round.userId === firebaseUser?.uid;
 
@@ -632,54 +561,43 @@ function RoundCard({ round }: { round: RoundDoc }) {
 		? navigation.navigate('Tabs', { screen: 'Perfil' })
 		: navigation.navigate('PerfilUsuario', { viewUser: { uid: round.userId, name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
 
+	const vsParLabel = round.vsPar === 0 ? 'E' : `${round.vsPar > 0 ? '+' : ''}${round.vsPar}`;
+	const shareText = `${round.authorName} jugó ${round.totalScore} (${vsParLabel}) en ${round.clubName}${round.courseName ? ` · ${round.courseName}` : ''} — Fore!`;
+
 	return (
 		<View style={styles.card}>
 			<TouchableOpacity style={styles.cardHeader} onPress={abrirPerfil}>
 				<Avatar initials={round.authorInitials} bg={COLORS.lime} color="#0f0f0f" photoURL={round.authorPhotoURL} />
 				<View style={styles.cardMeta}>
 					<Text style={styles.cardName} numberOfLines={1}>{round.authorName}</Text>
-					<Text style={styles.cardCourse} numberOfLines={1}>📍 {round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
+					<Text style={styles.cardCourse} numberOfLines={1}>{round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
 					<Text style={styles.cardTime}>{formatFechaRonda(round.date)}</Text>
 				</View>
 				<Text style={styles.dots}>···</Text>
 			</TouchableOpacity>
 
-			{hasPhotos ? (
+			<View style={styles.cardBody}>
+				<RoundStats holes={round.holes} score={round.totalScore} vsPar={round.vsPar} />
+				<TouchableOpacity style={styles.verTarjetaBtn} onPress={() => setExpanded(!expanded)}>
+					<Text style={styles.verTarjetaBtnText}>{expanded ? 'Ocultar tarjeta' : 'Ver tarjeta'}</Text>
+					<Ionicons name={expanded ? 'chevron-up' : 'chevron-forward'} size={14} color={COLORS.lime} />
+				</TouchableOpacity>
+				{expanded && <Scorecard holes={round.holes} score={round.totalScore} vsPar={round.vsPar} />}
+			</View>
+
+			{hasPhotos && (
 				<>
-					<PhotoCarousel photos={round.photos} />
-					<View style={styles.cardBody}>
-						<View style={styles.photoScoreRow}>
-							<View style={styles.photoScoreMain}>
-								<Text style={styles.photoScore}>{round.totalScore}</Text>
-								<Text style={[styles.photoVsPar, { color: round.vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
-									{round.vsPar > 0 ? '+' : ''}{round.vsPar}
-								</Text>
-							</View>
-							<TouchableOpacity style={styles.verTarjetaBtn} onPress={() => setExpanded(!expanded)}>
-								<Text style={styles.verTarjetaBtnText}>{expanded ? 'Ocultar' : 'Ver tarjeta'}</Text>
-								<Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={13} color={COLORS.lime} />
-							</TouchableOpacity>
-						</View>
-						{expanded && <Scorecard holes={round.holes} score={round.totalScore} vsPar={round.vsPar} />}
-					</View>
+					<PhotoGrid photos={round.photos} onPress={i => setLightboxIndex(i)} />
+					<PhotoLightbox
+						visible={lightboxIndex !== null}
+						photos={round.photos}
+						initialIndex={lightboxIndex ?? 0}
+						onClose={() => setLightboxIndex(null)}
+					/>
 				</>
-			) : (
-				<View style={styles.cardBody}>
-					{expanded ? (
-						<>
-							<Scorecard holes={round.holes} score={round.totalScore} vsPar={round.vsPar} />
-							<TouchableOpacity style={styles.collapseBtn} onPress={() => setExpanded(false)}>
-								<Text style={styles.expandBtnText}>Ocultar tarjeta</Text>
-								<Ionicons name="chevron-up" size={13} color={COLORS.lime} />
-							</TouchableOpacity>
-						</>
-					) : (
-						<RoundSummary holes={round.holes} score={round.totalScore} vsPar={round.vsPar} onExpand={() => setExpanded(true)} />
-					)}
-				</View>
 			)}
 
-			<CardFooter roundId={round.id} likes={round.likesCount} comments={round.commentsCount} />
+			<CardFooter roundId={round.id} likes={round.likesCount} comments={round.commentsCount} shares={round.sharesCount} shareText={shareText} />
 		</View>
 	);
 }
@@ -885,7 +803,7 @@ const styles = StyleSheet.create({
 		alignSelf: "flex-start",
 	},
 	courseText: { fontSize: 11, color: COLORS.muted },
-	scorecard: { backgroundColor: "#141414", borderRadius: 10, padding: 8 },
+	scorecard: { backgroundColor: "#141414", borderRadius: 10, padding: 8, marginTop: 10 },
 	scHeader: {
 		flexDirection: "row",
 		justifyContent: "space-between",
@@ -899,21 +817,6 @@ const styles = StyleSheet.create({
 	},
 	scTotal: { fontSize: 13, fontWeight: "700" },
 	holesRow: { flexDirection: "row", gap: 2, marginBottom: 3 },
-	scSummary: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		paddingTop: 7,
-		borderTopWidth: 0.5,
-		borderTopColor: "#222",
-	},
-	scItem: { alignItems: "center" },
-	scVal: { fontSize: 16, fontWeight: "700", color: COLORS.white },
-	scLbl: {
-		fontSize: 9,
-		color: COLORS.muted,
-		textTransform: "uppercase",
-		letterSpacing: 0.4,
-	},
 	milestone: {
 		flexDirection: "row",
 		alignItems: "center",
@@ -933,53 +836,25 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 	},
 
-	summaryBox: {
-		backgroundColor: "#141414",
-		borderRadius: 10,
-		padding: 10,
-		gap: 10,
-	},
-	summaryScores: { flexDirection: "row", alignItems: "center", gap: 12 },
-	summaryMain: {
-		alignItems: "center",
-		paddingRight: 12,
-		borderRightWidth: 0.5,
-		borderRightColor: "#2a2a2a",
-	},
+	summaryScores: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+	summaryMain: { flexDirection: "row", alignItems: "center", gap: 10 },
 	summaryBigScore: {
 		fontSize: 32,
 		fontWeight: "800",
 		color: COLORS.white,
 		lineHeight: 34,
 	},
-	summaryVsPar: { fontSize: 13, fontWeight: "700", marginTop: 2 },
-	summaryStats: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 8 },
-	summaryItem: { alignItems: "center", minWidth: 40 },
-	summaryVal: { fontSize: 18, fontWeight: "800", color: COLORS.white },
+	summaryDivider: { width: 1, height: 22, backgroundColor: "#333" },
+	summaryVsPar: { fontSize: 15, fontWeight: "700" },
+	summaryStats: { flexDirection: "row", gap: 14 },
+	summaryItem: { alignItems: "center" },
+	summaryVal: { fontSize: 16, fontWeight: "800", color: COLORS.white, marginTop: 2 },
 	summaryLbl: {
 		fontSize: 9,
 		color: COLORS.muted,
 		textTransform: "uppercase",
 		letterSpacing: 0.4,
-		marginTop: 1,
 	},
-	expandBtn: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		gap: 4,
-		paddingTop: 8,
-		borderTopWidth: 0.5,
-		borderTopColor: "#2a2a2a",
-	},
-	collapseBtn: {
-		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "center",
-		gap: 4,
-		marginTop: 8,
-	},
-	expandBtnText: { fontSize: 12, fontWeight: "700", color: COLORS.lime },
 
 	toast: {
 		position: "absolute",
@@ -1041,15 +916,20 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 	},
-	photoDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, paddingTop: 8 },
-	photoDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: COLORS.dim },
-	photoDotActive: { backgroundColor: COLORS.lime, width: 14 },
-	photoScoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-	photoScoreMain: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-	photoScore: { fontSize: 28, fontWeight: '800', color: COLORS.white },
-	photoVsPar: { fontSize: 14, fontWeight: '700' },
-	verTarjetaBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 0.5, borderColor: COLORS.lime, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-	verTarjetaBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.lime },
+	verTarjetaBtn: {
+		flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+		borderWidth: 1, borderColor: COLORS.lime, borderRadius: 10,
+		paddingHorizontal: 14, paddingVertical: 10, marginTop: 12,
+	},
+	verTarjetaBtnText: { fontSize: 13, fontWeight: '700', color: COLORS.lime },
+	photoGridRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 16, marginTop: 10 },
+	photoGridTile: { flex: 1, aspectRatio: 1, borderRadius: 10, overflow: 'hidden', backgroundColor: '#141414' },
+	photoGridImg: { width: '100%', height: '100%' },
+	photoGridOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center' },
+	photoGridOverlayNum: { fontSize: 17, fontWeight: '800', color: COLORS.white },
+	photoGridOverlayLbl: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
+	lightboxOverlay: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+	lightboxClose: { position: 'absolute', top: 50, right: 20, zIndex: 10 },
 
 	holeTriangleWrap: {
 		width: HOLE_SIZE,
