@@ -2,6 +2,7 @@ import {
 	createUserWithEmailAndPassword,
 	signInWithEmailAndPassword,
 	signOut,
+	sendPasswordResetEmail,
 	GoogleAuthProvider,
 	signInWithCredential,
 	type UserCredential,
@@ -23,6 +24,10 @@ export async function loginWithGoogleIdToken(idToken: string): Promise<UserCrede
 
 export async function logout(): Promise<void> {
 	return signOut(auth);
+}
+
+export async function resetPassword(email: string): Promise<void> {
+	return sendPasswordResetEmail(auth, email);
 }
 
 const ERROR_MESSAGES: Record<string, string> = {

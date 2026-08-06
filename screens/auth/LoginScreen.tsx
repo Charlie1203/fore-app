@@ -2,17 +2,20 @@ import { useState } from 'react';
 import {
 	View,
 	Text,
+	Image,
 	TouchableOpacity,
 	StyleSheet,
 	ActivityIndicator,
 	KeyboardAvoidingView,
 	Platform,
 	ScrollView,
+	Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import AuthTextInput from '../../components/AuthTextInput';
-import { loginWithEmail, mapAuthError } from '../../services/auth';
+import { loginWithEmail, resetPassword, mapAuthError } from '../../services/auth';
 import { getDocs, query, collection, where } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
@@ -40,6 +43,7 @@ export default function LoginScreen() {
 	const navigation = useNavigation<any>();
 	const [identifier, setIdentifier] = useState('');
 	const [password, setPassword] = useState('');
+	const [remember, setRemember] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +64,25 @@ export default function LoginScreen() {
 		}
 	};
 
+	const handleForgotPassword = async () => {
+		if (!identifier.includes('@')) {
+			Alert.alert('Recuperar contraseña', 'Escribí tu email arriba (no el @usuario) y volvé a tocar el link.');
+			return;
+		}
+		try {
+			await resetPassword(identifier.trim());
+			Alert.alert('Listo', `Te mandamos un mail a ${identifier.trim()} para reestablecer tu contraseña.`);
+		} catch (e: any) {
+			Alert.alert('Error', mapAuthError(e.code));
+		}
+	};
+
+	const handleSocialLogin = (provider: string) => {
+		// expo-auth-session está deprecado para esto — hace falta migrar a un dev client
+		// con @react-native-google-signin/google-signin o el equivalente de Apple.
+		Alert.alert('Próximamente', `El login con ${provider} todavía no está disponible.`);
+	};
+
 	return (
 		<SafeAreaView style={styles.container} edges={['top', 'bottom']}>
 			<KeyboardAvoidingView
@@ -67,18 +90,19 @@ export default function LoginScreen() {
 				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 			>
 				<ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-					<View style={styles.badge}>
-						<Text style={styles.badgeEmoji}>⛳</Text>
-					</View>
-					<Text style={styles.logo}>
+					<Image source={require('../../assets/images/logo.jpeg')} style={styles.logoImg} resizeMode="contain" />
+					<Text style={styles.wordmark}>
 						FORE<Text style={{ color: COLORS.lime }}>!</Text>
 					</Text>
+					<Text style={styles.tagline}>YOUR GAME. YOUR STORY.</Text>
+
+					<Text style={styles.welcome}>Bienvenido a FORE!</Text>
 					<Text style={styles.subtitle}>Iniciá sesión para seguir jugando</Text>
 
 					<View style={styles.form}>
 						<AuthTextInput
-							icon="person-outline"
-							placeholder="Email o @usuario"
+							icon="mail-outline"
+							placeholder="Email"
 							autoCapitalize="none"
 							keyboardType="email-address"
 							value={identifier}
@@ -92,6 +116,20 @@ export default function LoginScreen() {
 							onChangeText={setPassword}
 						/>
 
+						<View style={styles.optionsRow}>
+							<TouchableOpacity style={styles.rememberRow} onPress={() => setRemember(v => !v)}>
+								<View style={[styles.checkbox, remember && styles.checkboxActive]}>
+									{remember && <Ionicons name="checkmark" size={12} color="#0f0f0f" />}
+								</View>
+								<Text style={styles.rememberText}>Recordarme</Text>
+							</TouchableOpacity>
+							<TouchableOpacity onPress={handleForgotPassword}>
+								<Text style={styles.forgotText}>
+									¿Olvidaste tu <Text style={{ color: COLORS.lime }}>contraseña?</Text>
+								</Text>
+							</TouchableOpacity>
+						</View>
+
 						{error && <Text style={styles.error}>{error}</Text>}
 
 						<TouchableOpacity style={styles.primaryBtn} onPress={handleLogin} disabled={loading}>
@@ -101,8 +139,23 @@ export default function LoginScreen() {
 								<Text style={styles.primaryBtnText}>Ingresar</Text>
 							)}
 						</TouchableOpacity>
-						{/* Login con Google pendiente: expo-auth-session está deprecado y requiere
-						    migrar a un dev client con @react-native-google-signin/google-signin. */}
+
+						<View style={styles.dividerRow}>
+							<View style={styles.dividerLine} />
+							<Text style={styles.dividerText}>o continuá con</Text>
+							<View style={styles.dividerLine} />
+						</View>
+
+						<View style={styles.socialRow}>
+							<TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialLogin('Google')}>
+								<Ionicons name="logo-google" size={18} color={COLORS.white} />
+								<Text style={styles.socialBtnText}>Google</Text>
+							</TouchableOpacity>
+							<TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialLogin('Apple')}>
+								<Ionicons name="logo-apple" size={20} color={COLORS.white} />
+								<Text style={styles.socialBtnText}>Apple</Text>
+							</TouchableOpacity>
+						</View>
 					</View>
 
 					<TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.footerLink}>
@@ -118,32 +171,37 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: COLORS.bg },
-	scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-	badge: {
-		width: 64,
-		height: 64,
-		borderRadius: 32,
-		backgroundColor: COLORS.card,
-		borderWidth: 0.5,
-		borderColor: COLORS.border,
-		alignItems: 'center',
-		justifyContent: 'center',
-		alignSelf: 'center',
-		marginBottom: 16,
-	},
-	badgeEmoji: { fontSize: 28 },
-	logo: { fontSize: 40, fontWeight: '800', color: COLORS.white, textAlign: 'center' },
-	subtitle: { fontSize: 14, color: COLORS.muted, textAlign: 'center', marginTop: 8, marginBottom: 32 },
+	scroll: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: 40 },
+	logoImg: { width: 110, height: 110, alignSelf: 'center' },
+	wordmark: { fontSize: 34, fontWeight: '800', color: COLORS.white, textAlign: 'center', letterSpacing: 4, marginTop: 4 },
+	tagline: { fontSize: 11, color: COLORS.muted, textAlign: 'center', letterSpacing: 3, marginTop: 6, marginBottom: 28 },
+	welcome: { fontSize: 20, fontWeight: '800', color: COLORS.white, textAlign: 'center' },
+	subtitle: { fontSize: 13, color: COLORS.muted, textAlign: 'center', marginTop: 6, marginBottom: 28 },
 	form: { gap: 12 },
+	optionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
+	rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+	checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: COLORS.lime, alignItems: 'center', justifyContent: 'center' },
+	checkboxActive: { backgroundColor: COLORS.lime },
+	rememberText: { fontSize: 13, color: COLORS.muted },
+	forgotText: { fontSize: 13, color: COLORS.muted },
 	error: { color: COLORS.red, fontSize: 13, textAlign: 'center' },
 	primaryBtn: {
 		backgroundColor: COLORS.lime,
 		borderRadius: 12,
-		paddingVertical: 14,
+		paddingVertical: 15,
 		alignItems: 'center',
 		marginTop: 8,
 	},
 	primaryBtnText: { color: COLORS.bg, fontSize: 15, fontWeight: '800' },
-	footerLink: { marginTop: 24, alignItems: 'center' },
+	dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
+	dividerLine: { flex: 1, height: 0.5, backgroundColor: COLORS.border },
+	dividerText: { fontSize: 12, color: COLORS.muted },
+	socialRow: { flexDirection: 'row', gap: 12 },
+	socialBtn: {
+		flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+		backgroundColor: COLORS.card, borderWidth: 0.5, borderColor: COLORS.border, borderRadius: 12, paddingVertical: 13,
+	},
+	socialBtnText: { color: COLORS.white, fontSize: 14, fontWeight: '600' },
+	footerLink: { marginTop: 28, alignItems: 'center' },
 	footerText: { color: COLORS.muted, fontSize: 13 },
 });
