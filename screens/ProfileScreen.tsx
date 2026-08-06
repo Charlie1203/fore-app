@@ -188,11 +188,38 @@ function CardFooter({ likes, comments }: { likes: number; comments: number }) {
   );
 }
 
+function PhotoCarousel({ photos }: { photos: string[] }) {
+  const [index, setIndex] = useState(0);
+  return (
+    <View>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))}
+      >
+        {photos.map((uri, i) => (
+          <Image key={i} source={{ uri }} style={{ width: SCREEN_W, height: SCREEN_W * 0.65 }} resizeMode="cover" />
+        ))}
+      </ScrollView>
+      {photos.length > 1 && (
+        <View style={styles.photoDots}>
+          {photos.map((_, i) => (
+            <View key={i} style={[styles.photoDot, i === index && styles.photoDotActive]} />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function RoundCard({ round }: { round: RoundDoc }) {
   const [expanded, setExpanded] = useState(false);
+  const hasPhotos = round.photos.length > 0;
 
   return (
     <View style={styles.card}>
+      {hasPhotos && <PhotoCarousel photos={round.photos} />}
       <View style={styles.cardHeader}>
         <View>
           <Text style={styles.cardCourse}>📍 {round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
@@ -820,6 +847,9 @@ const styles = StyleSheet.create({
   achievementsEmptyText: { fontSize: 13, color: COLORS.muted, textAlign: 'center', lineHeight: 19 },
 
   card: { backgroundColor: COLORS.bg, borderBottomWidth: 8, borderBottomColor: '#1a1a1a', overflow: 'hidden' },
+  photoDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, paddingTop: 8 },
+  photoDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: COLORS.dim },
+  photoDotActive: { backgroundColor: COLORS.lime, width: 14 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingBottom: 6 },
   cardTime: { fontSize: 11, color: COLORS.muted },
   cardBody: { paddingHorizontal: 12, paddingBottom: 10 },
