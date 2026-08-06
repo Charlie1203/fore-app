@@ -96,7 +96,7 @@ export default function GlobalSearchScreen() {
                       <TouchableOpacity
                         key={u.uid}
                         style={styles.row}
-                        onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: u.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: u.handicap ?? undefined } })}
+                        onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { uid: u.uid, name: u.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: u.handicap ?? undefined } })}
                       >
                         <View style={[styles.avatar, { backgroundColor: COLORS.lime }]}>
                           <Text style={[styles.avatarText, { color: '#0f0f0f' }]}>{initials}</Text>

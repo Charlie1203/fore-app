@@ -1,6 +1,6 @@
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Dimensions, Animated, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Image,
+  Dimensions, Animated, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
@@ -14,7 +14,8 @@ import { doc, updateDoc, collection, query, where, orderBy, onSnapshot } from 'f
 import { db, storage } from '../firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
-import type { RoundDoc } from '../firebase/types';
+import type { RoundDoc, UserDoc } from '../firebase/types';
+import { followDocId, followUser, unfollowUser } from '../services/follows';
 
 function GolfBallIcon({ color, size = 16 }: { color: string; size?: number }) {
   const d = [
@@ -388,6 +389,7 @@ const epStyles = StyleSheet.create({
 });
 
 export type ViewUser = {
+  uid: string;
   name: string;
   initials: string;
   bg?: string;
@@ -406,6 +408,8 @@ export default function ProfileScreen() {
   const [editVisible, setEditVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [following, setFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [viewUserDoc, setViewUserDoc] = useState<UserDoc | null>(null);
   const [rounds, setRounds] = useState<RoundDoc[]>([]);
   const pagerRef = useRef<PagerView>(null);
 
@@ -418,14 +422,36 @@ export default function ProfileScreen() {
     return unsubscribe;
   }, [isOwnProfile, firebaseUser?.uid]);
 
-  const onPressFollow = () => {
+  // Trae el doc real del usuario visto para tener contadores/handicap al día, no lo que se pasó al navegar.
+  useEffect(() => {
+    if (!viewUser?.uid) { setViewUserDoc(null); return; }
+    return onSnapshot(doc(db, 'users', viewUser.uid), snap => setViewUserDoc(snap.exists() ? snap.data() as UserDoc : null));
+  }, [viewUser?.uid]);
+
+  useEffect(() => {
+    if (!viewUser?.uid || !firebaseUser) return;
+    return onSnapshot(doc(db, 'follows', followDocId(firebaseUser.uid, viewUser.uid)), snap => setFollowing(snap.exists()));
+  }, [viewUser?.uid, firebaseUser?.uid]);
+
+  const onPressFollow = async () => {
+    if (!viewUser?.uid || !firebaseUser || followBusy) return;
     if (following) {
-      Alert.alert('Dejar de seguir', `¿Dejar de seguir a ${viewUser?.name}?`, [
+      Alert.alert('Dejar de seguir', `¿Dejar de seguir a ${viewUser.name}?`, [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Dejar de seguir', style: 'destructive', onPress: () => setFollowing(false) },
+        {
+          text: 'Dejar de seguir', style: 'destructive', onPress: async () => {
+            setFollowBusy(true);
+            try { await unfollowUser(firebaseUser.uid, viewUser.uid); }
+            catch { Alert.alert('Error', 'No pudimos completar la acción. Probá de nuevo.'); }
+            finally { setFollowBusy(false); }
+          },
+        },
       ]);
     } else {
-      setFollowing(true);
+      setFollowBusy(true);
+      try { await followUser(firebaseUser.uid, viewUser.uid); }
+      catch { Alert.alert('Error', 'No pudimos completar la acción. Probá de nuevo.'); }
+      finally { setFollowBusy(false); }
     }
   };
   const totalEagles = rounds.reduce((a, r) => a + r.eagles, 0);
@@ -443,11 +469,11 @@ export default function ProfileScreen() {
     ? {
         name: viewUser.name,
         initials,
-        username: '',
-        club: 'Sin club',
-        handicap: viewUser.handicap ?? null,
-        followers: 0,
-        following: 0,
+        username: viewUserDoc ? '@' + viewUserDoc.username : '',
+        club: viewUserDoc?.club ?? 'Sin club',
+        handicap: viewUserDoc ? viewUserDoc.handicap : (viewUser.handicap ?? null),
+        followers: viewUserDoc?.followersCount ?? 0,
+        following: viewUserDoc?.followingCount ?? 0,
         avatarBg: viewUser.bg ?? COLORS.lime,
         avatarColor: viewUser.color ?? '#0f0f0f',
       }
@@ -631,10 +657,14 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={[styles.followBtn, following && styles.followBtnActive]}
                 onPress={onPressFollow}
+                disabled={followBusy}
               >
-                <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
-                  {following ? 'Siguiendo' : 'Seguir'}
-                </Text>
+                {followBusy
+                  ? <ActivityIndicator size="small" color={following ? COLORS.muted : '#0f0f0f'} />
+                  : <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
+                      {following ? 'Siguiendo' : 'Seguir'}
+                    </Text>
+                }
               </TouchableOpacity>
             )}
           </View>

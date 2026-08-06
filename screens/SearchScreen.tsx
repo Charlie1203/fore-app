@@ -12,6 +12,7 @@ import { collection, query, where, orderBy, onSnapshot, doc, setDoc, addDoc, upd
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { joinGroup, removeMemberFromGroup, deleteGroup } from '../services/groups';
 import { estadoDeTorneo, joinTournament } from '../services/tournaments';
+import { followDocId, followUser, unfollowUser } from '../services/follows';
 import type { CommentDoc, GroupDoc, GroupMemberDoc, GroupPostDoc, TournamentDoc, UserDoc } from '../firebase/types';
 import { formatFechaTorneo } from './TorneosScreen';
 
@@ -82,6 +83,7 @@ type PostType = 'texto' | 'fotos' | 'sistema';
 interface Post {
   id: string;
   tipo: PostType;
+  autorId?: string;
   autor?: string;
   initials?: string;
   bg?: string;
@@ -137,7 +139,7 @@ function CommentsSheet({ visible, onClose, count, groupId, postId }: { visible: 
   }, [visible, groupId, postId]);
 
   const abrirPerfil = (c: CommentDoc) =>
-    navigation.navigate('PerfilUsuario', { viewUser: { name: c.authorName, initials: c.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
+    navigation.navigate('PerfilUsuario', { viewUser: { uid: c.authorId, name: c.authorName, initials: c.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
 
   const enviar = async () => {
     const value = text.trim();
@@ -232,7 +234,7 @@ function PostHeader({ post }: { post: Post }) {
   const navigation = useNavigation<any>();
   // El post fijado lo publica el club (la cuenta del grupo), no una persona — no navega a un perfil.
   const esPersona = !post.pinned;
-  const abrirPerfil = () => navigation.navigate('PerfilUsuario', { viewUser: { name: post.autor, initials: post.initials, bg: post.bg, color: post.color } });
+  const abrirPerfil = () => navigation.navigate('PerfilUsuario', { viewUser: { uid: post.autorId!, name: post.autor, initials: post.initials, bg: post.bg, color: post.color } });
   return (
     <TouchableOpacity style={styles.postHeader} activeOpacity={esPersona ? 0.7 : 1} onPress={esPersona ? abrirPerfil : undefined}>
       <Avatar initials={post.initials!} bg={post.bg!} color={post.color!} size={36} />
@@ -601,6 +603,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
   const toPost = (p: GroupPostDoc): Post => ({
     id: p.id,
     tipo: p.kind === 'fotos' ? 'fotos' : p.kind === 'sistema' ? 'sistema' : 'texto',
+    autorId: p.authorId,
     autor: p.authorName,
     initials: p.authorInitials,
     bg: '#1a2a0a',
@@ -764,7 +767,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
                       style={styles.row}
                       onPress={() => esYo
                         ? navigation.navigate('Tabs', { screen: 'Perfil' })
-                        : navigation.navigate('PerfilUsuario', { viewUser: { name: m.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: m.handicap ?? undefined } })
+                        : navigation.navigate('PerfilUsuario', { viewUser: { uid: m.uid, name: m.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: m.handicap ?? undefined } })
                       }
                     >
                       <Avatar initials={initials} bg={COLORS.lime} color="#0f0f0f" size={46} />
@@ -832,13 +835,34 @@ function GroupRow({ group, isMember, onPress }: { group: GroupDoc; isMember: boo
 
 function PlayerRow({ user }: { user: UserDoc }) {
   const navigation = useNavigation<any>();
+  const { firebaseUser } = useAuth();
   const [following, setFollowing] = useState(false);
+  const [busy, setBusy] = useState(false);
   const initials = user.displayName.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    return onSnapshot(doc(db, 'follows', followDocId(firebaseUser.uid, user.uid)), snap => setFollowing(snap.exists()));
+  }, [firebaseUser?.uid, user.uid]);
+
+  const toggleFollow = async () => {
+    if (!firebaseUser || busy) return;
+    setBusy(true);
+    try {
+      if (following) await unfollowUser(firebaseUser.uid, user.uid);
+      else await followUser(firebaseUser.uid, user.uid);
+    } catch {
+      Alert.alert('Error', 'No pudimos completar la acción. Probá de nuevo.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <View style={styles.row}>
       <TouchableOpacity
         style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}
-        onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { name: user.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: user.handicap ?? undefined } })}
+        onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { uid: user.uid, name: user.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: user.handicap ?? undefined } })}
       >
         <Avatar initials={initials} bg={COLORS.lime} color="#0f0f0f" size={46} />
         <View style={styles.rowInfo}>
@@ -848,11 +872,15 @@ function PlayerRow({ user }: { user: UserDoc }) {
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.followBtn, following && styles.followBtnActive]}
-        onPress={() => setFollowing(!following)}
+        onPress={toggleFollow}
+        disabled={busy}
       >
-        <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
-          {following ? 'Siguiendo' : 'Seguir'}
-        </Text>
+        {busy
+          ? <ActivityIndicator size="small" color={following ? COLORS.white : '#0f0f0f'} />
+          : <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
+              {following ? 'Siguiendo' : 'Seguir'}
+            </Text>
+        }
       </TouchableOpacity>
     </View>
   );

@@ -31,7 +31,7 @@ function PodiumCard({ entry }: { entry: Entry }) {
   const isFirst = entry.pos === 1;
   const abrirPerfil = () => isMe
     ? navigation.navigate('Tabs', { screen: 'Perfil' })
-    : navigation.navigate('PerfilUsuario', { viewUser: { name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
+    : navigation.navigate('PerfilUsuario', { viewUser: { uid: round.userId, name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
   return (
     <TouchableOpacity style={[styles.podiumCard, isFirst && styles.podiumCardFirst]} onPress={abrirPerfil}>
       <Text style={styles.podiumMedal}>{MEDAL[entry.pos]}</Text>
@@ -118,7 +118,7 @@ export default function RankingScreen() {
                     style={[styles.row, isMe && styles.rowMe]}
                     onPress={() => isMe
                       ? navigation.navigate('Tabs', { screen: 'Perfil' })
-                      : navigation.navigate('PerfilUsuario', { viewUser: { name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } })
+                      : navigation.navigate('PerfilUsuario', { viewUser: { uid: round.userId, name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } })
                     }
                   >
                     <Text style={styles.rowPos}>{entry.pos}</Text>

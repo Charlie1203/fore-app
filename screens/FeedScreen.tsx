@@ -25,7 +25,7 @@ import {
 	collection, query, where, orderBy, limit, onSnapshot,
 	doc, getDoc, setDoc, deleteDoc, updateDoc, addDoc, increment, serverTimestamp,
 } from "firebase/firestore";
-import type { RoundDoc, CommentDoc } from "../firebase/types";
+import type { RoundDoc, CommentDoc, FollowDoc } from "../firebase/types";
 
 const SCREEN_W = Dimensions.get("window").width;
 const SCREEN_H = Dimensions.get("window").height;
@@ -349,7 +349,7 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 	}, [visible, roundId]);
 
 	const abrirPerfil = (c: CommentDoc) => {
-		navigation.navigate('PerfilUsuario', { viewUser: { name: c.authorName, initials: c.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
+		navigation.navigate('PerfilUsuario', { viewUser: { uid: c.authorId, name: c.authorName, initials: c.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
 	};
 
 	const enviar = async () => {
@@ -623,7 +623,7 @@ function RoundCard({ round }: { round: RoundDoc }) {
 
 	const abrirPerfil = () => esPropio
 		? navigation.navigate('Tabs', { screen: 'Perfil' })
-		: navigation.navigate('PerfilUsuario', { viewUser: { name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
+		: navigation.navigate('PerfilUsuario', { viewUser: { uid: round.userId, name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
 
 	return (
 		<View style={styles.card}>
@@ -686,6 +686,8 @@ export default function FeedScreen() {
 	const [showToast, setShowToast] = useState(false);
 	const [rounds, setRounds] = useState<RoundDoc[]>([]);
 	const [hayNotifsSinLeer, setHayNotifsSinLeer] = useState(false);
+	const [followingIds, setFollowingIds] = useState<string[]>([]);
+	const [followingLoaded, setFollowingLoaded] = useState(false);
 
 	useEffect(() => {
 		if (!firebaseUser) return;
@@ -693,14 +695,32 @@ export default function FeedScreen() {
 		return onSnapshot(q, snap => setHayNotifsSinLeer(!snap.empty));
 	}, [firebaseUser?.uid]);
 
+	// A quién sigue el usuario — determina qué rondas entran en el feed.
 	useEffect(() => {
-		// Feed de rondas públicas — todavía sin filtrar por a quién seguís, eso llega cuando conectemos follows.
-		const q = query(collection(db, 'rounds'), where('visibility', '==', 'public'), orderBy('date', 'desc'), limit(20));
+		if (!firebaseUser) return;
+		const q = query(collection(db, 'follows'), where('followerUid', '==', firebaseUser.uid));
+		return onSnapshot(q, snap => {
+			setFollowingIds(snap.docs.map(d => (d.data() as FollowDoc).followingUid));
+			setFollowingLoaded(true);
+		});
+	}, [firebaseUser?.uid]);
+
+	useEffect(() => {
+		if (!firebaseUser || !followingLoaded) return;
+		// Siempre incluye las propias, aunque no te sigas a vos mismo. Firestore permite hasta 30 valores en "in".
+		const ids = Array.from(new Set([firebaseUser.uid, ...followingIds])).slice(0, 30);
+		const q = query(
+			collection(db, 'rounds'),
+			where('visibility', '==', 'public'),
+			where('userId', 'in', ids),
+			orderBy('date', 'desc'),
+			limit(20),
+		);
 		const unsubscribe = onSnapshot(q, snap => {
 			setRounds(snap.docs.map(d => d.data() as RoundDoc));
 		});
 		return unsubscribe;
-	}, []);
+	}, [firebaseUser?.uid, followingLoaded, followingIds.join(',')]);
 
 	useEffect(() => {
 		if (!route.params?.showSuccess) return;

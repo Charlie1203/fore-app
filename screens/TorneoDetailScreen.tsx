@@ -169,7 +169,7 @@ function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, 
               style={styles.participanteRow}
               onPress={() => esYo
                 ? navigation.navigate('Tabs', { screen: 'Perfil' })
-                : navigation.navigate('PerfilUsuario', { viewUser: { name: p.displayName, initials: p.initials, bg: COLORS.lime, color: '#0f0f0f', handicap: p.handicap } })
+                : navigation.navigate('PerfilUsuario', { viewUser: { uid: p.uid, name: p.displayName, initials: p.initials, bg: COLORS.lime, color: '#0f0f0f', handicap: p.handicap } })
               }
             >
               <Avatar initials={p.initials} size={40} />

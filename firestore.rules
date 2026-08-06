@@ -20,7 +20,10 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create: if isOwner(uid);
-      allow update: if isOwner(uid);
+      // El dueño puede editar todo; cualquier usuario firmado puede tocar solo followersCount
+      // (necesario para poder seguir/dejar de seguir a otro usuario).
+      allow update: if isOwner(uid) ||
+        (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["followersCount"]));
       allow delete: if false;
 
       match /notifications/{notifId} {
