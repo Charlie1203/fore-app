@@ -83,9 +83,9 @@ export default function FollowListScreen() {
           {users.map(u => (
             <TouchableOpacity key={u.uid} style={styles.row} onPress={() => abrirPerfil(u)}>
               <Avatar initials={initialsOf(u.displayName)} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowName}>{u.displayName}</Text>
-                <Text style={styles.rowSub}>@{u.username}{u.handicap != null ? ` · HCP ${u.handicap}` : ''}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.rowName} numberOfLines={1}>{u.displayName}</Text>
+                <Text style={styles.rowSub} numberOfLines={1}>@{u.username}{u.handicap != null ? ` · HCP ${u.handicap}` : ''}</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
             </TouchableOpacity>

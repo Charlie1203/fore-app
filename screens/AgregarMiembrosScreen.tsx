@@ -124,8 +124,8 @@ export default function AgregarMiembrosScreen() {
                 <Text style={styles.avatarText}>{initials}</Text>
               </View>
               <View style={styles.rowInfo}>
-                <Text style={styles.rowName}>{u.displayName}</Text>
-                <Text style={styles.rowSub}>@{u.username}{u.handicap != null ? ` · HCP ${u.handicap}` : ''}</Text>
+                <Text style={styles.rowName} numberOfLines={1}>{u.displayName}</Text>
+                <Text style={styles.rowSub} numberOfLines={1}>@{u.username}{u.handicap != null ? ` · HCP ${u.handicap}` : ''}</Text>
               </View>
               <View style={[styles.checkbox, active && styles.checkboxActive]}>
                 {active && <Ionicons name="checkmark" size={14} color="#0f0f0f" />}
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
 
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 12 },
   rowBorder: { borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
-  rowInfo: { flex: 1 },
+  rowInfo: { flex: 1, minWidth: 0 },
   rowName: { fontSize: 14, fontWeight: '600', color: COLORS.white },
   rowSub: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
   emptyText: { textAlign: 'center', color: COLORS.muted, fontSize: 13, marginTop: 40, paddingHorizontal: 32 },

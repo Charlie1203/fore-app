@@ -124,10 +124,10 @@ export default function RankingScreen() {
                     <Text style={styles.rowPos}>{entry.pos}</Text>
                     <Avatar initials={round.authorInitials} size={38} />
                     <View style={styles.rowInfo}>
-                      <Text style={[styles.rowName, isMe && { color: COLORS.lime }]}>
+                      <Text style={[styles.rowName, isMe && { color: COLORS.lime }]} numberOfLines={1}>
                         {round.authorName}{isMe ? ' (vos)' : ''}
                       </Text>
-                      <Text style={styles.rowMeta}>{round.clubName} · {formatFecha(round.date)}</Text>
+                      <Text style={styles.rowMeta} numberOfLines={1}>{round.clubName} · {formatFecha(round.date)}</Text>
                     </View>
                     <View style={styles.rowScores}>
                       <Text style={styles.rowScore}>{round.totalScore}</Text>
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: '#1e1e1e' },
   rowMe: { backgroundColor: '#0f1a0a' },
   rowPos: { fontSize: 13, fontWeight: '700', color: COLORS.dim, width: 18, textAlign: 'center' },
-  rowInfo: { flex: 1 },
+  rowInfo: { flex: 1, minWidth: 0 },
   rowName: { fontSize: 14, fontWeight: '600', color: COLORS.white },
   rowMeta: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
   rowScores: { alignItems: 'flex-end' },

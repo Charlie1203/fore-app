@@ -173,9 +173,9 @@ function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, 
               }
             >
               <Avatar initials={p.initials} size={40} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.participanteNombre}>{p.displayName}{esYo ? ' (vos)' : ''}</Text>
-                <Text style={styles.participanteSub}>{p.handicap != null ? `HCP ${p.handicap}` : 'Sin HCP cargado'}</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.participanteNombre} numberOfLines={1}>{p.displayName}{esYo ? ' (vos)' : ''}</Text>
+                <Text style={styles.participanteSub} numberOfLines={1}>{p.handicap != null ? `HCP ${p.handicap}` : 'Sin HCP cargado'}</Text>
               </View>
               {esYo ? (
                 <TouchableOpacity onPress={confirmarSalir} disabled={removingUid === p.uid} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

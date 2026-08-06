@@ -180,10 +180,10 @@ function CommentsSheet({ visible, onClose, count, groupId, postId }: { visible: 
               </TouchableOpacity>
               <View style={styles.commentBubble}>
                 <View style={styles.commentMeta}>
-                  <TouchableOpacity onPress={() => abrirPerfil(c)}>
-                    <Text style={styles.commentAutor}>{c.authorName}</Text>
+                  <TouchableOpacity style={{ flexShrink: 1 }} onPress={() => abrirPerfil(c)}>
+                    <Text style={styles.commentAutor} numberOfLines={1}>{c.authorName}</Text>
                   </TouchableOpacity>
-                  <Text style={styles.commentTiempo}>{formatTs(c.createdAt)}</Text>
+                  <Text style={styles.commentTiempo} numberOfLines={1}>{formatTs(c.createdAt)}</Text>
                 </View>
                 <Text style={styles.commentTexto}>{c.text}</Text>
               </View>
@@ -238,9 +238,9 @@ function PostHeader({ post }: { post: Post }) {
   return (
     <TouchableOpacity style={styles.postHeader} activeOpacity={esPersona ? 0.7 : 1} onPress={esPersona ? abrirPerfil : undefined}>
       <Avatar initials={post.initials!} bg={post.bg!} color={post.color!} size={36} />
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={styles.postAutor}>{post.autor}</Text>
+          <Text style={styles.postAutor} numberOfLines={1}>{post.autor}</Text>
           {post.pinned && (
             <View style={styles.pinnedBadge}>
               <Ionicons name="pin" size={10} color={COLORS.lime} />
@@ -248,7 +248,7 @@ function PostHeader({ post }: { post: Post }) {
             </View>
           )}
         </View>
-        <Text style={styles.postTiempo}>{post.tiempo}</Text>
+        <Text style={styles.postTiempo} numberOfLines={1}>{post.tiempo}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -646,7 +646,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={20} color={COLORS.white} />
         </TouchableOpacity>
-        <Text style={styles.detailTitle}>{group.name}</Text>
+        <Text style={styles.detailTitle} numberOfLines={1}>{group.name}</Text>
         {!isMember && group.type === 'club' && (
           <TouchableOpacity style={styles.joinBtnSmall} onPress={handleJoin} disabled={joining}>
             {joining
@@ -717,9 +717,9 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
               return (
                 <TouchableOpacity key={t.id} style={styles.torneoRow} onPress={() => navigation.navigate('TorneoDetail', { torneoId: t.id })}>
                   <View style={[styles.torneoEstadoDot, estado === 'próximo' ? styles.torneoEstadoDotNext : styles.torneoEstadoDotDone]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.torneoNombre}>{t.name}</Text>
-                    <Text style={styles.torneoMeta}>{t.modality} · {formatFechaTorneo(t.roundDates)}</Text>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.torneoNombre} numberOfLines={1}>{t.name}</Text>
+                    <Text style={styles.torneoMeta} numberOfLines={1}>{t.modality} · {formatFechaTorneo(t.roundDates)}</Text>
                   </View>
                   {soyParticipante || estado === 'finalizado' ? (
                     <View style={estado === 'próximo' ? styles.torneoBadgeNext : styles.torneoBadgeDone}>
@@ -773,12 +773,12 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
                       <Avatar initials={initials} bg={COLORS.lime} color="#0f0f0f" size={46} />
                       <View style={styles.rowInfo}>
                         <View style={styles.rowNameRow}>
-                          <Text style={styles.rowName}>{m.displayName}{esYo ? ' (vos)' : ''}</Text>
+                          <Text style={styles.rowName} numberOfLines={1}>{m.displayName}{esYo ? ' (vos)' : ''}</Text>
                           {m.role === 'admin' && (
                             <View style={styles.adminBadge}><Text style={styles.adminBadgeText}>Admin</Text></View>
                           )}
                         </View>
-                        <Text style={styles.rowSub}>{m.handicap != null ? `HCP ${m.handicap}` : 'Sin handicap'}</Text>
+                        <Text style={styles.rowSub} numberOfLines={1}>{m.handicap != null ? `HCP ${m.handicap}` : 'Sin handicap'}</Text>
                       </View>
                       {esYo ? (
                         <TouchableOpacity onPress={confirmarSalir} disabled={removingUid === m.uid} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -823,10 +823,10 @@ function GroupRow({ group, isMember, onPress }: { group: GroupDoc; isMember: boo
       <Avatar initials={visual.initials} bg={visual.bg} color={visual.color} size={46} />
       <View style={styles.rowInfo}>
         <View style={styles.rowNameRow}>
-          <Text style={styles.rowName}>{group.name}</Text>
+          <Text style={styles.rowName} numberOfLines={1}>{group.name}</Text>
           {isMember && <Ionicons name="checkmark-circle" size={15} color={COLORS.lime} />}
         </View>
-        <Text style={styles.rowSub}>{group.membersCount} {group.membersCount === 1 ? 'miembro' : 'miembros'} · {group.type === 'club' ? 'Club' : 'Privado'} · {formatTs(group.lastActivityAt)}</Text>
+        <Text style={styles.rowSub} numberOfLines={1}>{group.membersCount} {group.membersCount === 1 ? 'miembro' : 'miembros'} · {group.type === 'club' ? 'Club' : 'Privado'} · {formatTs(group.lastActivityAt)}</Text>
       </View>
       <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
     </TouchableOpacity>
@@ -861,13 +861,13 @@ function PlayerRow({ user }: { user: UserDoc }) {
   return (
     <View style={styles.row}>
       <TouchableOpacity
-        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}
+        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, gap: 12 }}
         onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { uid: user.uid, name: user.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: user.handicap ?? undefined } })}
       >
         <Avatar initials={initials} bg={COLORS.lime} color="#0f0f0f" size={46} />
         <View style={styles.rowInfo}>
-          <Text style={styles.rowName}>{user.displayName}</Text>
-          <Text style={styles.rowSub}>@{user.username}{user.handicap != null ? ` · HCP ${user.handicap}` : ''}</Text>
+          <Text style={styles.rowName} numberOfLines={1}>{user.displayName}</Text>
+          <Text style={styles.rowSub} numberOfLines={1}>@{user.username}{user.handicap != null ? ` · HCP ${user.handicap}` : ''}</Text>
         </View>
       </TouchableOpacity>
       <TouchableOpacity
@@ -1037,8 +1037,8 @@ const styles = StyleSheet.create({
   list: {},
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 13, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   rowNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rowInfo: { flex: 1 },
-  rowName: { fontSize: 15, fontWeight: '600', color: COLORS.white },
+  rowInfo: { flex: 1, minWidth: 0 },
+  rowName: { flexShrink: 1, fontSize: 15, fontWeight: '600', color: COLORS.white },
   rowSub: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
   avatar: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontWeight: '700' },
@@ -1091,7 +1091,7 @@ const styles = StyleSheet.create({
   postCard: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 8, borderBottomColor: '#1a1a1a' },
   postCardPinned: { backgroundColor: '#0f1a09' },
   postHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  postAutor: { fontSize: 14, fontWeight: '700', color: COLORS.white },
+  postAutor: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: COLORS.white },
   postTiempo: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
   postTexto: { fontSize: 14, color: '#ddd', lineHeight: 20 },
   pinnedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#1a2a0a', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
@@ -1169,7 +1169,7 @@ const styles = StyleSheet.create({
   commentBubble: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 12, padding: 10 },
   commentMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   commentAutor: { fontSize: 13, fontWeight: '700', color: COLORS.white },
-  commentTiempo: { fontSize: 11, color: COLORS.dim },
+  commentTiempo: { fontSize: 11, color: COLORS.dim, marginLeft: 6 },
   commentTexto: { fontSize: 13, color: '#ddd', lineHeight: 18 },
   commentInput: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 0.5, borderTopColor: '#1e1e1e' },
   commentTextInput: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, color: COLORS.white },

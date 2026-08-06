@@ -272,7 +272,7 @@ export default function CreateTorneoScreen() {
             onPress={() => { setGrupoId(g.id); setGrupoNombre(g.name); setGrupoOpen(false); }}
           >
             <Avatar initials={groupInitials(g.name)} bg={COLORS.lime} color="#0f0f0f" size={28} />
-            <Text style={[styles.popupItemText, { flex: 1 }, grupoId === g.id && styles.textActive]}>{g.name}</Text>
+            <Text style={[styles.popupItemText, { flex: 1 }, grupoId === g.id && styles.textActive]} numberOfLines={1}>{g.name}</Text>
             {grupoId === g.id && <Ionicons name="checkmark" size={18} color={COLORS.lime} />}
           </TouchableOpacity>
         ))}

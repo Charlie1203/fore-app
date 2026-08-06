@@ -31,9 +31,9 @@ function TorneoRow({ torneo, onPress }: { torneo: TournamentDoc; onPress: () => 
   return (
     <TouchableOpacity style={styles.torneoRow} onPress={onPress}>
       <View style={[styles.dot, { backgroundColor: dotColor }]} />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.torneoNombre}>{torneo.name}</Text>
-        <Text style={styles.torneoMeta}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.torneoNombre} numberOfLines={1}>{torneo.name}</Text>
+        <Text style={styles.torneoMeta} numberOfLines={1}>
           {torneo.modality} · {formatFechaTorneo(torneo.roundDates)}{torneo.groupName ? ` · ${torneo.groupName}` : ' · Abierto'}
         </Text>
         {estado === 'en curso' && (

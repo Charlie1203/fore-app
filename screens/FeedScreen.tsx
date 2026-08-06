@@ -404,10 +404,10 @@ function CommentsSheet({ visible, roundId, count, onClose }: { visible: boolean;
 								</TouchableOpacity>
 								<View style={styles.commentBubble}>
 									<View style={styles.commentMeta}>
-										<TouchableOpacity onPress={() => abrirPerfil(c)}>
-											<Text style={styles.commentAutor}>{c.authorName}</Text>
+										<TouchableOpacity style={{ flexShrink: 1 }} onPress={() => abrirPerfil(c)}>
+											<Text style={styles.commentAutor} numberOfLines={1}>{c.authorName}</Text>
 										</TouchableOpacity>
-										<Text style={styles.commentTiempo}>{formatFechaComentario(c.createdAt)}</Text>
+										<Text style={styles.commentTiempo} numberOfLines={1}>{formatFechaComentario(c.createdAt)}</Text>
 									</View>
 									<Text style={styles.commentTexto}>{c.text}</Text>
 								</View>
@@ -630,8 +630,8 @@ function RoundCard({ round }: { round: RoundDoc }) {
 			<TouchableOpacity style={styles.cardHeader} onPress={abrirPerfil}>
 				<Avatar initials={round.authorInitials} bg={COLORS.lime} color="#0f0f0f" />
 				<View style={styles.cardMeta}>
-					<Text style={styles.cardName}>{round.authorName}</Text>
-					<Text style={styles.cardCourse}>📍 {round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
+					<Text style={styles.cardName} numberOfLines={1}>{round.authorName}</Text>
+					<Text style={styles.cardCourse} numberOfLines={1}>📍 {round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
 					<Text style={styles.cardTime}>{formatFechaRonda(round.date)}</Text>
 				</View>
 				<Text style={styles.dots}>···</Text>
@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
 	},
 	avatar: { borderRadius: 999, alignItems: "center", justifyContent: "center" },
 	avatarText: { fontWeight: "700" },
-	cardMeta: { flex: 1 },
+	cardMeta: { flex: 1, minWidth: 0 },
 	cardName: { fontSize: 14, fontWeight: "700", color: COLORS.white },
 	cardCourse: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
 	cardTime: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
@@ -834,7 +834,7 @@ const styles = StyleSheet.create({
 	commentBubble: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 12, padding: 10 },
 	commentMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
 	commentAutor: { fontSize: 13, fontWeight: '700', color: '#f0f0f0' },
-	commentTiempo: { fontSize: 11, color: '#444' },
+	commentTiempo: { fontSize: 11, color: '#444', marginLeft: 6 },
 	commentTexto: { fontSize: 13, color: '#ddd', lineHeight: 18 },
 	commentInput: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 0.5, borderTopColor: '#1e1e1e' },
 	commentTextInput: { flex: 1, backgroundColor: '#1e1e1e', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, color: '#f0f0f0' },

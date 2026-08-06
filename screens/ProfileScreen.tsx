@@ -646,14 +646,14 @@ export default function ProfileScreen() {
             }
             <View style={styles.headerInfo}>
               <View style={styles.nameRow}>
-                <Text style={styles.name}>{displayUser.name}</Text>
+                <Text style={styles.name} numberOfLines={1}>{displayUser.name}</Text>
                 <View style={styles.hcpBadge}>
                   <Text style={styles.hcpBadgeNum}>{displayUser.handicap ?? '—'}</Text>
                   <Text style={styles.hcpBadgeLabel}>HCP</Text>
                 </View>
               </View>
-              {!!displayUser.username && <Text style={styles.username}>{displayUser.username}</Text>}
-              <Text style={styles.club}>📍 {displayUser.club}</Text>
+              {!!displayUser.username && <Text style={styles.username} numberOfLines={1}>{displayUser.username}</Text>}
+              <Text style={styles.club} numberOfLines={1}>📍 {displayUser.club}</Text>
             </View>
             {isOwnProfile ? (
               <TouchableOpacity style={styles.settingsBtn} onPress={() => setMenuVisible(true)}>
@@ -742,9 +742,9 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, paddingBottom: 12 },
   avatarLarge: { width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.lime, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 22, fontWeight: '800', color: '#0f0f0f' },
-  headerInfo: { flex: 1 },
+  headerInfo: { flex: 1, minWidth: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name: { fontSize: 17, fontWeight: '700', color: COLORS.white },
+  name: { flexShrink: 1, fontSize: 17, fontWeight: '700', color: COLORS.white },
   username: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
   club: { fontSize: 11, color: COLORS.muted, marginTop: 4 },
   bio: { fontSize: 13, color: COLORS.white, marginHorizontal: 18, marginTop: 8, lineHeight: 18 },
