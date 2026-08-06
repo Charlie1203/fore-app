@@ -478,6 +478,7 @@ export default function ProfileScreen() {
         username: viewUserDoc ? '@' + viewUserDoc.username : '',
         club: viewUserDoc?.club ?? 'Sin club',
         handicap: viewUserDoc ? viewUserDoc.handicap : (viewUser.handicap ?? null),
+        rounds: viewUserDoc?.roundsCount ?? 0,
         followers: viewUserDoc?.followersCount ?? 0,
         following: viewUserDoc?.followingCount ?? 0,
         avatarBg: viewUser.bg ?? COLORS.lime,
@@ -489,6 +490,8 @@ export default function ProfileScreen() {
         username: '@' + (userDoc?.username ?? ''),
         club: userDoc?.club ?? 'Sin club',
         handicap: userDoc?.handicap ?? null,
+        // Math.max por si el contador todavía no alcanzó a las rondas cargadas antes de que existiera.
+        rounds: Math.max(userDoc?.roundsCount ?? 0, rounds.length),
         followers: userDoc?.followersCount ?? 0,
         following: userDoc?.followingCount ?? 0,
         avatarBg: COLORS.lime,
@@ -680,6 +683,11 @@ export default function ProfileScreen() {
           )}
 
           <View style={styles.socialRow}>
+            <TouchableOpacity style={styles.socialItem} onPress={() => handleTabPress(0)}>
+              <Text style={styles.socialVal}>{displayUser.rounds}</Text>
+              <Text style={styles.socialLabel}>Rondas</Text>
+            </TouchableOpacity>
+            <View style={styles.socialDivider} />
             <TouchableOpacity
               style={styles.socialItem}
               onPress={() => navigation.navigate('FollowList', { uid: viewUser?.uid ?? firebaseUser?.uid, mode: 'following', title: `${displayUser.name} sigue a` })}

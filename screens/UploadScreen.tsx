@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase/config';
-import { collection, doc, setDoc, serverTimestamp, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { HoleResult, RoundDoc } from '../firebase/types';
 
@@ -488,6 +488,7 @@ export default function UploadScreen() {
         commentsCount: 0,
         createdAt: serverTimestamp(),
       });
+      await updateDoc(doc(db, 'users', firebaseUser.uid), { roundsCount: increment(1) });
 
       reset();
       navigation.navigate('Inicio', { showSuccess: Date.now() });
