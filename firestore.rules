@@ -36,7 +36,9 @@ service cloud.firestore {
     }
 
     match /usernames/{username} {
-      allow read: if isSignedIn();
+      // Lectura pública a propósito: hace falta poder resolver @usuario -> email
+      // ANTES de loguearse (Firebase Auth pide el email, no el username).
+      allow read: if true;
       allow create: if isSignedIn()
                     && request.resource.data.uid == request.auth.uid;
       allow update, delete: if false;

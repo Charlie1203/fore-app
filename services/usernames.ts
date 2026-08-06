@@ -33,7 +33,7 @@ export async function reserveUsernameAndCreateUser(
 		if (usernameSnap.exists()) {
 			throw new Error('USERNAME_TAKEN');
 		}
-		tx.set(usernameRef, { uid });
+		tx.set(usernameRef, { uid, email: userData.email });
 		tx.set(userRef, {
 			uid,
 			username: usernameLower,

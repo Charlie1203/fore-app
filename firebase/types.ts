@@ -21,9 +21,11 @@ export interface UserDoc {
 	updatedAt: Timestamp;
 }
 
-// usernames/{usernameLower} — lock de unicidad, create-only
+// usernames/{usernameLower} — lock de unicidad, create-only. Lectura pública sin auth
+// a propósito: hace falta poder resolver @usuario -> email ANTES de loguearse.
 export interface UsernameDoc {
 	uid: string;
+	email: string;
 }
 
 // users/{uid}/notifications/{notifId}

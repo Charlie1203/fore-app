@@ -15,8 +15,9 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AuthTextInput from '../../components/AuthTextInput';
 import { loginWithEmail, resetPassword, mapAuthError } from '../../services/auth';
-import { getDocs, query, collection, where } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import type { UsernameDoc } from '../../firebase/types';
 
 const COLORS = {
 	bg: '#0f0f0f',
@@ -31,11 +32,14 @@ const COLORS = {
 async function resolveEmail(input: string): Promise<string> {
 	// Si tiene @ en el medio es un email, si no es un username
 	if (input.includes('@') && input.indexOf('@') > 0) return input;
-	// Buscar el email asociado al username
+	// Buscar el email asociado al username en usernames/{username} — es de lectura
+	// pública a propósito, porque todavía no hay sesión iniciada en este punto.
 	const username = input.replace(/^@/, '').toLowerCase();
-	const snap = await getDocs(query(collection(db, 'users'), where('username', '==', username)));
-	if (snap.empty) throw { code: 'auth/user-not-found' };
-	return snap.docs[0].data().email as string;
+	const snap = await getDoc(doc(db, 'usernames', username));
+	if (!snap.exists()) throw { code: 'auth/user-not-found' };
+	const data = snap.data() as UsernameDoc;
+	if (!data.email) throw { code: 'auth/user-not-found' };
+	return data.email;
 }
 
 export default function LoginScreen() {
