@@ -353,13 +353,11 @@ function CardFooter({
 	roundId,
 	likes,
 	comments,
-	shares,
 	shareText,
 }: {
 	roundId: string;
 	likes: number;
 	comments: number;
-	shares: number;
 	shareText: string;
 }) {
 	const { firebaseUser } = useAuth();
@@ -413,12 +411,9 @@ function CardFooter({
 
 	const onShare = async () => {
 		try {
-			const result = await Share.share({ message: shareText });
-			if (result.action === Share.sharedAction) {
-				await updateDoc(doc(db, 'rounds', roundId), { sharesCount: increment(1) });
-			}
+			await Share.share({ message: shareText });
 		} catch {
-			// el usuario canceló o el share sheet falló — no hay nada que revertir
+			// el usuario canceló o el share sheet falló
 		}
 	};
 
@@ -436,7 +431,6 @@ function CardFooter({
 				</TouchableOpacity>
 				<TouchableOpacity style={styles.action} onPress={onShare}>
 					<Ionicons name="paper-plane-outline" size={19} color={COLORS.dim} />
-					{shares > 0 && <Text style={styles.actionText}>{shares}</Text>}
 				</TouchableOpacity>
 				<View style={{ flex: 1 }} />
 				<TouchableOpacity onPress={toggleSave}>
@@ -597,7 +591,7 @@ function RoundCard({ round }: { round: RoundDoc }) {
 				</>
 			)}
 
-			<CardFooter roundId={round.id} likes={round.likesCount} comments={round.commentsCount} shares={round.sharesCount} shareText={shareText} />
+			<CardFooter roundId={round.id} likes={round.likesCount} comments={round.commentsCount} shareText={shareText} />
 		</View>
 	);
 }

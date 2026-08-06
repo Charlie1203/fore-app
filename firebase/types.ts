@@ -77,7 +77,6 @@ export interface RoundDoc {
 	visibility: 'public' | 'friends' | 'private';
 	likesCount: number;
 	commentsCount: number;
-	sharesCount: number;
 	createdAt: Timestamp;
 }
 
