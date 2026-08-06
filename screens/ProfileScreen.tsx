@@ -434,7 +434,7 @@ export default function ProfileScreen() {
   }, [viewUser?.uid, firebaseUser?.uid]);
 
   const onPressFollow = async () => {
-    if (!viewUser?.uid || !firebaseUser || followBusy) return;
+    if (!viewUser?.uid || !firebaseUser || !userDoc || followBusy) return;
     if (following) {
       Alert.alert('Dejar de seguir', `¿Dejar de seguir a ${viewUser.name}?`, [
         { text: 'Cancelar', style: 'cancel' },
@@ -449,7 +449,7 @@ export default function ProfileScreen() {
       ]);
     } else {
       setFollowBusy(true);
-      try { await followUser(firebaseUser.uid, viewUser.uid); }
+      try { await followUser({ uid: firebaseUser.uid, displayName: userDoc.displayName }, { uid: viewUser.uid, displayName: viewUser.name }); }
       catch { Alert.alert('Error', 'No pudimos completar la acción. Probá de nuevo.'); }
       finally { setFollowBusy(false); }
     }
@@ -674,12 +674,18 @@ export default function ProfileScreen() {
           )}
 
           <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialItem}>
+            <TouchableOpacity
+              style={styles.socialItem}
+              onPress={() => navigation.navigate('FollowList', { uid: viewUser?.uid ?? firebaseUser?.uid, mode: 'following', title: `${displayUser.name} sigue a` })}
+            >
               <Text style={styles.socialVal}>{displayUser.following}</Text>
               <Text style={styles.socialLabel}>Siguiendo</Text>
             </TouchableOpacity>
             <View style={styles.socialDivider} />
-            <TouchableOpacity style={styles.socialItem}>
+            <TouchableOpacity
+              style={styles.socialItem}
+              onPress={() => navigation.navigate('FollowList', { uid: viewUser?.uid ?? firebaseUser?.uid, mode: 'followers', title: `Seguidores de ${displayUser.name}` })}
+            >
               <Text style={styles.socialVal}>{displayUser.followers}</Text>
               <Text style={styles.socialLabel}>Seguidores</Text>
             </TouchableOpacity>

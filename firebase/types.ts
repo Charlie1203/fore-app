@@ -39,7 +39,11 @@ export interface NotificationDoc {
 // follows/{followerUid}_{followingUid}
 export interface FollowDoc {
 	followerUid: string;
+	followerName: string;
+	followerInitials: string;
 	followingUid: string;
+	followingName: string;
+	followingInitials: string;
 	createdAt: Timestamp;
 }
 
