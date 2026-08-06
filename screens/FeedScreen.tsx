@@ -590,11 +590,23 @@ function formatFechaRonda(ts: any): string {
 	return ts.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 }
 
-function PostMenu({ visible, onClose, onDelete, deleting }: { visible: boolean; onClose: () => void; onDelete: () => void; deleting: boolean }) {
+function PostMenu({ visible, anchor, onClose, onDelete, deleting }: {
+	visible: boolean;
+	anchor: { x: number; y: number; width: number; height: number } | null;
+	onClose: () => void;
+	onDelete: () => void;
+	deleting: boolean;
+}) {
+	const cardWidth = 200;
+	// Ancla la esquina superior derecha del menú al botón tocado, pegado justo debajo,
+	// y lo desliza para adentro si se saldría de la pantalla por la derecha.
+	const left = anchor ? Math.min(anchor.x + anchor.width - cardWidth, SCREEN_W - cardWidth - 12) : 0;
+	const top = anchor ? anchor.y + anchor.height + 4 : 0;
+
 	return (
 		<Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-			<TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={onClose}>
-				<View style={styles.menuCard}>
+			<TouchableOpacity style={styles.menuOverlayFree} activeOpacity={1} onPress={onClose}>
+				<View style={[styles.menuCard, { position: 'absolute', top, left, width: cardWidth }]}>
 					<TouchableOpacity style={styles.menuItem} onPress={() => { onClose(); onDelete(); }} disabled={deleting}>
 						{deleting
 							? <ActivityIndicator size="small" color={COLORS.red} />
@@ -614,9 +626,18 @@ function RoundCard({ round }: { round: RoundDoc }) {
 	const [expanded, setExpanded] = useState(false);
 	const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 	const [menuOpen, setMenuOpen] = useState(false);
+	const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 	const [deleting, setDeleting] = useState(false);
+	const dotsRef = useRef<View>(null);
 	const hasPhotos = round.photos.length > 0;
 	const esPropio = round.userId === firebaseUser?.uid;
+
+	const openMenu = () => {
+		dotsRef.current?.measureInWindow((x, y, width, height) => {
+			setMenuAnchor({ x, y, width, height });
+			setMenuOpen(true);
+		});
+	};
 
 	const abrirPerfil = () => esPropio
 		? navigation.navigate('Tabs', { screen: 'Perfil' })
@@ -654,12 +675,12 @@ function RoundCard({ round }: { round: RoundDoc }) {
 					</View>
 				</TouchableOpacity>
 				{esPropio && (
-					<TouchableOpacity onPress={() => setMenuOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+					<TouchableOpacity ref={dotsRef} onPress={openMenu} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
 						<Text style={styles.dots}>···</Text>
 					</TouchableOpacity>
 				)}
 			</View>
-			<PostMenu visible={menuOpen} onClose={() => setMenuOpen(false)} onDelete={onDelete} deleting={deleting} />
+			<PostMenu visible={menuOpen} anchor={menuAnchor} onClose={() => setMenuOpen(false)} onDelete={onDelete} deleting={deleting} />
 
 			<View style={styles.cardBody}>
 				<RoundStats holes={round.holes} score={round.totalScore} vsPar={round.vsPar} />
@@ -832,7 +853,7 @@ const styles = StyleSheet.create({
 	cardCourse: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
 	cardTime: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
 	dots: { fontSize: 18, color: COLORS.dim, paddingHorizontal: 4 },
-	menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'flex-end', paddingTop: 60, paddingRight: 18 },
+	menuOverlayFree: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
 	menuCard: { backgroundColor: '#1e1e1e', borderRadius: 12, borderWidth: 0.5, borderColor: '#2a2a2a', overflow: 'hidden', minWidth: 180 },
 	menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 13 },
 	menuItemText: { fontSize: 14, fontWeight: '600', color: COLORS.white },
