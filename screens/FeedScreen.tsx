@@ -470,21 +470,23 @@ function CardFooter({
 
 	const toggleLike = async () => {
 		if (!firebaseUser || busy) return;
+		// Optimista: el ícono cambia al toque, no espera la ida y vuelta al servidor.
+		// Si la escritura falla, se revierte en el catch.
+		const wasLiked = isLiked;
+		setIsLiked(!wasLiked);
 		setBusy(true);
 		const likeRef = doc(db, 'rounds', roundId, 'likes', firebaseUser.uid);
 		const roundRef = doc(db, 'rounds', roundId);
 		try {
-			if (isLiked) {
+			if (wasLiked) {
 				await deleteDoc(likeRef);
 				await updateDoc(roundRef, { likesCount: increment(-1) });
-				setIsLiked(false);
 			} else {
 				await setDoc(likeRef, { uid: firebaseUser.uid, createdAt: serverTimestamp() });
 				await updateDoc(roundRef, { likesCount: increment(1) });
-				setIsLiked(true);
 			}
 		} catch {
-			// noop — el estado visual vuelve a quedar como estaba en el próximo render
+			setIsLiked(wasLiked);
 		} finally {
 			setBusy(false);
 		}
