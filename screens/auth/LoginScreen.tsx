@@ -96,10 +96,9 @@ export default function LoginScreen() {
 
 					<View style={styles.form}>
 						<AuthTextInput
-							icon="mail-outline"
-							placeholder="Email"
+							icon="person-outline"
+							placeholder="Email o @usuario"
 							autoCapitalize="none"
-							keyboardType="email-address"
 							value={identifier}
 							onChangeText={setIdentifier}
 						/>
