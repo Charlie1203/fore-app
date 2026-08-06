@@ -90,11 +90,7 @@ export default function LoginScreen() {
 				behavior={Platform.OS === 'ios' ? 'padding' : undefined}
 			>
 				<ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-					<Image source={require('../../assets/images/logo.jpeg')} style={styles.logoImg} resizeMode="contain" />
-					<Text style={styles.wordmark}>
-						FORE<Text style={{ color: COLORS.lime }}>!</Text>
-					</Text>
-					<Text style={styles.tagline}>YOUR GAME. YOUR STORY.</Text>
+					<Image source={require('../../assets/images/logo-full.png')} style={styles.logoImg} resizeMode="contain" />
 
 					<Text style={styles.welcome}>Bienvenido a FORE!</Text>
 					<Text style={styles.subtitle}>Iniciá sesión para seguir jugando</Text>
@@ -172,9 +168,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: COLORS.bg },
 	scroll: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: 40 },
-	logoImg: { width: 110, height: 110, alignSelf: 'center' },
-	wordmark: { fontSize: 34, fontWeight: '800', color: COLORS.white, textAlign: 'center', letterSpacing: 4, marginTop: 4 },
-	tagline: { fontSize: 11, color: COLORS.muted, textAlign: 'center', letterSpacing: 3, marginTop: 6, marginBottom: 28 },
+	logoImg: { width: '100%', height: 220, alignSelf: 'center', marginBottom: 8 },
 	welcome: { fontSize: 20, fontWeight: '800', color: COLORS.white, textAlign: 'center' },
 	subtitle: { fontSize: 13, color: COLORS.muted, textAlign: 'center', marginTop: 6, marginBottom: 28 },
 	form: { gap: 12 },
