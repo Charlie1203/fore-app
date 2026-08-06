@@ -472,6 +472,7 @@ export default function UploadScreen() {
         userId: firebaseUser.uid,
         authorName,
         authorInitials,
+        authorPhotoURL: userDoc?.photoURL ?? null,
         courseId: null,
         courseName: course,
         clubName: club,

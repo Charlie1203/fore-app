@@ -111,12 +111,17 @@ function Avatar({
 	bg,
 	color,
 	size = 38,
+	photoURL,
 }: {
 	initials: string;
 	bg: string;
 	color: string;
 	size?: number;
+	photoURL?: string | null;
 }) {
+	if (photoURL) {
+		return <Image source={{ uri: photoURL }} style={[styles.avatar, { width: size, height: size }]} />;
+	}
 	return (
 		<View
 			style={[
@@ -628,7 +633,7 @@ function RoundCard({ round }: { round: RoundDoc }) {
 	return (
 		<View style={styles.card}>
 			<TouchableOpacity style={styles.cardHeader} onPress={abrirPerfil}>
-				<Avatar initials={round.authorInitials} bg={COLORS.lime} color="#0f0f0f" />
+				<Avatar initials={round.authorInitials} bg={COLORS.lime} color="#0f0f0f" photoURL={round.authorPhotoURL} />
 				<View style={styles.cardMeta}>
 					<Text style={styles.cardName} numberOfLines={1}>{round.authorName}</Text>
 					<Text style={styles.cardCourse} numberOfLines={1}>📍 {round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
