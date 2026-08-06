@@ -258,7 +258,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: COLORS.bg },
 	scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-	logoImg: { width: '100%', height: 140, alignSelf: 'center' },
+	logoImg: { width: '100%', height: 250, alignSelf: 'center' },
 	subtitle: { fontSize: 14, color: COLORS.muted, textAlign: 'center', marginTop: 8, marginBottom: 20 },
 	stepsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 24, gap: 6 },
 	stepDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.border },
