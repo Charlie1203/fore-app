@@ -168,9 +168,9 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: COLORS.bg },
 	scroll: { flexGrow: 1, justifyContent: 'center', padding: 24, paddingTop: 40 },
-	logoImg: { width: '100%', height: 220, alignSelf: 'center', marginBottom: 8 },
-	welcome: { fontSize: 20, fontWeight: '800', color: COLORS.white, textAlign: 'center' },
-	subtitle: { fontSize: 13, color: COLORS.muted, textAlign: 'center', marginTop: 6, marginBottom: 28 },
+	logoImg: { width: '100%', height: 320, alignSelf: 'center', marginBottom: 4 },
+	welcome: { fontSize: 16, fontWeight: '800', color: COLORS.white, textAlign: 'center', marginTop: 16 },
+	subtitle: { fontSize: 12, color: COLORS.muted, textAlign: 'center', marginTop: 4, marginBottom: 28 },
 	form: { gap: 12 },
 	optionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
 	rememberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
