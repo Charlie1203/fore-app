@@ -77,6 +77,7 @@ export interface RoundDoc {
 	visibility: 'public' | 'friends' | 'private';
 	likesCount: number;
 	commentsCount: number;
+	tournamentIds: string[]; // torneos a los que el jugador vinculó esta ronda al publicarla
 	createdAt: Timestamp;
 }
 
@@ -181,8 +182,8 @@ export interface AttendeeDoc {
 }
 
 // tournaments/{tournamentId}
-// El estado (próximo/en curso/finalizado) y la ronda actual se derivan de roundDates,
-// no se guardan — así nunca quedan desincronizados de la fecha real.
+// El estado (próximo/en curso/finalizado) y la ronda actual se derivan de roundDates y
+// roundsPlayedCount, no se guardan — así nunca quedan desincronizados.
 export type TournamentModality = 'Stroke Play' | 'Stableford' | 'Match Play';
 
 export interface TournamentDoc {
@@ -196,6 +197,7 @@ export interface TournamentDoc {
 	roundDates: (string | null)[]; // ISO yyyy-mm-dd, null = "a definir"
 	participantUids: string[]; // denormalizado para poder consultar "mis torneos" con array-contains
 	participantsCount: number;
+	roundsPlayedCount: number; // cuántas rondas ya tienen al menos una tarjeta publicada vinculada
 	createdAt: Timestamp;
 }
 

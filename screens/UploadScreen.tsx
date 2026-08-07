@@ -6,9 +6,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase/config';
-import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { HoleResult, RoundDoc } from '../firebase/types';
+import type { HoleResult, RoundDoc, TournamentDoc } from '../firebase/types';
+import { estadoDeTorneo, linkRoundToTournaments } from '../services/tournaments';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -245,20 +246,27 @@ function StepNueve({ club, course, label, offset, scores, onInc, onDec, footer }
   );
 }
 
-const TORNEOS_ACTIVOS = [
-  { id: '1', nombre: 'Open de Verano', modalidad: 'Stableford' },
-  { id: '2', nombre: 'Torneo del Club', modalidad: 'Stroke Play' },
-];
-
 function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
   scores: number[]; holesPlayed: 9 | 18; club: string; course: string; saving: boolean;
-  onDone: (opts: { photos: string[]; shareOnFeed: boolean }) => void;
+  onDone: (opts: { photos: string[]; shareOnFeed: boolean; torneoIds: string[] }) => void;
 }) {
+  const { firebaseUser } = useAuth();
   const [shareOnFeed, setShareOnFeed] = useState(false);
   const [comment, setComment] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [torneoIds, setTorneoIds] = useState<string[]>([]);
   const [showTorneos, setShowTorneos] = useState(false);
+  const [torneosActivos, setTorneosActivos] = useState<TournamentDoc[]>([]);
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const q = query(collection(db, 'tournaments'), where('participantUids', 'array-contains', firebaseUser.uid));
+    return onSnapshot(q, snap => {
+      const torneos = snap.docs.map(d => ({ ...d.data(), id: d.id }) as TournamentDoc)
+        .filter(t => estadoDeTorneo(t.roundDates, t.roundsPlayedCount) !== 'finalizado');
+      setTorneosActivos(torneos);
+    });
+  }, [firebaseUser?.uid]);
 
   const jugados = scores.slice(0, holesPlayed);
   const pares = DEFAULT_PARS.slice(0, holesPlayed);
@@ -306,31 +314,35 @@ function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
       </View>
 
       {/* Vincular a torneo */}
-      <TouchableOpacity style={styles.shareToggleRow} onPress={() => setShowTorneos(v => !v)}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.shareToggleTitle}>Vincular a torneo</Text>
-          <Text style={styles.shareToggleSub}>
-            {torneoIds.length === 0 ? 'Ninguno seleccionado' : TORNEOS_ACTIVOS.filter(t => torneoIds.includes(t.id)).map(t => t.nombre).join(', ')}
-          </Text>
-        </View>
-        <Ionicons name={showTorneos ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.muted} />
-      </TouchableOpacity>
-      {showTorneos && (
-        <View style={{ marginBottom: 4 }}>
-          {TORNEOS_ACTIVOS.map(t => (
-            <TouchableOpacity
-              key={t.id}
-              style={styles.torneoNoneRow}
-              onPress={() => setTorneoIds(ids => ids.includes(t.id) ? ids.filter(x => x !== t.id) : [...ids, t.id])}
-            >
-              <View style={{ flex: 1, gap: 1 }}>
-                <Text style={[styles.torneoRowText, torneoIds.includes(t.id) && { color: COLORS.white, fontWeight: '600' }]}>{t.nombre}</Text>
-                <Text style={styles.torneoRowSub}>{t.modalidad}</Text>
-              </View>
-              {torneoIds.includes(t.id) && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
-            </TouchableOpacity>
-          ))}
-        </View>
+      {torneosActivos.length > 0 && (
+        <>
+          <TouchableOpacity style={styles.shareToggleRow} onPress={() => setShowTorneos(v => !v)}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.shareToggleTitle}>Vincular a torneo</Text>
+              <Text style={styles.shareToggleSub}>
+                {torneoIds.length === 0 ? 'Ninguno seleccionado' : torneosActivos.filter(t => torneoIds.includes(t.id)).map(t => t.name).join(', ')}
+              </Text>
+            </View>
+            <Ionicons name={showTorneos ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.muted} />
+          </TouchableOpacity>
+          {showTorneos && (
+            <View style={{ marginBottom: 4 }}>
+              {torneosActivos.map(t => (
+                <TouchableOpacity
+                  key={t.id}
+                  style={styles.torneoNoneRow}
+                  onPress={() => setTorneoIds(ids => ids.includes(t.id) ? ids.filter(x => x !== t.id) : [...ids, t.id])}
+                >
+                  <View style={{ flex: 1, gap: 1 }}>
+                    <Text style={[styles.torneoRowText, torneoIds.includes(t.id) && { color: COLORS.white, fontWeight: '600' }]}>{t.name}</Text>
+                    <Text style={styles.torneoRowSub}>{t.modality}</Text>
+                  </View>
+                  {torneoIds.includes(t.id) && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </>
       )}
 
       {/* Toggle compartir */}
@@ -387,7 +399,7 @@ function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
 
       <TouchableOpacity
         style={[styles.nextBtn, saving && { opacity: 0.6 }]}
-        onPress={() => onDone({ photos: shareOnFeed ? photos : [], shareOnFeed })}
+        onPress={() => onDone({ photos: shareOnFeed ? photos : [], shareOnFeed, torneoIds })}
         disabled={saving}
       >
         {saving
@@ -440,7 +452,7 @@ export default function UploadScreen() {
     setHolesPlayed(18);
   };
 
-  const guardarRonda = async (holes: 9 | 18, { photos, shareOnFeed }: { photos: string[]; shareOnFeed: boolean }) => {
+  const guardarRonda = async (holes: 9 | 18, { photos, shareOnFeed, torneoIds }: { photos: string[]; shareOnFeed: boolean; torneoIds: string[] }) => {
     if (!firebaseUser) return;
     setSaving(true);
     try {
@@ -486,9 +498,11 @@ export default function UploadScreen() {
         visibility: shareOnFeed ? 'public' : 'private',
         likesCount: 0,
         commentsCount: 0,
+        tournamentIds: torneoIds,
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, 'users', firebaseUser.uid), { roundsCount: increment(1) });
+      if (torneoIds.length > 0) await linkRoundToTournaments(torneoIds);
 
       reset();
       navigation.navigate('Inicio', { showSuccess: Date.now() });

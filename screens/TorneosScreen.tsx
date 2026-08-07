@@ -30,7 +30,7 @@ export function formatFechaTorneo(roundDates: (string | null)[]): string {
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
 function TorneoRow({ torneo, onPress }: { torneo: TournamentDoc; onPress: () => void }) {
-  const estado = estadoDeTorneo(torneo.roundDates);
+  const estado = estadoDeTorneo(torneo.roundDates, torneo.roundsPlayedCount);
   const dotColor = estado === 'en curso' ? COLORS.lime : COLORS.dim;
   return (
     <TouchableOpacity style={styles.torneoRow} onPress={onPress}>
@@ -42,7 +42,7 @@ function TorneoRow({ torneo, onPress }: { torneo: TournamentDoc; onPress: () => 
         </Text>
         {estado === 'en curso' && (
           <Text style={[styles.torneoMeta, { color: COLORS.lime, marginTop: 2 }]}>
-            Ronda {rondaActualDeTorneo(torneo.roundDates)}/{torneo.roundDates.length} en curso
+            Ronda {rondaActualDeTorneo(torneo.roundDates, torneo.roundsPlayedCount)}/{torneo.roundDates.length} en curso
           </Text>
         )}
       </View>
@@ -81,7 +81,7 @@ function ParticipantesAvatares({ torneoId, count }: { torneoId: string; count: n
 
 function TorneoFeaturedCard({ torneo, onPress }: { torneo: TournamentDoc; onPress: () => void }) {
   const total = torneo.roundDates.length || 1;
-  const actual = rondaActualDeTorneo(torneo.roundDates);
+  const actual = rondaActualDeTorneo(torneo.roundDates, torneo.roundsPlayedCount);
   const pct = Math.min(100, Math.round((actual / total) * 100));
 
   return (
@@ -173,9 +173,9 @@ export default function TorneosScreen() {
     }, () => setLoading(false));
   }, [firebaseUser?.uid]);
 
-  const proximos = torneos.filter(t => estadoDeTorneo(t.roundDates) === 'próximo');
-  const enCurso = torneos.filter(t => estadoDeTorneo(t.roundDates) === 'en curso');
-  const finalizados = torneos.filter(t => estadoDeTorneo(t.roundDates) === 'finalizado');
+  const proximos = torneos.filter(t => estadoDeTorneo(t.roundDates, t.roundsPlayedCount) === 'próximo');
+  const enCurso = torneos.filter(t => estadoDeTorneo(t.roundDates, t.roundsPlayedCount) === 'en curso');
+  const finalizados = torneos.filter(t => estadoDeTorneo(t.roundDates, t.roundsPlayedCount) === 'finalizado');
 
   const abrir = (torneo: TournamentDoc) => navigation.navigate('TorneoDetail', { torneoId: torneo.id });
 
