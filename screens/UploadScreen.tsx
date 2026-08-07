@@ -506,7 +506,8 @@ export default function UploadScreen() {
 
       reset();
       navigation.navigate('Inicio', { showSuccess: Date.now() });
-    } catch {
+    } catch (err) {
+      console.error('guardarRonda error', err);
       Alert.alert('Error', 'No se pudo guardar la vuelta. Intentá de nuevo.');
     } finally {
       setSaving(false);
