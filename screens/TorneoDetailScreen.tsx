@@ -225,7 +225,48 @@ function LeaderboardEmpty() {
   );
 }
 
-function TorneoEnCursoContent({ torneo, isAdmin, isParticipante, joining, onJoin, onDelete, deleting }: { torneo: TournamentDoc; isAdmin: boolean; isParticipante: boolean; joining: boolean; onJoin: () => void; onDelete: () => void; deleting: boolean }) {
+function formatVsPar(vsPar: number): string {
+  return vsPar === 0 ? 'E' : `${vsPar > 0 ? '+' : ''}${vsPar}`;
+}
+
+/** Clasificación general: usa roundsPlayed/vsParTotal, que ya vienen sumados en el propio
+ * doc del participante al vincular una ronda (ver linkRoundToTournaments). Así evitamos
+ * consultar la colección rounds acá, que además chocaría con su regla de seguridad para
+ * queries de lista. Quien todavía no cargó ninguna tarjeta aparece con "-", no con 0. */
+function Leaderboard({ totalRondas, participantes }: { totalRondas: number; participantes: TournamentParticipantDoc[] }) {
+  if (participantes.length === 0) return <LeaderboardEmpty />;
+
+  // ?? 0 por participantes creados antes de que existieran estos campos.
+  const filas = participantes
+    .map(p => ({ ...p, roundsPlayed: p.roundsPlayed ?? 0, vsParTotal: p.vsParTotal ?? 0 }))
+    .sort((a, b) => {
+      if (a.roundsPlayed === 0 || b.roundsPlayed === 0) return b.roundsPlayed - a.roundsPlayed;
+      return a.vsParTotal - b.vsParTotal;
+    });
+
+  return (
+    <View style={{ paddingTop: 8 }}>
+      {filas.map((f, i) => (
+        <View key={f.uid} style={styles.leaderboardRow}>
+          <Text style={styles.leaderboardPos}>{i + 1}</Text>
+          <Avatar initials={f.initials} size={32} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.leaderboardNombre} numberOfLines={1}>{f.displayName}</Text>
+            <Text style={styles.leaderboardSub}>{f.roundsPlayed}/{totalRondas} cargadas</Text>
+          </View>
+          <Text style={[
+            styles.leaderboardScore,
+            f.roundsPlayed === 0 ? styles.leaderboardScoreVacio : { color: f.vsParTotal <= 0 ? COLORS.lime : COLORS.red },
+          ]}>
+            {f.roundsPlayed === 0 ? '-' : formatVsPar(f.vsParTotal)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function TorneoEnCursoContent({ torneo, participantes, isAdmin, isParticipante, joining, onJoin, onDelete, deleting }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean; isParticipante: boolean; joining: boolean; onJoin: () => void; onDelete: () => void; deleting: boolean }) {
   const navigation = useNavigation<any>();
   const totalRondas = torneo.roundDates.length || 1;
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
@@ -277,7 +318,10 @@ function TorneoEnCursoContent({ torneo, isAdmin, isParticipante, joining, onJoin
       >
         {tabs.map((_, i) => (
           <ScrollView key={i} style={{ width: SCREEN_W }} contentContainerStyle={{ paddingBottom: 40 }}>
-            <LeaderboardEmpty />
+            {i === 0
+              ? <Leaderboard totalRondas={totalRondas} participantes={participantes} />
+              : <LeaderboardEmpty />
+            }
           </ScrollView>
         ))}
       </ScrollView>
@@ -285,7 +329,7 @@ function TorneoEnCursoContent({ torneo, isAdmin, isParticipante, joining, onJoin
   );
 }
 
-function TorneoFinalizadoContent({ torneo, isAdmin, onDelete, deleting }: { torneo: TournamentDoc; isAdmin: boolean; onDelete: () => void; deleting: boolean }) {
+function TorneoFinalizadoContent({ torneo, participantes, isAdmin, onDelete, deleting }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean; onDelete: () => void; deleting: boolean }) {
   const navigation = useNavigation<any>();
   const totalRondas = torneo.roundDates.length || 1;
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
@@ -327,7 +371,10 @@ function TorneoFinalizadoContent({ torneo, isAdmin, onDelete, deleting }: { torn
       >
         {tabs.map((_, i) => (
           <ScrollView key={i} style={{ width: SCREEN_W }} contentContainerStyle={{ paddingBottom: 40 }}>
-            <LeaderboardEmpty />
+            {i === 0
+              ? <Leaderboard totalRondas={totalRondas} participantes={participantes} />
+              : <LeaderboardEmpty />
+            }
           </ScrollView>
         ))}
       </ScrollView>
@@ -402,8 +449,8 @@ export default function TorneoDetailScreen() {
   };
 
   if (estado === 'próximo') return <TorneoProximoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} onDelete={onDelete} deleting={deleting} />;
-  if (estado === 'en curso') return <TorneoEnCursoContent torneo={torneo} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} onDelete={onDelete} deleting={deleting} />;
-  return <TorneoFinalizadoContent torneo={torneo} isAdmin={isAdmin} onDelete={onDelete} deleting={deleting} />;
+  if (estado === 'en curso') return <TorneoEnCursoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} onDelete={onDelete} deleting={deleting} />;
+  return <TorneoFinalizadoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} onDelete={onDelete} deleting={deleting} />;
 }
 
 const styles = StyleSheet.create({
@@ -445,4 +492,11 @@ const styles = StyleSheet.create({
   participanteRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   participanteNombre: { fontSize: 14, fontWeight: '600', color: COLORS.white },
   participanteSub: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
+
+  leaderboardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  leaderboardPos: { width: 18, fontSize: 13, fontWeight: '700', color: COLORS.muted, textAlign: 'center' },
+  leaderboardNombre: { fontSize: 14, fontWeight: '600', color: COLORS.white },
+  leaderboardSub: { fontSize: 11, color: COLORS.muted, marginTop: 1 },
+  leaderboardScore: { fontSize: 15, fontWeight: '800', color: COLORS.lime, minWidth: 32, textAlign: 'right' },
+  leaderboardScoreVacio: { color: COLORS.dim },
 });

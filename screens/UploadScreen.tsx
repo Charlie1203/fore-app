@@ -502,7 +502,7 @@ export default function UploadScreen() {
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, 'users', firebaseUser.uid), { roundsCount: increment(1) });
-      if (torneoIds.length > 0) await linkRoundToTournaments(torneoIds);
+      if (torneoIds.length > 0) await linkRoundToTournaments(torneoIds, firebaseUser.uid, totalScore - totalPar);
 
       reset();
       navigation.navigate('Inicio', { showSuccess: Date.now() });

@@ -34,6 +34,8 @@ export async function createTournament(params: {
 		displayName: user.displayName,
 		initials: initialsOf(user.displayName),
 		handicap: user.handicap ?? null,
+		roundsPlayed: 0,
+		vsParTotal: 0,
 		joinedAt: serverTimestamp(),
 	});
 	return ref.id;
@@ -46,6 +48,8 @@ export async function joinTournament(tournamentId: string, user: UserDoc): Promi
 		displayName: user.displayName,
 		initials: initialsOf(user.displayName),
 		handicap: user.handicap ?? null,
+		roundsPlayed: 0,
+		vsParTotal: 0,
 		joinedAt: serverTimestamp(),
 	});
 	await updateDoc(doc(db, 'tournaments', tournamentId), {
@@ -66,6 +70,8 @@ export async function addParticipantToTournament(
 		displayName: participant.displayName,
 		initials: initialsOf(participant.displayName),
 		handicap: participant.handicap ?? null,
+		roundsPlayed: 0,
+		vsParTotal: 0,
 		joinedAt: serverTimestamp(),
 	});
 	await updateDoc(doc(db, 'tournaments', tournamentId), {
@@ -101,9 +107,13 @@ export async function deleteTournament(tournamentId: string): Promise<void> {
 }
 
 /** Se llama al publicar una vuelta vinculada a uno o más torneos: suma 1 a roundsPlayedCount
- * de cada uno, señal que usa estadoDeTorneo para saber que el torneo ya arrancó de verdad. */
-export async function linkRoundToTournaments(tournamentIds: string[]): Promise<void> {
-	await Promise.all(tournamentIds.map(id => updateDoc(doc(db, 'tournaments', id), { roundsPlayedCount: increment(1) })));
+ * del torneo (señal que usa estadoDeTorneo) y también al roundsPlayed/vsParTotal del propio
+ * participante, para armar la clasificación sin tener que leer la colección de rounds. */
+export async function linkRoundToTournaments(tournamentIds: string[], uid: string, vsPar: number): Promise<void> {
+	await Promise.all(tournamentIds.map(id => Promise.all([
+		updateDoc(doc(db, 'tournaments', id), { roundsPlayedCount: increment(1) }),
+		updateDoc(doc(db, 'tournaments', id, 'participants', uid), { roundsPlayed: increment(1), vsParTotal: increment(vsPar) }),
+	])));
 }
 
 export type TorneoEstado = 'próximo' | 'en curso' | 'finalizado';
