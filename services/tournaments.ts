@@ -36,6 +36,7 @@ export async function createTournament(params: {
 		handicap: user.handicap ?? null,
 		roundsPlayed: 0,
 		vsParTotal: 0,
+		roundsLoaded: [],
 		joinedAt: serverTimestamp(),
 	});
 	return ref.id;
@@ -50,6 +51,7 @@ export async function joinTournament(tournamentId: string, user: UserDoc): Promi
 		handicap: user.handicap ?? null,
 		roundsPlayed: 0,
 		vsParTotal: 0,
+		roundsLoaded: [],
 		joinedAt: serverTimestamp(),
 	});
 	await updateDoc(doc(db, 'tournaments', tournamentId), {
@@ -72,6 +74,7 @@ export async function addParticipantToTournament(
 		handicap: participant.handicap ?? null,
 		roundsPlayed: 0,
 		vsParTotal: 0,
+		roundsLoaded: [],
 		joinedAt: serverTimestamp(),
 	});
 	await updateDoc(doc(db, 'tournaments', tournamentId), {
@@ -106,13 +109,23 @@ export async function deleteTournament(tournamentId: string): Promise<void> {
 	await deleteDoc(doc(db, 'tournaments', tournamentId));
 }
 
-/** Se llama al publicar una vuelta vinculada a uno o más torneos: suma 1 a roundsPlayedCount
- * del torneo (señal que usa estadoDeTorneo) y también al roundsPlayed/vsParTotal del propio
- * participante, para armar la clasificación sin tener que leer la colección de rounds. */
-export async function linkRoundToTournaments(tournamentIds: string[], uid: string, vsPar: number): Promise<void> {
-	await Promise.all(tournamentIds.map(id => Promise.all([
-		updateDoc(doc(db, 'tournaments', id), { roundsPlayedCount: increment(1) }),
-		updateDoc(doc(db, 'tournaments', id, 'participants', uid), { roundsPlayed: increment(1), vsParTotal: increment(vsPar) }),
+export interface TorneoRondaSeleccion {
+	tournamentId: string;
+	roundIndex: number; // 0-based, posición dentro de roundDates
+}
+
+/** Se llama al publicar una vuelta vinculada a una o más rondas de torneo: suma 1 a
+ * roundsPlayedCount del torneo (señal que usa estadoDeTorneo) y también al
+ * roundsPlayed/vsParTotal/roundsLoaded del propio participante, para armar la
+ * clasificación y saber qué rondas le quedan por cargar sin leer la colección de rounds. */
+export async function linkRoundToTournaments(selecciones: TorneoRondaSeleccion[], uid: string, vsPar: number): Promise<void> {
+	await Promise.all(selecciones.map(({ tournamentId, roundIndex }) => Promise.all([
+		updateDoc(doc(db, 'tournaments', tournamentId), { roundsPlayedCount: increment(1) }),
+		updateDoc(doc(db, 'tournaments', tournamentId, 'participants', uid), {
+			roundsPlayed: increment(1),
+			vsParTotal: increment(vsPar),
+			roundsLoaded: arrayUnion(roundIndex),
+		}),
 	])));
 }
 

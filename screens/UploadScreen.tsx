@@ -6,10 +6,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase/config';
-import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { HoleResult, RoundDoc, TournamentDoc } from '../firebase/types';
-import { estadoDeTorneo, linkRoundToTournaments } from '../services/tournaments';
+import type { HoleResult, RoundDoc, TournamentDoc, TournamentParticipantDoc } from '../firebase/types';
+import { estadoDeTorneo, linkRoundToTournaments, type TorneoRondaSeleccion } from '../services/tournaments';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -248,15 +248,18 @@ function StepNueve({ club, course, label, offset, scores, onInc, onDec, footer }
 
 function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
   scores: number[]; holesPlayed: 9 | 18; club: string; course: string; saving: boolean;
-  onDone: (opts: { photos: string[]; shareOnFeed: boolean; torneoIds: string[] }) => void;
+  onDone: (opts: { photos: string[]; shareOnFeed: boolean; selecciones: TorneoRondaSeleccion[] }) => void;
 }) {
   const { firebaseUser } = useAuth();
   const [shareOnFeed, setShareOnFeed] = useState(false);
   const [comment, setComment] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
-  const [torneoIds, setTorneoIds] = useState<string[]>([]);
+  const [selecciones, setSelecciones] = useState<TorneoRondaSeleccion[]>([]);
   const [showTorneos, setShowTorneos] = useState(false);
   const [torneosActivos, setTorneosActivos] = useState<TournamentDoc[]>([]);
+  const [expandedTorneoId, setExpandedTorneoId] = useState<string | null>(null);
+  const [roundsLoadedByTorneo, setRoundsLoadedByTorneo] = useState<Record<string, number[]>>({});
+  const [loadingRoundsFor, setLoadingRoundsFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!firebaseUser) return;
@@ -267,6 +270,24 @@ function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
       setTorneosActivos(torneos);
     });
   }, [firebaseUser?.uid]);
+
+  const toggleTorneoExpand = async (t: TournamentDoc) => {
+    if (expandedTorneoId === t.id) { setExpandedTorneoId(null); return; }
+    setExpandedTorneoId(t.id);
+    if (!(t.id in roundsLoadedByTorneo) && firebaseUser) {
+      setLoadingRoundsFor(t.id);
+      const snap = await getDoc(doc(db, 'tournaments', t.id, 'participants', firebaseUser.uid));
+      const data = snap.data() as TournamentParticipantDoc | undefined;
+      setRoundsLoadedByTorneo(prev => ({ ...prev, [t.id]: data?.roundsLoaded ?? [] }));
+      setLoadingRoundsFor(null);
+    }
+  };
+
+  const toggleRonda = (tournamentId: string, roundIndex: number) => {
+    setSelecciones(prev => prev.some(s => s.tournamentId === tournamentId && s.roundIndex === roundIndex)
+      ? prev.filter(s => !(s.tournamentId === tournamentId && s.roundIndex === roundIndex))
+      : [...prev, { tournamentId, roundIndex }]);
+  };
 
   const jugados = scores.slice(0, holesPlayed);
   const pares = DEFAULT_PARS.slice(0, holesPlayed);
@@ -320,26 +341,52 @@ function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
             <View style={{ flex: 1 }}>
               <Text style={styles.shareToggleTitle}>Vincular a torneo</Text>
               <Text style={styles.shareToggleSub}>
-                {torneoIds.length === 0 ? 'Ninguno seleccionado' : torneosActivos.filter(t => torneoIds.includes(t.id)).map(t => t.name).join(', ')}
+                {selecciones.length === 0 ? 'Ninguna seleccionada' : selecciones.map(s => {
+                  const t = torneosActivos.find(t => t.id === s.tournamentId);
+                  return `${t?.name ?? '?'} · Ronda ${s.roundIndex + 1}`;
+                }).join(', ')}
               </Text>
             </View>
             <Ionicons name={showTorneos ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.muted} />
           </TouchableOpacity>
           {showTorneos && (
             <View style={{ marginBottom: 4 }}>
-              {torneosActivos.map(t => (
-                <TouchableOpacity
-                  key={t.id}
-                  style={styles.torneoNoneRow}
-                  onPress={() => setTorneoIds(ids => ids.includes(t.id) ? ids.filter(x => x !== t.id) : [...ids, t.id])}
-                >
-                  <View style={{ flex: 1, gap: 1 }}>
-                    <Text style={[styles.torneoRowText, torneoIds.includes(t.id) && { color: COLORS.white, fontWeight: '600' }]}>{t.name}</Text>
-                    <Text style={styles.torneoRowSub}>{t.modality}</Text>
+              {torneosActivos.map(t => {
+                const totalRondas = t.roundDates.length || 1;
+                const cargadas = roundsLoadedByTorneo[t.id] ?? [];
+                const rondasDisponibles = Array.from({ length: totalRondas }, (_, i) => i).filter(i => !cargadas.includes(i));
+                const seleccionadasEnEsteTorneo = selecciones.filter(s => s.tournamentId === t.id).length;
+                return (
+                  <View key={t.id}>
+                    <TouchableOpacity style={styles.torneoNoneRow} onPress={() => toggleTorneoExpand(t)}>
+                      <View style={{ flex: 1, gap: 1 }}>
+                        <Text style={[styles.torneoRowText, seleccionadasEnEsteTorneo > 0 && { color: COLORS.white, fontWeight: '600' }]}>{t.name}</Text>
+                        <Text style={styles.torneoRowSub}>{t.modality}{seleccionadasEnEsteTorneo > 0 ? ` · ${seleccionadasEnEsteTorneo} seleccionada${seleccionadasEnEsteTorneo > 1 ? 's' : ''}` : ''}</Text>
+                      </View>
+                      <Ionicons name={expandedTorneoId === t.id ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.dim} />
+                    </TouchableOpacity>
+                    {expandedTorneoId === t.id && (
+                      loadingRoundsFor === t.id ? (
+                        <ActivityIndicator size="small" color={COLORS.lime} style={{ marginVertical: 10 }} />
+                      ) : rondasDisponibles.length === 0 ? (
+                        <Text style={styles.rondaVacioText}>Ya cargaste todas las rondas de este torneo.</Text>
+                      ) : (
+                        <View style={{ marginBottom: 6, marginLeft: 8 }}>
+                          {rondasDisponibles.map(i => {
+                            const sel = selecciones.some(s => s.tournamentId === t.id && s.roundIndex === i);
+                            return (
+                              <TouchableOpacity key={i} style={styles.rondaRow} onPress={() => toggleRonda(t.id, i)}>
+                                <Text style={[styles.rondaRowText, sel && { color: COLORS.white, fontWeight: '600' }]}>Ronda {i + 1}</Text>
+                                {sel && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )
+                    )}
                   </View>
-                  {torneoIds.includes(t.id) && <Ionicons name="checkmark" size={16} color={COLORS.lime} />}
-                </TouchableOpacity>
-              ))}
+                );
+              })}
             </View>
           )}
         </>
@@ -399,7 +446,7 @@ function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
 
       <TouchableOpacity
         style={[styles.nextBtn, saving && { opacity: 0.6 }]}
-        onPress={() => onDone({ photos: shareOnFeed ? photos : [], shareOnFeed, torneoIds })}
+        onPress={() => onDone({ photos: shareOnFeed ? photos : [], shareOnFeed, selecciones })}
         disabled={saving}
       >
         {saving
@@ -452,7 +499,7 @@ export default function UploadScreen() {
     setHolesPlayed(18);
   };
 
-  const guardarRonda = async (holes: 9 | 18, { photos, shareOnFeed, torneoIds }: { photos: string[]; shareOnFeed: boolean; torneoIds: string[] }) => {
+  const guardarRonda = async (holes: 9 | 18, { photos, shareOnFeed, selecciones }: { photos: string[]; shareOnFeed: boolean; selecciones: TorneoRondaSeleccion[] }) => {
     if (!firebaseUser) return;
     setSaving(true);
     try {
@@ -498,11 +545,11 @@ export default function UploadScreen() {
         visibility: shareOnFeed ? 'public' : 'private',
         likesCount: 0,
         commentsCount: 0,
-        tournamentIds: torneoIds,
+        tournamentIds: selecciones.map(s => s.tournamentId),
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, 'users', firebaseUser.uid), { roundsCount: increment(1) });
-      if (torneoIds.length > 0) await linkRoundToTournaments(torneoIds, firebaseUser.uid, totalScore - totalPar);
+      if (selecciones.length > 0) await linkRoundToTournaments(selecciones, firebaseUser.uid, totalScore - totalPar);
 
       reset();
       navigation.navigate('Inicio', { showSuccess: Date.now() });
@@ -604,6 +651,9 @@ const styles = StyleSheet.create({
   torneoNoneRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
   torneoRowText: { fontSize: 14, color: COLORS.muted },
   torneoRowSub: { fontSize: 11, color: COLORS.dim, marginTop: 1 },
+  rondaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingLeft: 8, borderBottomWidth: 0.5, borderBottomColor: '#1a1a1a' },
+  rondaRowText: { fontSize: 13, color: COLORS.muted },
+  rondaVacioText: { fontSize: 12, color: COLORS.dim, paddingVertical: 10, paddingLeft: 8 },
   nextBtn: { backgroundColor: COLORS.lime, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 },
   nextBtnText: { fontSize: 15, fontWeight: '800', color: '#0f0f0f' },
   skipLink: { fontSize: 13, color: COLORS.muted, textAlign: 'center', fontWeight: '600' },

@@ -209,6 +209,7 @@ export interface TournamentParticipantDoc {
 	handicap: number | null;
 	roundsPlayed: number; // cuántas rondas de este jugador se vincularon al torneo
 	vsParTotal: number; // suma del vsPar de esas rondas — la clasificación se ordena por esto
+	roundsLoaded: number[]; // índices (0-based) de las rondas del torneo ya vinculadas, para no ofrecer cargar la misma dos veces
 	joinedAt: Timestamp;
 }
 
