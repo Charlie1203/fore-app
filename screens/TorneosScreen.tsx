@@ -1,11 +1,11 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import type { TournamentDoc } from '../firebase/types';
 import { estadoDeTorneo, rondaActualDeTorneo } from '../services/tournaments';
 
@@ -13,6 +13,10 @@ const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
   lime: '#c8e03a', white: '#f0f0f0', muted: '#666', dim: '#444', dark2: '#242424',
 };
+
+const SCREEN_W = Dimensions.get('window').width;
+const FEATURED_GAP = 12;
+const FEATURED_W = SCREEN_W - 18 * 2 - 28; // deja asomar un poco la próxima tarjeta
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -44,6 +48,111 @@ function TorneoRow({ torneo, onPress }: { torneo: TournamentDoc; onPress: () => 
       </View>
       <Ionicons name="chevron-forward" size={16} color={COLORS.dim} />
     </TouchableOpacity>
+  );
+}
+
+// ─── Tarjeta destacada (en curso) ──────────────────────────────────────────────
+
+function ParticipantesAvatares({ torneoId, count }: { torneoId: string; count: number }) {
+  const [previos, setPrevios] = useState<{ uid: string; initials: string }[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'tournaments', torneoId, 'participants'), orderBy('joinedAt', 'asc'), limit(4));
+    return onSnapshot(q, snap => setPrevios(snap.docs.map(d => ({ uid: d.id, initials: (d.data() as any).initials ?? '?' }))));
+  }, [torneoId]);
+
+  const extra = count - previos.length;
+
+  return (
+    <View style={styles.avatarRow}>
+      {previos.map((p, i) => (
+        <View key={p.uid} style={[styles.avatarChip, i > 0 && { marginLeft: -10 }, { zIndex: 10 - i }]}>
+          <Text style={styles.avatarChipText}>{p.initials}</Text>
+        </View>
+      ))}
+      {extra > 0 && (
+        <View style={[styles.avatarChip, styles.avatarChipExtra, { marginLeft: -10 }]}>
+          <Text style={[styles.avatarChipText, styles.avatarChipExtraText]}>+{extra}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function TorneoFeaturedCard({ torneo, onPress }: { torneo: TournamentDoc; onPress: () => void }) {
+  const total = torneo.roundDates.length || 1;
+  const actual = rondaActualDeTorneo(torneo.roundDates);
+  const pct = Math.min(100, Math.round((actual / total) * 100));
+
+  return (
+    <TouchableOpacity activeOpacity={0.85} style={[styles.featuredCard, { width: FEATURED_W }]} onPress={onPress}>
+      <View style={styles.featuredHeader}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.featuredNombre} numberOfLines={1}>{torneo.name}</Text>
+          <Text style={styles.featuredMeta} numberOfLines={1}>
+            {torneo.modality} · {total} {total === 1 ? 'ronda' : 'rondas'}
+          </Text>
+        </View>
+        <Ionicons name="flag" size={20} color={COLORS.lime} />
+      </View>
+
+      <View style={styles.featuredBadge}>
+        <View style={styles.featuredBadgeDot} />
+        <Text style={styles.featuredBadgeText}>EN PROGRESO</Text>
+      </View>
+
+      <View style={styles.featuredProgress}>
+        <View style={styles.featuredProgressLabelRow}>
+          <Text style={styles.featuredProgressLabel}>Ronda {actual} de {total}</Text>
+          <Text style={styles.featuredProgressPct}>{pct}%</Text>
+        </View>
+        <View style={styles.featuredProgressTrack}>
+          <View style={[styles.featuredProgressFill, { width: `${pct}%` }]} />
+        </View>
+      </View>
+
+      <View style={styles.featuredFooter}>
+        <ParticipantesAvatares torneoId={torneo.id} count={torneo.participantsCount} />
+        <View style={styles.featuredCta}>
+          <Text style={styles.featuredCtaText}>Ver clasificación</Text>
+          <Ionicons name="chevron-forward" size={14} color="#0f0f0f" />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function TorneosEnCursoCarrusel({ torneos, onOpen }: { torneos: TournamentDoc[]; onOpen: (t: TournamentDoc) => void }) {
+  const [index, setIndex] = useState(0);
+
+  const onScroll = (e: any) => {
+    const i = Math.round(e.nativeEvent.contentOffset.x / (FEATURED_W + FEATURED_GAP));
+    if (i !== index) setIndex(i);
+  };
+
+  return (
+    <View style={{ paddingTop: 8 }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={FEATURED_W + FEATURED_GAP}
+        snapToAlignment="start"
+        contentContainerStyle={{ paddingHorizontal: 18, gap: FEATURED_GAP }}
+        onMomentumScrollEnd={onScroll}
+      >
+        {torneos.map(t => (
+          <TorneoFeaturedCard key={t.id} torneo={t} onPress={() => onOpen(t)} />
+        ))}
+      </ScrollView>
+      {torneos.length > 1 && (
+        <View style={styles.dotsRow}>
+          {torneos.map((t, i) => (
+            <View key={t.id} style={[styles.pageDot, { backgroundColor: i === index ? COLORS.lime : COLORS.dim }]} />
+          ))}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -89,6 +198,7 @@ export default function TorneosScreen() {
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+          {enCurso.length > 0 && <TorneosEnCursoCarrusel torneos={enCurso} onOpen={abrir} />}
           {enCurso.length > 0 && (
             <>
               <Text style={styles.sectionTitle}>En curso</Text>
@@ -130,4 +240,33 @@ const styles = StyleSheet.create({
   torneoNombre: { fontSize: 15, fontWeight: '600', color: COLORS.white },
   torneoMeta: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
   torneoGanador: { fontSize: 12, color: COLORS.muted, marginTop: 3 },
+
+  featuredCard: { backgroundColor: COLORS.card, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border, padding: 18 },
+  featuredHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  featuredNombre: { fontSize: 19, fontWeight: '800', color: COLORS.white },
+  featuredMeta: { fontSize: 12, color: COLORS.muted, marginTop: 3 },
+
+  featuredBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 12, borderWidth: 1, borderColor: 'rgba(200,224,58,0.35)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  featuredBadgeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.lime },
+  featuredBadgeText: { fontSize: 10, fontWeight: '800', color: COLORS.lime, letterSpacing: 0.5 },
+
+  featuredProgress: { marginTop: 18 },
+  featuredProgressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  featuredProgressLabel: { fontSize: 14, fontWeight: '700', color: COLORS.white },
+  featuredProgressPct: { fontSize: 12, fontWeight: '700', color: COLORS.lime },
+  featuredProgressTrack: { height: 6, borderRadius: 3, backgroundColor: COLORS.dark2, marginTop: 8, overflow: 'hidden' },
+  featuredProgressFill: { height: '100%', borderRadius: 3, backgroundColor: COLORS.lime },
+
+  featuredFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 },
+  avatarRow: { flexDirection: 'row', alignItems: 'center' },
+  avatarChip: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.lime, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.card },
+  avatarChipExtra: { backgroundColor: COLORS.dark2 },
+  avatarChipText: { fontSize: 10, fontWeight: '700', color: '#0f0f0f' },
+  avatarChipExtraText: { color: COLORS.white },
+
+  featuredCta: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.lime, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  featuredCtaText: { fontSize: 12, fontWeight: '800', color: '#0f0f0f' },
+
+  dotsRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 12 },
+  pageDot: { width: 6, height: 6, borderRadius: 3 },
 });
