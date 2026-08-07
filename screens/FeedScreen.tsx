@@ -13,7 +13,6 @@
 	Platform,
 	ActivityIndicator,
 	Keyboard,
-	Share,
 	Alert,
 } from "react-native";
 import { useState, useEffect, useRef } from "react";
@@ -419,12 +418,10 @@ function CardFooter({
 	roundId,
 	likes,
 	comments,
-	shareText,
 }: {
 	roundId: string;
 	likes: number;
 	comments: number;
-	shareText: string;
 }) {
 	const { firebaseUser } = useAuth();
 	const [isLiked, setIsLiked] = useState(false);
@@ -460,14 +457,6 @@ function CardFooter({
 		}
 	};
 
-	const onShare = async () => {
-		try {
-			await Share.share({ message: shareText });
-		} catch {
-			// el usuario canceló o el share sheet falló
-		}
-	};
-
 	return (
 		<>
 			<CommentsSheet visible={showComments} roundId={roundId} count={comments} onClose={() => setShowComments(false)} />
@@ -479,9 +468,6 @@ function CardFooter({
 				<TouchableOpacity style={styles.action} onPress={() => setShowComments(true)}>
 					<GolfBallIcon color={COLORS.dim} size={16} />
 					{comments > 0 && <Text style={styles.actionText}>{comments}</Text>}
-				</TouchableOpacity>
-				<TouchableOpacity style={styles.action} onPress={onShare}>
-					<Ionicons name="paper-plane-outline" size={19} color={COLORS.dim} />
 				</TouchableOpacity>
 			</View>
 		</>
@@ -645,9 +631,6 @@ function RoundCard({ round }: { round: RoundDoc }) {
 		? navigation.navigate('Tabs', { screen: 'Perfil' })
 		: navigation.navigate('PerfilUsuario', { viewUser: { uid: round.userId, name: round.authorName, initials: round.authorInitials, bg: COLORS.lime, color: '#0f0f0f' } });
 
-	const vsParLabel = round.vsPar === 0 ? 'E' : `${round.vsPar > 0 ? '+' : ''}${round.vsPar}`;
-	const shareText = `${round.authorName} jugó ${round.totalScore} (${vsParLabel}) en ${round.clubName}${round.courseName ? ` · ${round.courseName}` : ''} — Fore!`;
-
 	const onDelete = () => {
 		Alert.alert('Eliminar publicación', '¿Seguro que querés eliminar esta vuelta? Esta acción no se puede deshacer.', [
 			{ text: 'Cancelar', style: 'cancel' },
@@ -705,7 +688,7 @@ function RoundCard({ round }: { round: RoundDoc }) {
 				</>
 			)}
 
-			<CardFooter roundId={round.id} likes={round.likesCount} comments={round.commentsCount} shareText={shareText} />
+			<CardFooter roundId={round.id} likes={round.likesCount} comments={round.commentsCount} />
 		</View>
 	);
 }
