@@ -101,16 +101,21 @@ export async function deleteTournament(tournamentId: string): Promise<void> {
 
 export type TorneoEstado = 'próximo' | 'en curso' | 'finalizado';
 
-/** Deriva el estado del torneo a partir de las fechas de ronda, no se guarda en el doc. */
+/** Deriva el estado del torneo a partir de las fechas de ronda, no se guarda en el doc.
+ * Dos reglas: (1) por fechas, si hoy cae entre la primera y la última ronda cargada; y
+ * (2) si ya arrancó (la primera fecha ya llegó) pero queda alguna ronda "a definir" sin
+ * fecha todavía, sigue "en curso" aunque las fechas cargadas ya hayan pasado — recién es
+ * "finalizado" cuando TODAS las rondas tienen fecha y todas ya pasaron. */
 export function estadoDeTorneo(roundDates: (string | null)[]): TorneoEstado {
 	const fechas = roundDates.filter((d): d is string => !!d).map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
 	if (fechas.length === 0) return 'próximo';
 	const hoy = new Date();
 	hoy.setHours(0, 0, 0, 0);
 	const primera = fechas[0];
-	const ultima = fechas[fechas.length - 1];
 	if (hoy < primera) return 'próximo';
-	if (hoy > ultima) return 'finalizado';
+	const ultima = fechas[fechas.length - 1];
+	const quedaRondaSinFecha = roundDates.some(d => !d);
+	if (hoy > ultima && !quedaRondaSinFecha) return 'finalizado';
 	return 'en curso';
 }
 
