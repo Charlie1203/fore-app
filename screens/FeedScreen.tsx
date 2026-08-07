@@ -539,20 +539,22 @@ function RoundStats({
 }
 
 function PhotoGrid({ photos, onPress }: { photos: string[]; onPress: (index: number) => void }) {
+	// Altura del bloque siempre igual, sea 1 foto o varias — el ancho de cada
+	// columna es lo que cambia (foto sola = ancho completo, 2 = mitad, etc).
+	// A partir de la 4ta columna, esa se tapa con "+N" en vez de sumar más columnas.
 	const maxVisible = 4;
-	const showOverlay = photos.length > maxVisible;
-	const visible = photos.slice(0, maxVisible);
+	const hasOverlay = photos.length > 3;
+	const visible = photos.slice(0, Math.min(photos.length, maxVisible));
 	return (
 		<View style={styles.photoGridRow}>
 			{visible.map((uri, i) => {
-				const isOverlayTile = showOverlay && i === maxVisible - 1;
+				const isOverlayTile = hasOverlay && i === maxVisible - 1;
 				return (
 					<TouchableOpacity key={i} style={styles.photoGridTile} onPress={() => onPress(i)} activeOpacity={0.85}>
 						<Image source={{ uri }} style={styles.photoGridImg} resizeMode="cover" />
 						{isOverlayTile && (
 							<View style={styles.photoGridOverlay}>
-								<Text style={styles.photoGridOverlayNum}>+{photos.length - maxVisible + 1}</Text>
-								<Text style={styles.photoGridOverlayLbl}>fotos</Text>
+								<Text style={styles.photoGridOverlayNum}>+{photos.length - 3}</Text>
 							</View>
 						)}
 					</TouchableOpacity>
@@ -1033,12 +1035,12 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 14, paddingVertical: 10, marginTop: 12,
 	},
 	verTarjetaBtnText: { fontSize: 13, fontWeight: '700', color: COLORS.lime },
-	photoGridRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 16, marginTop: 10 },
-	photoGridTile: { flex: 1, aspectRatio: 1, borderRadius: 10, overflow: 'hidden', backgroundColor: '#141414' },
+	// Altura fija del bloque de fotos — no depende de cuántas fotos tenga la ronda.
+	photoGridRow: { flexDirection: 'row', gap: 2, height: SCREEN_W * 0.5, marginTop: 10, backgroundColor: '#141414' },
+	photoGridTile: { flex: 1 },
 	photoGridImg: { width: '100%', height: '100%' },
-	photoGridOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center' },
-	photoGridOverlayNum: { fontSize: 17, fontWeight: '800', color: COLORS.white },
-	photoGridOverlayLbl: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
+	photoGridOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+	photoGridOverlayNum: { fontSize: 22, fontWeight: '800', color: COLORS.white },
 	lightboxOverlay: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
 	lightboxClose: { position: 'absolute', top: 50, right: 20, zIndex: 10 },
 

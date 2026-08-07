@@ -188,38 +188,72 @@ function CardFooter({ likes, comments }: { likes: number; comments: number }) {
   );
 }
 
-function PhotoCarousel({ photos }: { photos: string[] }) {
-  const [index, setIndex] = useState(0);
+function PhotoGrid({ photos, onPress }: { photos: string[]; onPress: (index: number) => void }) {
+  // Altura fija del bloque, sea 1 foto o varias — el ancho de cada columna es lo que
+  // cambia. A partir de la 4ta columna, esa se tapa con "+N" en vez de sumar más.
+  const maxVisible = 4;
+  const hasOverlay = photos.length > 3;
+  const visible = photos.slice(0, Math.min(photos.length, maxVisible));
   return (
-    <View>
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))}
-      >
-        {photos.map((uri, i) => (
-          <Image key={i} source={{ uri }} style={{ width: SCREEN_W, height: SCREEN_W * 0.65 }} resizeMode="cover" />
-        ))}
-      </ScrollView>
-      {photos.length > 1 && (
-        <View style={styles.photoDots}>
-          {photos.map((_, i) => (
-            <View key={i} style={[styles.photoDot, i === index && styles.photoDotActive]} />
-          ))}
-        </View>
-      )}
+    <View style={styles.photoGridRow}>
+      {visible.map((uri, i) => {
+        const isOverlayTile = hasOverlay && i === maxVisible - 1;
+        return (
+          <TouchableOpacity key={i} style={styles.photoGridTile} onPress={() => onPress(i)} activeOpacity={0.85}>
+            <Image source={{ uri }} style={styles.photoGridImg} resizeMode="cover" />
+            {isOverlayTile && (
+              <View style={styles.photoGridOverlay}>
+                <Text style={styles.photoGridOverlayNum}>+{photos.length - 3}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
     </View>
+  );
+}
+
+function PhotoLightbox({ visible, photos, initialIndex, onClose }: { visible: boolean; photos: string[]; initialIndex: number; onClose: () => void }) {
+  if (!visible) return null;
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.lightboxOverlay}>
+        <TouchableOpacity style={styles.lightboxClose} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Ionicons name="close" size={28} color="#fff" />
+        </TouchableOpacity>
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: initialIndex * SCREEN_W, y: 0 }}
+        >
+          {photos.map((uri, i) => (
+            <Image key={i} source={{ uri }} style={{ width: SCREEN_W, height: '100%' }} resizeMode="contain" />
+          ))}
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
 function RoundCard({ round }: { round: RoundDoc }) {
   const [expanded, setExpanded] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const hasPhotos = round.photos.length > 0;
 
   return (
     <View style={styles.card}>
-      {hasPhotos && <PhotoCarousel photos={round.photos} />}
+      {hasPhotos && (
+        <>
+          <PhotoGrid photos={round.photos} onPress={i => setLightboxIndex(i)} />
+          <PhotoLightbox
+            visible={lightboxIndex !== null}
+            photos={round.photos}
+            initialIndex={lightboxIndex ?? 0}
+            onClose={() => setLightboxIndex(null)}
+          />
+        </>
+      )}
       <View style={styles.cardHeader}>
         <View>
           <Text style={styles.cardCourse}>📍 {round.clubName}{round.courseName ? ` · ${round.courseName}` : ''}</Text>
@@ -847,9 +881,13 @@ const styles = StyleSheet.create({
   achievementsEmptyText: { fontSize: 13, color: COLORS.muted, textAlign: 'center', lineHeight: 19 },
 
   card: { backgroundColor: COLORS.bg, borderBottomWidth: 8, borderBottomColor: '#1a1a1a', overflow: 'hidden' },
-  photoDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, paddingTop: 8 },
-  photoDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: COLORS.dim },
-  photoDotActive: { backgroundColor: COLORS.lime, width: 14 },
+  photoGridRow: { flexDirection: 'row', gap: 2, height: SCREEN_W * 0.5, backgroundColor: '#141414' },
+  photoGridTile: { flex: 1 },
+  photoGridImg: { width: '100%', height: '100%' },
+  photoGridOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  photoGridOverlayNum: { fontSize: 22, fontWeight: '800', color: COLORS.white },
+  lightboxOverlay: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  lightboxClose: { position: 'absolute', top: 50, right: 20, zIndex: 10 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, paddingBottom: 6 },
   cardTime: { fontSize: 11, color: COLORS.muted },
   cardBody: { paddingHorizontal: 12, paddingBottom: 10 },
