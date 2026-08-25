@@ -278,7 +278,8 @@ function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
       setLoadingRoundsFor(t.id);
       const snap = await getDoc(doc(db, 'tournaments', t.id, 'participants', firebaseUser.uid));
       const data = snap.data() as TournamentParticipantDoc | undefined;
-      setRoundsLoadedByTorneo(prev => ({ ...prev, [t.id]: data?.roundsLoaded ?? [] }));
+      const cargadas = Object.keys(data?.roundScores ?? {}).map(Number);
+      setRoundsLoadedByTorneo(prev => ({ ...prev, [t.id]: cargadas }));
       setLoadingRoundsFor(null);
     }
   };
@@ -549,7 +550,12 @@ export default function UploadScreen() {
         createdAt: serverTimestamp(),
       });
       await updateDoc(doc(db, 'users', firebaseUser.uid), { roundsCount: increment(1) });
-      if (selecciones.length > 0) await linkRoundToTournaments(selecciones, firebaseUser.uid, totalScore - totalPar);
+      if (selecciones.length > 0) {
+        await linkRoundToTournaments(selecciones, firebaseUser.uid, {
+          totalScore, totalPar, vsPar: totalScore - totalPar,
+          holes: holeResults, courseName: course, clubName: club,
+        });
+      }
 
       reset();
       navigation.navigate('Inicio', { showSuccess: Date.now() });

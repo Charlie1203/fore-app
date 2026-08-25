@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator, Alert, Modal } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator, Alert, Modal, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -6,9 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
 import { collection, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
-import type { TournamentDoc, TournamentParticipantDoc } from '../firebase/types';
+import type { TournamentDoc, TournamentParticipantDoc, TournamentRoundScore } from '../firebase/types';
 import { estadoDeTorneo, joinTournament, removeParticipantFromTournament, deleteTournament } from '../services/tournaments';
 import { formatFechaTorneo } from './TorneosScreen';
+import { Scorecard } from '../components/RoundCard';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -17,7 +18,10 @@ const COLORS = {
   lime: '#c8e03a', white: '#f0f0f0', muted: '#666', dim: '#444', dark2: '#242424', red: '#e07070',
 };
 
-function Avatar({ initials, size = 36 }: { initials: string; size?: number }) {
+function Avatar({ initials, photoURL, size = 36 }: { initials: string; photoURL?: string | null; size?: number }) {
+  if (photoURL) {
+    return <Image source={{ uri: photoURL }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  }
   return (
     <View style={[{ backgroundColor: COLORS.lime, width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }]}>
       <Text style={{ color: '#0f0f0f', fontSize: size * 0.32, fontWeight: '700' }}>{initials}</Text>
@@ -172,7 +176,7 @@ function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, 
                 : navigation.navigate('PerfilUsuario', { viewUser: { uid: p.uid, name: p.displayName, initials: p.initials, bg: COLORS.lime, color: '#0f0f0f', handicap: p.handicap } })
               }
             >
-              <Avatar initials={p.initials} size={40} />
+              <Avatar initials={p.initials} photoURL={p.photoURL} size={40} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.participanteNombre} numberOfLines={1}>{p.displayName}{esYo ? ' (vos)' : ''}</Text>
                 <Text style={styles.participanteSub} numberOfLines={1}>{p.handicap != null ? `HCP ${p.handicap}` : 'Sin HCP cargado'}</Text>
@@ -229,11 +233,64 @@ function formatVsPar(vsPar: number): string {
   return vsPar === 0 ? 'E' : `${vsPar > 0 ? '+' : ''}${vsPar}`;
 }
 
+/** Modal con la tarjeta de un participante. Si tiene más de una ronda cargada, deja
+ * pasar de una a otra con las flechas — abrís desde una ronda puntual o desde el
+ * general y desde ahí vas viendo todas las que cargó. */
+function ScorecardModal({ participante, roundIndex, onClose, onChangeRoundIndex }: {
+  participante: TournamentParticipantDoc | null;
+  roundIndex: number | null;
+  onClose: () => void;
+  onChangeRoundIndex: (i: number) => void;
+}) {
+  if (!participante || roundIndex === null) return null;
+  const indices = Object.keys(participante.roundScores ?? {}).map(Number).sort((a, b) => a - b);
+  const pos = indices.indexOf(roundIndex);
+  const score: TournamentRoundScore | undefined = participante.roundScores?.[String(roundIndex)];
+  if (!score || pos === -1) return null;
+
+  const irA = (nuevaPos: number) => {
+    if (nuevaPos < 0 || nuevaPos >= indices.length) return;
+    onChangeRoundIndex(indices[nuevaPos]);
+  };
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.scorecardOverlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={styles.scorecardModalCard}>
+          <View style={styles.scorecardModalHeader}>
+            <Avatar initials={participante.initials} photoURL={participante.photoURL} size={36} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.leaderboardNombre} numberOfLines={1}>{participante.displayName}</Text>
+              <Text style={styles.leaderboardSub}>{score.clubName} · {score.courseName}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={22} color={COLORS.muted} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.scorecardPagerRow}>
+            <TouchableOpacity onPress={() => irA(pos - 1)} disabled={pos === 0} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="chevron-back" size={20} color={pos === 0 ? COLORS.dim : COLORS.white} />
+            </TouchableOpacity>
+            <Text style={styles.scorecardPagerText}>Ronda {roundIndex + 1}</Text>
+            <TouchableOpacity onPress={() => irA(pos + 1)} disabled={pos === indices.length - 1} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="chevron-forward" size={20} color={pos === indices.length - 1 ? COLORS.dim : COLORS.white} />
+            </TouchableOpacity>
+          </View>
+
+          <Scorecard holes={score.holes} score={score.totalScore} vsPar={score.vsPar} />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
 /** Clasificación general: usa roundsPlayed/vsParTotal, que ya vienen sumados en el propio
  * doc del participante al vincular una ronda (ver linkRoundToTournaments). Así evitamos
  * consultar la colección rounds acá, que además chocaría con su regla de seguridad para
- * queries de lista. Quien todavía no cargó ninguna tarjeta aparece con "-", no con 0. */
-function Leaderboard({ totalRondas, participantes }: { totalRondas: number; participantes: TournamentParticipantDoc[] }) {
+ * queries de lista. Quien todavía no cargó ninguna tarjeta aparece con "-", no con 0.
+ * Tocar una fila abre su primera tarjeta cargada; desde ahí se navegan todas con las flechas. */
+function Leaderboard({ totalRondas, participantes, onAbrirTarjeta }: { totalRondas: number; participantes: TournamentParticipantDoc[]; onAbrirTarjeta: (p: TournamentParticipantDoc, roundIndex: number) => void }) {
   if (participantes.length === 0) return <LeaderboardEmpty />;
 
   // ?? 0 por participantes creados antes de que existieran estos campos.
@@ -246,21 +303,67 @@ function Leaderboard({ totalRondas, participantes }: { totalRondas: number; part
 
   return (
     <View style={{ paddingTop: 8 }}>
-      {filas.map((f, i) => (
-        <View key={f.uid} style={styles.leaderboardRow}>
+      {filas.map((f, i) => {
+        const primeraRondaCargada = Object.keys(f.roundScores ?? {}).map(Number).sort((a, b) => a - b)[0];
+        return (
+          <TouchableOpacity
+            key={f.uid}
+            style={styles.leaderboardRow}
+            disabled={f.roundsPlayed === 0 || primeraRondaCargada === undefined}
+            onPress={() => onAbrirTarjeta(f, primeraRondaCargada)}
+          >
+            <Text style={styles.leaderboardPos}>{i + 1}</Text>
+            <Avatar initials={f.initials} photoURL={f.photoURL} size={32} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.leaderboardNombre} numberOfLines={1}>{f.displayName}</Text>
+              <Text style={styles.leaderboardSub}>{f.roundsPlayed}/{totalRondas} cargadas</Text>
+            </View>
+            <Text style={[
+              styles.leaderboardScore,
+              f.roundsPlayed === 0 ? styles.leaderboardScoreVacio : { color: f.vsParTotal <= 0 ? COLORS.lime : COLORS.red },
+            ]}>
+              {f.roundsPlayed === 0 ? '-' : formatVsPar(f.vsParTotal)}
+            </Text>
+            {f.roundsPlayed > 0 && <Ionicons name="chevron-forward" size={14} color={COLORS.dim} />}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Clasificación de una ronda puntual: mismo criterio que Leaderboard pero mirando
+ * solo roundScores[roundIndex] de cada participante, no el acumulado del torneo. */
+function RoundLeaderboard({ roundIndex, participantes, onAbrirTarjeta }: { roundIndex: number; participantes: TournamentParticipantDoc[]; onAbrirTarjeta: (p: TournamentParticipantDoc, roundIndex: number) => void }) {
+  if (participantes.length === 0) return <LeaderboardEmpty />;
+
+  const filas = participantes
+    .map(p => ({ p, score: p.roundScores?.[String(roundIndex)] }))
+    .sort((a, b) => {
+      if (!a.score || !b.score) return (b.score ? 1 : 0) - (a.score ? 1 : 0);
+      return a.score.vsPar - b.score.vsPar;
+    });
+
+  return (
+    <View style={{ paddingTop: 8 }}>
+      {filas.map(({ p, score }, i) => (
+        <TouchableOpacity
+          key={p.uid}
+          style={styles.leaderboardRow}
+          disabled={!score}
+          onPress={() => score && onAbrirTarjeta(p, roundIndex)}
+        >
           <Text style={styles.leaderboardPos}>{i + 1}</Text>
-          <Avatar initials={f.initials} size={32} />
+          <Avatar initials={p.initials} photoURL={p.photoURL} size={32} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.leaderboardNombre} numberOfLines={1}>{f.displayName}</Text>
-            <Text style={styles.leaderboardSub}>{f.roundsPlayed}/{totalRondas} cargadas</Text>
+            <Text style={styles.leaderboardNombre} numberOfLines={1}>{p.displayName}</Text>
+            {!!score && <Text style={styles.leaderboardSub}>{score.totalScore} golpes</Text>}
           </View>
-          <Text style={[
-            styles.leaderboardScore,
-            f.roundsPlayed === 0 ? styles.leaderboardScoreVacio : { color: f.vsParTotal <= 0 ? COLORS.lime : COLORS.red },
-          ]}>
-            {f.roundsPlayed === 0 ? '-' : formatVsPar(f.vsParTotal)}
+          <Text style={[styles.leaderboardScore, !score ? styles.leaderboardScoreVacio : { color: score.vsPar <= 0 ? COLORS.lime : COLORS.red }]}>
+            {score ? formatVsPar(score.vsPar) : '-'}
           </Text>
-        </View>
+          {!!score && <Ionicons name="chevron-forward" size={14} color={COLORS.dim} />}
+        </TouchableOpacity>
       ))}
     </View>
   );
@@ -272,6 +375,8 @@ function TorneoEnCursoContent({ torneo, participantes, isAdmin, isParticipante, 
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
   const [tab, setTab] = useState(0);
   const pagerRef = useRef<ScrollView>(null);
+  const [scorecardAbierto, setScorecardAbierto] = useState<{ participante: TournamentParticipantDoc; roundIndex: number } | null>(null);
+  const abrirTarjeta = (participante: TournamentParticipantDoc, roundIndex: number) => setScorecardAbierto({ participante, roundIndex });
 
   const onTabPress = (i: number) => {
     setTab(i);
@@ -319,12 +424,18 @@ function TorneoEnCursoContent({ torneo, participantes, isAdmin, isParticipante, 
         {tabs.map((_, i) => (
           <ScrollView key={i} style={{ width: SCREEN_W }} contentContainerStyle={{ paddingBottom: 40 }}>
             {i === 0
-              ? <Leaderboard totalRondas={totalRondas} participantes={participantes} />
-              : <LeaderboardEmpty />
+              ? <Leaderboard totalRondas={totalRondas} participantes={participantes} onAbrirTarjeta={abrirTarjeta} />
+              : <RoundLeaderboard roundIndex={i - 1} participantes={participantes} onAbrirTarjeta={abrirTarjeta} />
             }
           </ScrollView>
         ))}
       </ScrollView>
+      <ScorecardModal
+        participante={scorecardAbierto?.participante ?? null}
+        roundIndex={scorecardAbierto?.roundIndex ?? null}
+        onClose={() => setScorecardAbierto(null)}
+        onChangeRoundIndex={i => setScorecardAbierto(s => s && { ...s, roundIndex: i })}
+      />
     </View>
   );
 }
@@ -335,6 +446,8 @@ function TorneoFinalizadoContent({ torneo, participantes, isAdmin, onDelete, del
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
   const [tab, setTab] = useState(0);
   const pagerRef = useRef<ScrollView>(null);
+  const [scorecardAbierto, setScorecardAbierto] = useState<{ participante: TournamentParticipantDoc; roundIndex: number } | null>(null);
+  const abrirTarjeta = (participante: TournamentParticipantDoc, roundIndex: number) => setScorecardAbierto({ participante, roundIndex });
 
   const onTabPress = (i: number) => {
     setTab(i);
@@ -372,12 +485,18 @@ function TorneoFinalizadoContent({ torneo, participantes, isAdmin, onDelete, del
         {tabs.map((_, i) => (
           <ScrollView key={i} style={{ width: SCREEN_W }} contentContainerStyle={{ paddingBottom: 40 }}>
             {i === 0
-              ? <Leaderboard totalRondas={totalRondas} participantes={participantes} />
-              : <LeaderboardEmpty />
+              ? <Leaderboard totalRondas={totalRondas} participantes={participantes} onAbrirTarjeta={abrirTarjeta} />
+              : <RoundLeaderboard roundIndex={i - 1} participantes={participantes} onAbrirTarjeta={abrirTarjeta} />
             }
           </ScrollView>
         ))}
       </ScrollView>
+      <ScorecardModal
+        participante={scorecardAbierto?.participante ?? null}
+        roundIndex={scorecardAbierto?.roundIndex ?? null}
+        onClose={() => setScorecardAbierto(null)}
+        onChangeRoundIndex={i => setScorecardAbierto(s => s && { ...s, roundIndex: i })}
+      />
     </View>
   );
 }
@@ -471,6 +590,12 @@ const styles = StyleSheet.create({
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 13 },
   menuItemBorder: { borderTopWidth: 0.5, borderTopColor: '#2a2a2a' },
   menuItemText: { fontSize: 14, fontWeight: '600', color: COLORS.white },
+
+  scorecardOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  scorecardModalCard: { backgroundColor: COLORS.card, borderRadius: 16, borderWidth: 0.5, borderColor: COLORS.border, padding: 16, width: '100%', maxWidth: 420 },
+  scorecardModalHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  scorecardPagerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 14, marginBottom: 4 },
+  scorecardPagerText: { fontSize: 13, fontWeight: '700', color: COLORS.white, minWidth: 70, textAlign: 'center' },
 
   estadoBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#222' },
   estadoBadgeEnCurso: { backgroundColor: '#1a2a0a', flexDirection: 'row', alignItems: 'center', gap: 5 },

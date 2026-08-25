@@ -64,7 +64,7 @@ export default function InvitarJugadoresScreen() {
     try {
       const elegidos = usuarios.filter(u => seleccionados.includes(u.uid));
       await Promise.all(elegidos.map(u =>
-        addParticipantToTournament(torneoId, nombreTorneo, { uid: u.uid, displayName: u.displayName, handicap: u.handicap }, userDoc.displayName)
+        addParticipantToTournament(torneoId, nombreTorneo, { uid: u.uid, displayName: u.displayName, handicap: u.handicap, photoURL: u.photoURL }, userDoc.displayName)
       ));
       if (standalone) {
         navigation.replace('TorneoCreado', { nombreTorneo, kind: 'invitados', invitados: seleccionados.length });

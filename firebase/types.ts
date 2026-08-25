@@ -201,15 +201,30 @@ export interface TournamentDoc {
 	createdAt: Timestamp;
 }
 
+// Copia liviana de una tarjeta, guardada dentro del participante para poder mostrar el
+// detalle de la ronda (y armar la clasificación por ronda) sin tener que leer la colección
+// rounds desde el torneo — esa lectura chocaría con la regla de seguridad de rounds en queries de lista.
+export interface TournamentRoundScore {
+	roundIndex: number; // 0-based, posición dentro de roundDates
+	totalScore: number;
+	totalPar: number;
+	vsPar: number;
+	holes: HoleResult[];
+	courseName: string;
+	clubName: string;
+	date: Timestamp;
+}
+
 // tournaments/{tournamentId}/participants/{uid}
 export interface TournamentParticipantDoc {
 	uid: string;
 	displayName: string;
 	initials: string;
+	photoURL: string | null;
 	handicap: number | null;
 	roundsPlayed: number; // cuántas rondas de este jugador se vincularon al torneo
 	vsParTotal: number; // suma del vsPar de esas rondas — la clasificación se ordena por esto
-	roundsLoaded: number[]; // índices (0-based) de las rondas del torneo ya vinculadas, para no ofrecer cargar la misma dos veces
+	roundScores: Record<string, TournamentRoundScore>; // clave = roundIndex como string (los mapas de Firestore piden claves string)
 	joinedAt: Timestamp;
 }
 

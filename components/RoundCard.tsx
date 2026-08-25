@@ -168,7 +168,7 @@ function HoleCell({ num, score, par }: { num: number; score: number; par: number
 	);
 }
 
-function Scorecard({ holes, score, vsPar }: { holes: { score: number; par: number }[]; score: number; vsPar: number }) {
+export function Scorecard({ holes, score, vsPar }: { holes: { score: number; par: number }[]; score: number; vsPar: number }) {
 	return (
 		<View style={styles.scorecard}>
 			<View style={styles.scHeader}>

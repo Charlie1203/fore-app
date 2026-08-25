@@ -1,6 +1,6 @@
 import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, serverTimestamp, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import type { TournamentModality, UserDoc } from '../firebase/types';
+import type { TournamentModality, UserDoc, HoleResult } from '../firebase/types';
 
 function initialsOf(name: string): string {
 	return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
@@ -33,10 +33,11 @@ export async function createTournament(params: {
 		uid: user.uid,
 		displayName: user.displayName,
 		initials: initialsOf(user.displayName),
+		photoURL: user.photoURL ?? null,
 		handicap: user.handicap ?? null,
 		roundsPlayed: 0,
 		vsParTotal: 0,
-		roundsLoaded: [],
+		roundScores: {},
 		joinedAt: serverTimestamp(),
 	});
 	return ref.id;
@@ -48,10 +49,11 @@ export async function joinTournament(tournamentId: string, user: UserDoc): Promi
 		uid: user.uid,
 		displayName: user.displayName,
 		initials: initialsOf(user.displayName),
+		photoURL: user.photoURL ?? null,
 		handicap: user.handicap ?? null,
 		roundsPlayed: 0,
 		vsParTotal: 0,
-		roundsLoaded: [],
+		roundScores: {},
 		joinedAt: serverTimestamp(),
 	});
 	await updateDoc(doc(db, 'tournaments', tournamentId), {
@@ -64,17 +66,18 @@ export async function joinTournament(tournamentId: string, user: UserDoc): Promi
 export async function addParticipantToTournament(
 	tournamentId: string,
 	tournamentName: string,
-	participant: Pick<UserDoc, 'uid' | 'displayName' | 'handicap'>,
+	participant: Pick<UserDoc, 'uid' | 'displayName' | 'handicap' | 'photoURL'>,
 	addedByName: string,
 ): Promise<void> {
 	await setDoc(doc(db, 'tournaments', tournamentId, 'participants', participant.uid), {
 		uid: participant.uid,
 		displayName: participant.displayName,
 		initials: initialsOf(participant.displayName),
+		photoURL: participant.photoURL ?? null,
 		handicap: participant.handicap ?? null,
 		roundsPlayed: 0,
 		vsParTotal: 0,
-		roundsLoaded: [],
+		roundScores: {},
 		joinedAt: serverTimestamp(),
 	});
 	await updateDoc(doc(db, 'tournaments', tournamentId), {
@@ -114,17 +117,27 @@ export interface TorneoRondaSeleccion {
 	roundIndex: number; // 0-based, posición dentro de roundDates
 }
 
+export interface TorneoScorecard {
+	totalScore: number;
+	totalPar: number;
+	vsPar: number;
+	holes: HoleResult[];
+	courseName: string;
+	clubName: string;
+}
+
 /** Se llama al publicar una vuelta vinculada a una o más rondas de torneo: suma 1 a
  * roundsPlayedCount del torneo (señal que usa estadoDeTorneo) y también al
- * roundsPlayed/vsParTotal/roundsLoaded del propio participante, para armar la
- * clasificación y saber qué rondas le quedan por cargar sin leer la colección de rounds. */
-export async function linkRoundToTournaments(selecciones: TorneoRondaSeleccion[], uid: string, vsPar: number): Promise<void> {
+ * roundsPlayed/vsParTotal del propio participante, guardando además una copia liviana
+ * de la tarjeta en roundScores[roundIndex] — así se puede armar la clasificación por
+ * ronda y mostrar el detalle de cada tarjeta sin leer la colección rounds desde el torneo. */
+export async function linkRoundToTournaments(selecciones: TorneoRondaSeleccion[], uid: string, scorecard: TorneoScorecard): Promise<void> {
 	await Promise.all(selecciones.map(({ tournamentId, roundIndex }) => Promise.all([
 		updateDoc(doc(db, 'tournaments', tournamentId), { roundsPlayedCount: increment(1) }),
 		updateDoc(doc(db, 'tournaments', tournamentId, 'participants', uid), {
 			roundsPlayed: increment(1),
-			vsParTotal: increment(vsPar),
-			roundsLoaded: arrayUnion(roundIndex),
+			vsParTotal: increment(scorecard.vsPar),
+			[`roundScores.${roundIndex}`]: { roundIndex, ...scorecard, date: serverTimestamp() },
 		}),
 	])));
 }
