@@ -168,10 +168,10 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
       // El creador puede editar todo; cualquier usuario firmado puede tocar solo los campos
-      // de participación (unirse desde la pestaña Torneos de un grupo) o roundsPlayedCount
+      // de participación (unirse/salir desde la pestaña Torneos de un grupo) o roundsWithScores
       // (vincular una ronda publicada al torneo).
       allow update: if isSignedIn() && (resource.data.createdBy == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["participantUids", "participantsCount", "roundsPlayedCount"]));
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["participantUids", "participantsCount", "roundsWithScores"]));
       allow delete: if isSignedIn() && resource.data.createdBy == request.auth.uid;
 
       match /participants/{uid} {

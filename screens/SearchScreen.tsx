@@ -712,7 +712,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
             {torneos.length === 0 ? (
               <Text style={styles.emptyTabText}>Todavía no hay torneos en este grupo.</Text>
             ) : torneos.map(t => {
-              const estado = estadoDeTorneo(t.roundDates, t.roundsPlayedCount);
+              const estado = estadoDeTorneo(t.roundDates, t.roundsWithScores);
               const soyParticipante = !!firebaseUser && t.participantUids.includes(firebaseUser.uid);
               return (
                 <TouchableOpacity key={t.id} style={styles.torneoRow} onPress={() => navigation.navigate('TorneoDetail', { torneoId: t.id })}>

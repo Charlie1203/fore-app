@@ -266,7 +266,7 @@ function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
     const q = query(collection(db, 'tournaments'), where('participantUids', 'array-contains', firebaseUser.uid));
     return onSnapshot(q, snap => {
       const torneos = snap.docs.map(d => ({ ...d.data(), id: d.id }) as TournamentDoc)
-        .filter(t => estadoDeTorneo(t.roundDates, t.roundsPlayedCount) !== 'finalizado');
+        .filter(t => estadoDeTorneo(t.roundDates, t.roundsWithScores) !== 'finalizado');
       setTorneosActivos(torneos);
     });
   }, [firebaseUser?.uid]);

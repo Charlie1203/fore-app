@@ -26,7 +26,7 @@ export async function createTournament(params: {
 		roundDates: params.roundDates,
 		participantUids: [user.uid],
 		participantsCount: 1,
-		roundsPlayedCount: 0,
+		roundsWithScores: [],
 		createdAt: serverTimestamp(),
 	});
 	await setDoc(doc(db, 'tournaments', ref.id, 'participants', user.uid), {
@@ -126,14 +126,15 @@ export interface TorneoScorecard {
 	clubName: string;
 }
 
-/** Se llama al publicar una vuelta vinculada a una o más rondas de torneo: suma 1 a
- * roundsPlayedCount del torneo (señal que usa estadoDeTorneo) y también al
+/** Se llama al publicar una vuelta vinculada a una o más rondas de torneo: agrega el
+ * índice de ronda a roundsWithScores del torneo (señal que usa estadoDeTorneo — cuenta
+ * rondas *distintas* con algún dato, no cuántas veces se cargó algo) y suma al
  * roundsPlayed/vsParTotal del propio participante, guardando además una copia liviana
  * de la tarjeta en roundScores[roundIndex] — así se puede armar la clasificación por
  * ronda y mostrar el detalle de cada tarjeta sin leer la colección rounds desde el torneo. */
 export async function linkRoundToTournaments(selecciones: TorneoRondaSeleccion[], uid: string, scorecard: TorneoScorecard): Promise<void> {
 	await Promise.all(selecciones.map(({ tournamentId, roundIndex }) => Promise.all([
-		updateDoc(doc(db, 'tournaments', tournamentId), { roundsPlayedCount: increment(1) }),
+		updateDoc(doc(db, 'tournaments', tournamentId), { roundsWithScores: arrayUnion(roundIndex) }),
 		updateDoc(doc(db, 'tournaments', tournamentId, 'participants', uid), {
 			roundsPlayed: increment(1),
 			vsParTotal: increment(scorecard.vsPar),
@@ -144,16 +145,30 @@ export async function linkRoundToTournaments(selecciones: TorneoRondaSeleccion[]
 
 export type TorneoEstado = 'próximo' | 'en curso' | 'finalizado';
 
-/** Deriva el estado del torneo, no se guarda en el doc. Combina dos señales:
- * (1) por fechas — hoy cae entre la primera y la última ronda cargada, y solo es
- * "finalizado" cuando TODAS las rondas tienen fecha y todas ya pasaron; y
- * (2) por carga real — si el torneo tiene más de una ronda y ya se publicó al menos
- * una tarjeta (pero no todas), está "en curso" aunque las fechas no lo digan (o no haya
- * fechas cargadas). Así no depende solo de que alguien haya cargado fechas a tiempo. */
-export function estadoDeTorneo(roundDates: (string | null)[], roundsPlayedCount: number = 0): TorneoEstado {
-	const total = roundDates.length;
-	const empezoPorCarga = total > 1 && roundsPlayedCount > 0 && roundsPlayedCount < total;
+/** true solo cuando TODAS las rondas tienen fecha cargada y todas ya pasaron — el cierre
+ * "duro" por calendario. Se usa para distinguir ese cierre confirmado del cierre "blando"
+ * por carga (todas las rondas ya tienen alguna tarjeta, pero podría faltar gente por jugar). */
+export function finalizadoPorFecha(roundDates: (string | null)[]): boolean {
+	const fechas = roundDates.filter((d): d is string => !!d).map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
+	if (fechas.length === 0) return false;
+	const quedaRondaSinFecha = roundDates.some(d => !d);
+	if (quedaRondaSinFecha) return false;
+	const hoy = new Date();
+	hoy.setHours(0, 0, 0, 0);
+	return hoy > fechas[fechas.length - 1];
+}
 
+/** Deriva el estado del torneo, no se guarda en el doc. Combina dos señales:
+ * (1) por carga — si todas las rondas ya tienen alguna tarjeta cargada (por cualquier
+ * participante), el torneo está "finalizado" así sea de una sola ronda; si hay carga pero
+ * no en todas las rondas, está "en curso"; y (2) por fechas — como respaldo cuando todavía
+ * no hay ninguna tarjeta, para no depender solo de que alguien haya cargado a tiempo. */
+export function estadoDeTorneo(roundDates: (string | null)[], roundsWithScores: number[] = []): TorneoEstado {
+	const total = roundDates.length;
+	const rondasConDatos = roundsWithScores.length;
+	if (total > 0 && rondasConDatos >= total) return 'finalizado';
+
+	const empezoPorCarga = rondasConDatos > 0;
 	const fechas = roundDates.filter((d): d is string => !!d).map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
 	if (fechas.length === 0) return empezoPorCarga ? 'en curso' : 'próximo';
 
@@ -162,18 +177,17 @@ export function estadoDeTorneo(roundDates: (string | null)[], roundsPlayedCount:
 	const primera = fechas[0];
 	if (hoy < primera) return empezoPorCarga ? 'en curso' : 'próximo';
 
-	const ultima = fechas[fechas.length - 1];
-	const quedaRondaSinFecha = roundDates.some(d => !d);
-	if (hoy > ultima && !quedaRondaSinFecha) return 'finalizado';
+	if (finalizadoPorFecha(roundDates)) return 'finalizado';
 	return 'en curso';
 }
 
 /** Cuántas rondas ya pasaron (incluye la de hoy), 1-indexed. Toma la mayor entre lo que
- * dicen las fechas y las tarjetas realmente cargadas. Solo tiene sentido si el torneo está en curso. */
-export function rondaActualDeTorneo(roundDates: (string | null)[], roundsPlayedCount: number = 0): number {
+ * dicen las fechas y las rondas que ya tienen alguna tarjeta cargada. Solo tiene sentido
+ * si el torneo está en curso. */
+export function rondaActualDeTorneo(roundDates: (string | null)[], roundsWithScores: number[] = []): number {
 	const hoy = new Date();
 	hoy.setHours(0, 0, 0, 0);
 	const fechas = roundDates.filter((d): d is string => !!d).map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
 	const pasadas = fechas.filter(f => f <= hoy).length;
-	return Math.max(1, pasadas, roundsPlayedCount);
+	return Math.max(1, pasadas, roundsWithScores.length);
 }

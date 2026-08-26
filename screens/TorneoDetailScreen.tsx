@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
 import { collection, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import type { TournamentDoc, TournamentParticipantDoc, TournamentRoundScore } from '../firebase/types';
-import { estadoDeTorneo, joinTournament, removeParticipantFromTournament, deleteTournament } from '../services/tournaments';
+import { estadoDeTorneo, finalizadoPorFecha, joinTournament, removeParticipantFromTournament, deleteTournament } from '../services/tournaments';
 import { formatFechaTorneo } from './TorneosScreen';
 import { Scorecard } from '../components/RoundCard';
 
@@ -52,7 +52,9 @@ function SettingsMenu({ visible, onClose, onEdit, onDelete, editLabel, deleteLab
   );
 }
 
-function DetailNav({ torneo, onBack, badge, isAdmin, onEdit, onDelete, deleting }: { torneo: TournamentDoc; onBack: () => void; badge: React.ReactNode; isAdmin: boolean; onEdit?: () => void; onDelete?: () => void; deleting?: boolean }) {
+type TorneoSettingsMenu = { onEdit?: () => void; onDelete: () => void; editLabel?: string; deleteLabel: string };
+
+function DetailNav({ torneo, onBack, badge, settingsMenu, busy }: { torneo: TournamentDoc; onBack: () => void; badge: React.ReactNode; settingsMenu?: TorneoSettingsMenu; busy?: boolean }) {
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
   return (
@@ -65,22 +67,22 @@ function DetailNav({ torneo, onBack, badge, isAdmin, onEdit, onDelete, deleting 
         <Text style={styles.detailNavSub}>{torneo.modality} · {formatFechaTorneo(torneo.roundDates)}{torneo.groupName ? ` · ${torneo.groupName}` : ''}</Text>
       </View>
       {badge}
-      {isAdmin && (
-        <TouchableOpacity onPress={() => setMenuOpen(true)} disabled={deleting} style={{ marginLeft: 10, padding: 2 }}>
-          {deleting
+      {settingsMenu && (
+        <TouchableOpacity onPress={() => setMenuOpen(true)} disabled={busy} style={{ marginLeft: 10, padding: 2 }}>
+          {busy
             ? <ActivityIndicator size="small" color={COLORS.muted} />
             : <Ionicons name="settings-outline" size={19} color={COLORS.muted} />
           }
         </TouchableOpacity>
       )}
-      {isAdmin && onDelete && (
+      {settingsMenu && (
         <SettingsMenu
           visible={menuOpen}
           onClose={() => setMenuOpen(false)}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          editLabel="Editar torneo"
-          deleteLabel="Eliminar torneo"
+          onEdit={settingsMenu.onEdit}
+          onDelete={settingsMenu.onDelete}
+          editLabel={settingsMenu.editLabel ?? ''}
+          deleteLabel={settingsMenu.deleteLabel}
         />
       )}
     </View>
@@ -125,16 +127,21 @@ function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, 
     ]);
   };
 
+  const totalRondas = torneo.roundDates.length || 1;
+  const settingsMenu: TorneoSettingsMenu | undefined = isAdmin
+    ? { onEdit: () => navigation.navigate('CreateTorneo', { torneo }), onDelete, editLabel: 'Editar torneo', deleteLabel: 'Eliminar torneo' }
+    : isParticipante
+      ? { onDelete: confirmarSalir, deleteLabel: 'Abandonar torneo' }
+      : undefined;
+
   return (
     <View style={styles.container}>
       <DetailNav
         torneo={torneo}
         onBack={() => navigation.goBack()}
-        isAdmin={isAdmin}
         badge={<View style={styles.estadoBadge}><Text style={styles.estadoBadgeText}>Próximo</Text></View>}
-        onEdit={() => navigation.navigate('CreateTorneo', { torneo })}
-        onDelete={onDelete}
-        deleting={deleting}
+        settingsMenu={settingsMenu}
+        busy={isAdmin ? deleting : removingUid === firebaseUser?.uid}
       />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.infoCard}>
@@ -145,6 +152,19 @@ function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, 
             <Text style={styles.infoLabel}>Modalidad</Text>
             <Text style={styles.infoValue}>{torneo.modality}</Text>
             {!!modalidadInfo.desc && <Text style={styles.infoDesc}>{modalidadInfo.desc}</Text>}
+          </View>
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Ionicons name="flag-outline" size={16} color={COLORS.lime} />
+            <Text style={styles.statValue}>{totalRondas}</Text>
+            <Text style={styles.statLabel}>{totalRondas === 1 ? 'Ronda' : 'Rondas'}</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Ionicons name="people-outline" size={16} color={COLORS.lime} />
+            <Text style={styles.statValue}>{participantes.length}</Text>
+            <Text style={styles.statLabel}>{participantes.length === 1 ? 'Participante' : 'Participantes'}</Text>
           </View>
         </View>
 
@@ -181,14 +201,7 @@ function TorneoProximoContent({ torneo, participantes, isAdmin, isParticipante, 
                 <Text style={styles.participanteNombre} numberOfLines={1}>{p.displayName}{esYo ? ' (vos)' : ''}</Text>
                 <Text style={styles.participanteSub} numberOfLines={1}>{p.handicap != null ? `HCP ${p.handicap}` : 'Sin HCP cargado'}</Text>
               </View>
-              {esYo ? (
-                <TouchableOpacity onPress={confirmarSalir} disabled={removingUid === p.uid} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  {removingUid === p.uid
-                    ? <ActivityIndicator size="small" color={COLORS.muted} />
-                    : <Ionicons name="exit-outline" size={20} color={COLORS.muted} />
-                  }
-                </TouchableOpacity>
-              ) : isAdmin ? (
+              {isAdmin && !esYo ? (
                 <TouchableOpacity onPress={() => confirmarEliminar(p)} disabled={removingUid === p.uid} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   {removingUid === p.uid
                     ? <ActivityIndicator size="small" color={COLORS.muted} />
@@ -371,12 +384,14 @@ function RoundLeaderboard({ roundIndex, participantes, onAbrirTarjeta }: { round
 
 function TorneoEnCursoContent({ torneo, participantes, isAdmin, isParticipante, joining, onJoin, onDelete, deleting }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean; isParticipante: boolean; joining: boolean; onJoin: () => void; onDelete: () => void; deleting: boolean }) {
   const navigation = useNavigation<any>();
+  const { firebaseUser } = useAuth();
   const totalRondas = torneo.roundDates.length || 1;
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
   const [tab, setTab] = useState(0);
   const pagerRef = useRef<ScrollView>(null);
   const [scorecardAbierto, setScorecardAbierto] = useState<{ participante: TournamentParticipantDoc; roundIndex: number } | null>(null);
   const abrirTarjeta = (participante: TournamentParticipantDoc, roundIndex: number) => setScorecardAbierto({ participante, roundIndex });
+  const [leaving, setLeaving] = useState(false);
 
   const onTabPress = (i: number) => {
     setTab(i);
@@ -388,21 +403,44 @@ function TorneoEnCursoContent({ torneo, participantes, isAdmin, isParticipante, 
     if (i !== tab) setTab(i);
   };
 
+  const confirmarAbandonar = () => {
+    Alert.alert('Abandonar torneo', `¿Seguro que querés abandonar ${torneo.name}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Abandonar', style: 'destructive', onPress: async () => {
+          if (!firebaseUser) return;
+          setLeaving(true);
+          try {
+            await removeParticipantFromTournament(torneo.id, firebaseUser.uid);
+          } catch {
+            Alert.alert('Error', 'No pudimos completar la acción. Probá de nuevo.');
+          } finally {
+            setLeaving(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const settingsMenu: TorneoSettingsMenu | undefined = isAdmin
+    ? { onEdit: () => navigation.navigate('CreateTorneo', { torneo }), onDelete, editLabel: 'Editar torneo', deleteLabel: 'Eliminar torneo' }
+    : isParticipante
+      ? { onDelete: confirmarAbandonar, deleteLabel: 'Abandonar torneo' }
+      : undefined;
+
   return (
     <View style={styles.container}>
       <DetailNav
         torneo={torneo}
         onBack={() => navigation.goBack()}
-        isAdmin={isAdmin}
         badge={
           <View style={[styles.estadoBadge, styles.estadoBadgeEnCurso]}>
             <View style={styles.estadoBadgeDot} />
             <Text style={[styles.estadoBadgeText, { color: COLORS.lime }]}>En curso</Text>
           </View>
         }
-        onEdit={() => navigation.navigate('CreateTorneo', { torneo })}
-        onDelete={onDelete}
-        deleting={deleting}
+        settingsMenu={settingsMenu}
+        busy={isAdmin ? deleting : leaving}
       />
       {!isAdmin && !isParticipante && (
         <TouchableOpacity style={[styles.joinCard, { marginTop: 14 }]} onPress={onJoin} disabled={joining}>
@@ -440,14 +478,16 @@ function TorneoEnCursoContent({ torneo, participantes, isAdmin, isParticipante, 
   );
 }
 
-function TorneoFinalizadoContent({ torneo, participantes, isAdmin, onDelete, deleting }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean; onDelete: () => void; deleting: boolean }) {
+function TorneoFinalizadoContent({ torneo, participantes, isAdmin, isParticipante, onDelete, deleting }: { torneo: TournamentDoc; participantes: TournamentParticipantDoc[]; isAdmin: boolean; isParticipante: boolean; onDelete: () => void; deleting: boolean }) {
   const navigation = useNavigation<any>();
+  const { firebaseUser } = useAuth();
   const totalRondas = torneo.roundDates.length || 1;
   const tabs = ['General', ...Array.from({ length: totalRondas }, (_, i) => `Ronda ${i + 1}`)];
   const [tab, setTab] = useState(0);
   const pagerRef = useRef<ScrollView>(null);
   const [scorecardAbierto, setScorecardAbierto] = useState<{ participante: TournamentParticipantDoc; roundIndex: number } | null>(null);
   const abrirTarjeta = (participante: TournamentParticipantDoc, roundIndex: number) => setScorecardAbierto({ participante, roundIndex });
+  const [leaving, setLeaving] = useState(false);
 
   const onTabPress = (i: number) => {
     setTab(i);
@@ -459,20 +499,54 @@ function TorneoFinalizadoContent({ torneo, participantes, isAdmin, onDelete, del
     if (i !== tab) setTab(i);
   };
 
+  const confirmarAbandonar = () => {
+    Alert.alert('Abandonar torneo', `¿Seguro que querés abandonar ${torneo.name}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Abandonar', style: 'destructive', onPress: async () => {
+          if (!firebaseUser) return;
+          setLeaving(true);
+          try {
+            await removeParticipantFromTournament(torneo.id, firebaseUser.uid);
+          } catch {
+            Alert.alert('Error', 'No pudimos completar la acción. Probá de nuevo.');
+          } finally {
+            setLeaving(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const settingsMenu: TorneoSettingsMenu | undefined = isAdmin
+    ? { onEdit: undefined, onDelete, deleteLabel: 'Eliminar torneo' }
+    : isParticipante
+      ? { onDelete: confirmarAbandonar, deleteLabel: 'Abandonar torneo' }
+      : undefined;
+
+  const yo = participantes.find(p => p.uid === firebaseUser?.uid);
+  const yoTermino = !!yo && (yo.roundsPlayed ?? 0) >= totalRondas;
+  const avisoProvisorio = yoTermino && !finalizadoPorFecha(torneo.roundDates);
+
   return (
     <View style={styles.container}>
       <DetailNav
         torneo={torneo}
         onBack={() => navigation.goBack()}
-        isAdmin={isAdmin}
         badge={
           <View style={[styles.estadoBadge, styles.estadoBadgeFinalizado]}>
             <Text style={styles.estadoBadgeText}>Finalizado</Text>
           </View>
         }
-        onDelete={onDelete}
-        deleting={deleting}
+        settingsMenu={settingsMenu}
+        busy={isAdmin ? deleting : leaving}
       />
+      {avisoProvisorio && (
+        <View style={styles.avisoProvisorio}>
+          <Ionicons name="information-circle-outline" size={16} color={COLORS.lime} />
+          <Text style={styles.avisoProvisorioText}>Vos ya completaste tus rondas. El resultado todavía no está confirmado — puede haber jugadores que no terminaron.</Text>
+        </View>
+      )}
       <TabBar tabs={tabs} tab={tab} onPress={onTabPress} />
       <ScrollView
         ref={pagerRef}
@@ -535,7 +609,7 @@ export default function TorneoDetailScreen() {
 
   const isAdmin = torneo.createdBy === firebaseUser?.uid;
   const isParticipante = !!firebaseUser && torneo.participantUids.includes(firebaseUser.uid);
-  const estado = estadoDeTorneo(torneo.roundDates, torneo.roundsPlayedCount);
+  const estado = estadoDeTorneo(torneo.roundDates, torneo.roundsWithScores);
 
   const onJoin = async () => {
     if (!userDoc || joining) return;
@@ -569,7 +643,7 @@ export default function TorneoDetailScreen() {
 
   if (estado === 'próximo') return <TorneoProximoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} onDelete={onDelete} deleting={deleting} />;
   if (estado === 'en curso') return <TorneoEnCursoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} isParticipante={isParticipante} joining={joining} onJoin={onJoin} onDelete={onDelete} deleting={deleting} />;
-  return <TorneoFinalizadoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} onDelete={onDelete} deleting={deleting} />;
+  return <TorneoFinalizadoContent torneo={torneo} participantes={participantes} isAdmin={isAdmin} isParticipante={isParticipante} onDelete={onDelete} deleting={deleting} />;
 }
 
 const styles = StyleSheet.create({
@@ -608,6 +682,14 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 11, color: COLORS.lime, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' },
   infoValue: { fontSize: 17, fontWeight: '800', color: COLORS.white, marginTop: 2 },
   infoDesc: { fontSize: 12, color: COLORS.muted, marginTop: 3, lineHeight: 16 },
+
+  statsRow: { flexDirection: 'row', gap: 10, marginHorizontal: 18, marginTop: 10 },
+  statBox: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: COLORS.card, borderRadius: 14, borderWidth: 0.5, borderColor: COLORS.border, paddingVertical: 12 },
+  statValue: { fontSize: 18, fontWeight: '800', color: COLORS.white, marginTop: 2 },
+  statLabel: { fontSize: 11, color: COLORS.muted },
+
+  avisoProvisorio: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginHorizontal: 18, marginTop: 14, padding: 12, backgroundColor: '#141f09', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(200,224,58,0.28)' },
+  avisoProvisorioText: { flex: 1, fontSize: 12, color: COLORS.white, lineHeight: 17 },
 
   joinCard: { marginHorizontal: 18, marginTop: 18, backgroundColor: COLORS.lime, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   joinCardText: { fontSize: 14, fontWeight: '800', color: '#0f0f0f' },

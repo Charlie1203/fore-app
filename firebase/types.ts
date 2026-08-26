@@ -183,7 +183,7 @@ export interface AttendeeDoc {
 
 // tournaments/{tournamentId}
 // El estado (próximo/en curso/finalizado) y la ronda actual se derivan de roundDates y
-// roundsPlayedCount, no se guardan — así nunca quedan desincronizados.
+// roundsWithScores, no se guardan — así nunca quedan desincronizados.
 export type TournamentModality = 'Stroke Play' | 'Stableford' | 'Match Play';
 
 export interface TournamentDoc {
@@ -197,7 +197,7 @@ export interface TournamentDoc {
 	roundDates: (string | null)[]; // ISO yyyy-mm-dd, null = "a definir"
 	participantUids: string[]; // denormalizado para poder consultar "mis torneos" con array-contains
 	participantsCount: number;
-	roundsPlayedCount: number; // cuántas rondas ya tienen al menos una tarjeta publicada vinculada
+	roundsWithScores: number[]; // índices (0-based) de rondas que ya tienen al menos una tarjeta de algún participante
 	createdAt: Timestamp;
 }
 
