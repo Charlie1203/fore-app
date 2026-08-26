@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
 import { collection, doc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import type { TournamentDoc, TournamentParticipantDoc, TournamentRoundScore } from '../firebase/types';
-import { estadoDeTorneo, finalizadoPorFecha, joinTournament, removeParticipantFromTournament, deleteTournament } from '../services/tournaments';
+import { estadoDeTorneo, joinTournament, removeParticipantFromTournament, deleteTournament, finalizeTournament } from '../services/tournaments';
 import { formatFechaTorneo } from './TorneosScreen';
 import { Scorecard } from '../components/RoundCard';
 
@@ -29,8 +29,8 @@ function Avatar({ initials, photoURL, size = 36 }: { initials: string; photoURL?
   );
 }
 
-function SettingsMenu({ visible, onClose, onEdit, onDelete, editLabel, deleteLabel }: {
-  visible: boolean; onClose: () => void; onEdit?: () => void; onDelete: () => void; editLabel: string; deleteLabel: string;
+function SettingsMenu({ visible, onClose, onEdit, onFinalize, onDelete, editLabel, finalizeLabel, deleteLabel }: {
+  visible: boolean; onClose: () => void; onEdit?: () => void; onFinalize?: () => void; onDelete: () => void; editLabel?: string; finalizeLabel?: string; deleteLabel: string;
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -42,7 +42,13 @@ function SettingsMenu({ visible, onClose, onEdit, onDelete, editLabel, deleteLab
               <Text style={styles.menuItemText}>{editLabel}</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={[styles.menuItem, onEdit && styles.menuItemBorder]} onPress={() => { onClose(); onDelete(); }}>
+          {onFinalize && (
+            <TouchableOpacity style={[styles.menuItem, onEdit && styles.menuItemBorder]} onPress={() => { onClose(); onFinalize(); }}>
+              <Ionicons name="flag-outline" size={17} color={COLORS.lime} />
+              <Text style={styles.menuItemText}>{finalizeLabel}</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={[styles.menuItem, (onEdit || onFinalize) && styles.menuItemBorder]} onPress={() => { onClose(); onDelete(); }}>
             <Ionicons name="trash-outline" size={17} color={COLORS.red} />
             <Text style={[styles.menuItemText, { color: COLORS.red }]}>{deleteLabel}</Text>
           </TouchableOpacity>
@@ -52,7 +58,7 @@ function SettingsMenu({ visible, onClose, onEdit, onDelete, editLabel, deleteLab
   );
 }
 
-type TorneoSettingsMenu = { onEdit?: () => void; onDelete: () => void; editLabel?: string; deleteLabel: string };
+type TorneoSettingsMenu = { onEdit?: () => void; onFinalize?: () => void; onDelete: () => void; editLabel?: string; finalizeLabel?: string; deleteLabel: string };
 
 function DetailNav({ torneo, onBack, badge, settingsMenu, busy }: { torneo: TournamentDoc; onBack: () => void; badge: React.ReactNode; settingsMenu?: TorneoSettingsMenu; busy?: boolean }) {
   const insets = useSafeAreaInsets();
@@ -80,8 +86,10 @@ function DetailNav({ torneo, onBack, badge, settingsMenu, busy }: { torneo: Tour
           visible={menuOpen}
           onClose={() => setMenuOpen(false)}
           onEdit={settingsMenu.onEdit}
+          onFinalize={settingsMenu.onFinalize}
           onDelete={settingsMenu.onDelete}
-          editLabel={settingsMenu.editLabel ?? ''}
+          editLabel={settingsMenu.editLabel}
+          finalizeLabel={settingsMenu.finalizeLabel}
           deleteLabel={settingsMenu.deleteLabel}
         />
       )}
@@ -392,6 +400,7 @@ function TorneoEnCursoContent({ torneo, participantes, isAdmin, isParticipante, 
   const [scorecardAbierto, setScorecardAbierto] = useState<{ participante: TournamentParticipantDoc; roundIndex: number } | null>(null);
   const abrirTarjeta = (participante: TournamentParticipantDoc, roundIndex: number) => setScorecardAbierto({ participante, roundIndex });
   const [leaving, setLeaving] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
 
   const onTabPress = (i: number) => {
     setTab(i);
@@ -422,8 +431,26 @@ function TorneoEnCursoContent({ torneo, participantes, isAdmin, isParticipante, 
     ]);
   };
 
+  const confirmarFinalizar = () => {
+    Alert.alert('Finalizar torneo', `¿Cerrar ${torneo.name} para todos los participantes? A partir de ahí nadie va a poder vincular más tarjetas.`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Finalizar', onPress: async () => {
+          setFinalizing(true);
+          try {
+            await finalizeTournament(torneo.id);
+          } catch {
+            Alert.alert('Error', 'No pudimos finalizar el torneo. Probá de nuevo.');
+          } finally {
+            setFinalizing(false);
+          }
+        },
+      },
+    ]);
+  };
+
   const settingsMenu: TorneoSettingsMenu | undefined = isAdmin
-    ? { onEdit: () => navigation.navigate('CreateTorneo', { torneo }), onDelete, editLabel: 'Editar torneo', deleteLabel: 'Eliminar torneo' }
+    ? { onEdit: () => navigation.navigate('CreateTorneo', { torneo }), onFinalize: confirmarFinalizar, onDelete, editLabel: 'Editar torneo', finalizeLabel: 'Finalizar torneo', deleteLabel: 'Eliminar torneo' }
     : isParticipante
       ? { onDelete: confirmarAbandonar, deleteLabel: 'Abandonar torneo' }
       : undefined;
@@ -440,7 +467,7 @@ function TorneoEnCursoContent({ torneo, participantes, isAdmin, isParticipante, 
           </View>
         }
         settingsMenu={settingsMenu}
-        busy={isAdmin ? deleting : leaving}
+        busy={isAdmin ? (deleting || finalizing) : leaving}
       />
       {!isAdmin && !isParticipante && (
         <TouchableOpacity style={[styles.joinCard, { marginTop: 14 }]} onPress={onJoin} disabled={joining}>
@@ -488,6 +515,7 @@ function TorneoFinalizadoContent({ torneo, participantes, isAdmin, isParticipant
   const [scorecardAbierto, setScorecardAbierto] = useState<{ participante: TournamentParticipantDoc; roundIndex: number } | null>(null);
   const abrirTarjeta = (participante: TournamentParticipantDoc, roundIndex: number) => setScorecardAbierto({ participante, roundIndex });
   const [leaving, setLeaving] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
 
   const onTabPress = (i: number) => {
     setTab(i);
@@ -518,15 +546,33 @@ function TorneoFinalizadoContent({ torneo, participantes, isAdmin, isParticipant
     ]);
   };
 
+  const confirmarFinalizar = () => {
+    Alert.alert('Finalizar torneo', `¿Cerrar ${torneo.name} para todos los participantes, aunque no todos hayan terminado?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Finalizar', onPress: async () => {
+          setFinalizing(true);
+          try {
+            await finalizeTournament(torneo.id);
+          } catch {
+            Alert.alert('Error', 'No pudimos finalizar el torneo. Probá de nuevo.');
+          } finally {
+            setFinalizing(false);
+          }
+        },
+      },
+    ]);
+  };
+
   const settingsMenu: TorneoSettingsMenu | undefined = isAdmin
-    ? { onEdit: undefined, onDelete, deleteLabel: 'Eliminar torneo' }
+    ? (torneo.finalizedManually
+        ? { onDelete, deleteLabel: 'Eliminar torneo' }
+        : { onFinalize: confirmarFinalizar, onDelete, finalizeLabel: 'Finalizar torneo para todos', deleteLabel: 'Eliminar torneo' })
     : isParticipante
       ? { onDelete: confirmarAbandonar, deleteLabel: 'Abandonar torneo' }
       : undefined;
 
-  const yo = participantes.find(p => p.uid === firebaseUser?.uid);
-  const yoTermino = !!yo && (yo.roundsPlayed ?? 0) >= totalRondas;
-  const avisoProvisorio = yoTermino && !finalizadoPorFecha(torneo.roundDates);
+  const avisoProvisorio = !torneo.finalizedManually;
 
   return (
     <View style={styles.container}>
@@ -539,12 +585,12 @@ function TorneoFinalizadoContent({ torneo, participantes, isAdmin, isParticipant
           </View>
         }
         settingsMenu={settingsMenu}
-        busy={isAdmin ? deleting : leaving}
+        busy={isAdmin ? (deleting || finalizing) : leaving}
       />
       {avisoProvisorio && (
         <View style={styles.avisoProvisorio}>
           <Ionicons name="information-circle-outline" size={16} color={COLORS.lime} />
-          <Text style={styles.avisoProvisorioText}>Vos ya completaste tus rondas. El resultado todavía no está confirmado — puede haber jugadores que no terminaron.</Text>
+          <Text style={styles.avisoProvisorioText}>Vos ya completaste tus rondas. El torneo sigue abierto para el resto hasta que {isAdmin ? 'lo cierres' : 'el admin lo cierre'}.</Text>
         </View>
       )}
       <TabBar tabs={tabs} tab={tab} onPress={onTabPress} />
@@ -610,7 +656,7 @@ export default function TorneoDetailScreen() {
   const isAdmin = torneo.createdBy === firebaseUser?.uid;
   const isParticipante = !!firebaseUser && torneo.participantUids.includes(firebaseUser.uid);
   const misRoundsPlayed = participantes.find(p => p.uid === firebaseUser?.uid)?.roundsPlayed ?? 0;
-  const estado = estadoDeTorneo(torneo.roundDates, torneo.roundsWithScores, misRoundsPlayed);
+  const estado = estadoDeTorneo(torneo.roundDates, torneo.roundsWithScores, misRoundsPlayed, torneo.finalizedManually);
 
   const onJoin = async () => {
     if (!userDoc || joining) return;

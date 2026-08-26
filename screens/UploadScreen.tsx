@@ -9,7 +9,7 @@ import { db, storage } from '../firebase/config';
 import { collection, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, query, where, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { HoleResult, RoundDoc, TournamentDoc, TournamentParticipantDoc } from '../firebase/types';
-import { finalizadoPorFecha, linkRoundToTournaments, type TorneoRondaSeleccion } from '../services/tournaments';
+import { linkRoundToTournaments, type TorneoRondaSeleccion } from '../services/tournaments';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -266,7 +266,7 @@ function StepPublicar({ scores, holesPlayed, club, course, saving, onDone }: {
     const q = query(collection(db, 'tournaments'), where('participantUids', 'array-contains', firebaseUser.uid));
     return onSnapshot(q, snap => {
       const torneos = snap.docs.map(d => ({ ...d.data(), id: d.id }) as TournamentDoc)
-        .filter(t => !finalizadoPorFecha(t.roundDates)); // el cierre "por carga" es personal, no oculta el torneo para quien todavía tiene rondas propias por cargar
+        .filter(t => !t.finalizedManually); // el cierre por progreso propio es personal, no oculta el torneo para quien todavía tiene rondas por cargar
       setTorneosActivos(torneos);
     });
   }, [firebaseUser?.uid]);

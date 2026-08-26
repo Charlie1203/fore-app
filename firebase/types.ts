@@ -182,8 +182,10 @@ export interface AttendeeDoc {
 }
 
 // tournaments/{tournamentId}
-// El estado (próximo/en curso/finalizado) y la ronda actual se derivan de roundDates y
-// roundsWithScores, no se guardan — así nunca quedan desincronizados.
+// El estado (próximo/en curso/finalizado) y la ronda actual se derivan de roundDates,
+// roundsWithScores y finalizedManually, no se guardan — así nunca quedan desincronizados.
+// "Finalizado" es personal: cada participante lo ve cuando cargó todas sus rondas, o
+// cuando el admin cierra el torneo entero con finalizedManually.
 export type TournamentModality = 'Stroke Play' | 'Stableford' | 'Match Play';
 
 export interface TournamentDoc {
@@ -198,6 +200,7 @@ export interface TournamentDoc {
 	participantUids: string[]; // denormalizado para poder consultar "mis torneos" con array-contains
 	participantsCount: number;
 	roundsWithScores: number[]; // índices (0-based) de rondas que ya tienen al menos una tarjeta de algún participante
+	finalizedManually: boolean; // el admin cerró el torneo a mano — finalizado para todos, jugaron o no
 	createdAt: Timestamp;
 }
 

@@ -27,6 +27,7 @@ export async function createTournament(params: {
 		participantUids: [user.uid],
 		participantsCount: 1,
 		roundsWithScores: [],
+		finalizedManually: false,
 		createdAt: serverTimestamp(),
 	});
 	await setDoc(doc(db, 'tournaments', ref.id, 'participants', user.uid), {
@@ -112,6 +113,13 @@ export async function deleteTournament(tournamentId: string): Promise<void> {
 	await deleteDoc(doc(db, 'tournaments', tournamentId));
 }
 
+/** El admin cierra el torneo a mano: queda "finalizado" para todos los participantes,
+ * hayan cargado sus rondas o no. Es la única forma de finalizar un torneo aparte de que
+ * cada jugador cargue todas las suyas (ver estadoDeTorneo). */
+export async function finalizeTournament(tournamentId: string): Promise<void> {
+	await updateDoc(doc(db, 'tournaments', tournamentId), { finalizedManually: true });
+}
+
 export interface TorneoRondaSeleccion {
 	tournamentId: string;
 	roundIndex: number; // 0-based, posición dentro de roundDates
@@ -145,27 +153,14 @@ export async function linkRoundToTournaments(selecciones: TorneoRondaSeleccion[]
 
 export type TorneoEstado = 'próximo' | 'en curso' | 'finalizado';
 
-/** true solo cuando TODAS las rondas tienen fecha cargada y todas ya pasaron — el cierre
- * "duro" por calendario. Se usa para distinguir ese cierre confirmado del cierre "blando"
- * por carga (todas las rondas ya tienen alguna tarjeta, pero podría faltar gente por jugar). */
-export function finalizadoPorFecha(roundDates: (string | null)[]): boolean {
-	const fechas = roundDates.filter((d): d is string => !!d).map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
-	if (fechas.length === 0) return false;
-	const quedaRondaSinFecha = roundDates.some(d => !d);
-	if (quedaRondaSinFecha) return false;
-	const hoy = new Date();
-	hoy.setHours(0, 0, 0, 0);
-	return hoy > fechas[fechas.length - 1];
-}
-
 /** Deriva el estado del torneo para quien lo está mirando — no se guarda en el doc.
- * "Finalizado" es personal: aparece solo (a) si el torneo cerró por fecha de verdad
- * (aplica a todos por igual), o (b) si ESTE jugador ya cargó todas sus rondas, aunque al
- * resto le sigan faltando. Que "todas las rondas ya tengan alguna tarjeta" (de cualquiera)
- * ya no alcanza para cerrarlo para todo el mundo — eso fue justamente el bug: el creador
- * cargaba sus rondas y el torneo se veía "finalizado" para participantes que ni jugaron. */
-export function estadoDeTorneo(roundDates: (string | null)[], roundsWithScores: number[] = [], misRoundsPlayed: number = 0): TorneoEstado {
-	if (finalizadoPorFecha(roundDates)) return 'finalizado';
+ * "Finalizado" es siempre alguna de estas dos cosas, nunca una fecha: (a) ESTE jugador ya
+ * cargó todas sus rondas (aunque al resto le falten — cada uno ve su propio progreso), o
+ * (b) el admin cerró el torneo entero a mano (finalizedManually). Las fechas de roundDates
+ * solo se usan para decidir si todavía no arrancó ("próximo"), nunca para cerrarlo solas —
+ * ese fue el bug: alguien cargaba sus rondas y el torneo se veía "finalizado" para todos. */
+export function estadoDeTorneo(roundDates: (string | null)[], roundsWithScores: number[] = [], misRoundsPlayed: number = 0, finalizedManually: boolean = false): TorneoEstado {
+	if (finalizedManually) return 'finalizado';
 
 	const total = roundDates.length;
 	if (total > 0 && misRoundsPlayed >= total) return 'finalizado';

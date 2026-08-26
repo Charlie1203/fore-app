@@ -187,7 +187,7 @@ export default function TorneosScreen() {
     return () => unsubs.forEach(u => u());
   }, [torneoIds, firebaseUser?.uid]);
 
-  const estadoPara = (t: TournamentDoc) => estadoDeTorneo(t.roundDates, t.roundsWithScores, misRoundsPlayed[t.id] ?? 0);
+  const estadoPara = (t: TournamentDoc) => estadoDeTorneo(t.roundDates, t.roundsWithScores, misRoundsPlayed[t.id] ?? 0, t.finalizedManually);
 
   const proximos = torneos.filter(t => estadoPara(t) === 'próximo');
   const enCurso = torneos.filter(t => estadoPara(t) === 'en curso');
