@@ -609,7 +609,8 @@ export default function TorneoDetailScreen() {
 
   const isAdmin = torneo.createdBy === firebaseUser?.uid;
   const isParticipante = !!firebaseUser && torneo.participantUids.includes(firebaseUser.uid);
-  const estado = estadoDeTorneo(torneo.roundDates, torneo.roundsWithScores);
+  const misRoundsPlayed = participantes.find(p => p.uid === firebaseUser?.uid)?.roundsPlayed ?? 0;
+  const estado = estadoDeTorneo(torneo.roundDates, torneo.roundsWithScores, misRoundsPlayed);
 
   const onJoin = async () => {
     if (!userDoc || joining) return;

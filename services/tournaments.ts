@@ -158,17 +158,19 @@ export function finalizadoPorFecha(roundDates: (string | null)[]): boolean {
 	return hoy > fechas[fechas.length - 1];
 }
 
-/** Deriva el estado del torneo, no se guarda en el doc. Combina dos señales:
- * (1) por carga — si todas las rondas ya tienen alguna tarjeta cargada (por cualquier
- * participante), el torneo está "finalizado" así sea de una sola ronda; si hay carga pero
- * no en todas las rondas, está "en curso"; y (2) por fechas — como respaldo cuando todavía
- * no hay ninguna tarjeta, para no depender solo de que alguien haya cargado a tiempo. */
-export function estadoDeTorneo(roundDates: (string | null)[], roundsWithScores: number[] = []): TorneoEstado {
-	const total = roundDates.length;
-	const rondasConDatos = roundsWithScores.length;
-	if (total > 0 && rondasConDatos >= total) return 'finalizado';
+/** Deriva el estado del torneo para quien lo está mirando — no se guarda en el doc.
+ * "Finalizado" es personal: aparece solo (a) si el torneo cerró por fecha de verdad
+ * (aplica a todos por igual), o (b) si ESTE jugador ya cargó todas sus rondas, aunque al
+ * resto le sigan faltando. Que "todas las rondas ya tengan alguna tarjeta" (de cualquiera)
+ * ya no alcanza para cerrarlo para todo el mundo — eso fue justamente el bug: el creador
+ * cargaba sus rondas y el torneo se veía "finalizado" para participantes que ni jugaron. */
+export function estadoDeTorneo(roundDates: (string | null)[], roundsWithScores: number[] = [], misRoundsPlayed: number = 0): TorneoEstado {
+	if (finalizadoPorFecha(roundDates)) return 'finalizado';
 
-	const empezoPorCarga = rondasConDatos > 0;
+	const total = roundDates.length;
+	if (total > 0 && misRoundsPlayed >= total) return 'finalizado';
+
+	const empezoPorCarga = roundsWithScores.length > 0;
 	const fechas = roundDates.filter((d): d is string => !!d).map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
 	if (fechas.length === 0) return empezoPorCarga ? 'en curso' : 'próximo';
 
@@ -177,7 +179,6 @@ export function estadoDeTorneo(roundDates: (string | null)[], roundsWithScores: 
 	const primera = fechas[0];
 	if (hoy < primera) return empezoPorCarga ? 'en curso' : 'próximo';
 
-	if (finalizadoPorFecha(roundDates)) return 'finalizado';
 	return 'en curso';
 }
 

@@ -5,9 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase/config';
-import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import type { TournamentDoc } from '../firebase/types';
-import { estadoDeTorneo, rondaActualDeTorneo } from '../services/tournaments';
+import { collection, doc, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import type { TournamentDoc, TournamentParticipantDoc } from '../firebase/types';
+import { estadoDeTorneo, rondaActualDeTorneo, type TorneoEstado } from '../services/tournaments';
 
 const COLORS = {
   bg: '#0f0f0f', card: '#1a1a1a', border: '#2a2a2a',
@@ -29,8 +29,7 @@ export function formatFechaTorneo(roundDates: (string | null)[]): string {
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
-function TorneoRow({ torneo, onPress }: { torneo: TournamentDoc; onPress: () => void }) {
-  const estado = estadoDeTorneo(torneo.roundDates, torneo.roundsWithScores);
+function TorneoRow({ torneo, estado, onPress }: { torneo: TournamentDoc; estado: TorneoEstado; onPress: () => void }) {
   const dotColor = estado === 'en curso' ? COLORS.lime : COLORS.dim;
   return (
     <TouchableOpacity style={styles.torneoRow} onPress={onPress}>
@@ -162,6 +161,7 @@ export default function TorneosScreen() {
   const navigation = useNavigation<any>();
   const { firebaseUser } = useAuth();
   const [torneos, setTorneos] = useState<TournamentDoc[]>([]);
+  const [misRoundsPlayed, setMisRoundsPlayed] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -173,9 +173,25 @@ export default function TorneosScreen() {
     }, () => setLoading(false));
   }, [firebaseUser?.uid]);
 
-  const proximos = torneos.filter(t => estadoDeTorneo(t.roundDates, t.roundsWithScores) === 'próximo');
-  const enCurso = torneos.filter(t => estadoDeTorneo(t.roundDates, t.roundsWithScores) === 'en curso');
-  const finalizados = torneos.filter(t => estadoDeTorneo(t.roundDates, t.roundsWithScores) === 'finalizado');
+  // "Finalizado" es personal (ver estadoDeTorneo), así que necesitamos mi propio
+  // roundsPlayed en cada torneo — un listener liviano por torneo, no una query.
+  const torneoIds = torneos.map(t => t.id).join(',');
+  useEffect(() => {
+    if (!firebaseUser || torneos.length === 0) return;
+    const unsubs = torneos.map(t =>
+      onSnapshot(doc(db, 'tournaments', t.id, 'participants', firebaseUser.uid), snap => {
+        const rp = (snap.data() as TournamentParticipantDoc | undefined)?.roundsPlayed ?? 0;
+        setMisRoundsPlayed(prev => (prev[t.id] === rp ? prev : { ...prev, [t.id]: rp }));
+      })
+    );
+    return () => unsubs.forEach(u => u());
+  }, [torneoIds, firebaseUser?.uid]);
+
+  const estadoPara = (t: TournamentDoc) => estadoDeTorneo(t.roundDates, t.roundsWithScores, misRoundsPlayed[t.id] ?? 0);
+
+  const proximos = torneos.filter(t => estadoPara(t) === 'próximo');
+  const enCurso = torneos.filter(t => estadoPara(t) === 'en curso');
+  const finalizados = torneos.filter(t => estadoPara(t) === 'finalizado');
 
   const abrir = (torneo: TournamentDoc) => navigation.navigate('TorneoDetail', { torneoId: torneo.id });
 
@@ -202,19 +218,19 @@ export default function TorneosScreen() {
           {enCurso.length > 0 && (
             <>
               <Text style={styles.sectionTitle}>En curso</Text>
-              {enCurso.map(t => <TorneoRow key={t.id} torneo={t} onPress={() => abrir(t)} />)}
+              {enCurso.map(t => <TorneoRow key={t.id} torneo={t} estado="en curso" onPress={() => abrir(t)} />)}
             </>
           )}
           {proximos.length > 0 && (
             <>
               <Text style={styles.sectionTitle}>Próximos</Text>
-              {proximos.map(t => <TorneoRow key={t.id} torneo={t} onPress={() => abrir(t)} />)}
+              {proximos.map(t => <TorneoRow key={t.id} torneo={t} estado="próximo" onPress={() => abrir(t)} />)}
             </>
           )}
           {finalizados.length > 0 && (
             <>
               <Text style={styles.sectionTitle}>Finalizados</Text>
-              {finalizados.map(t => <TorneoRow key={t.id} torneo={t} onPress={() => abrir(t)} />)}
+              {finalizados.map(t => <TorneoRow key={t.id} torneo={t} estado="finalizado" onPress={() => abrir(t)} />)}
             </>
           )}
         </ScrollView>
