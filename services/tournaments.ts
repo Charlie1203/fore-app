@@ -177,13 +177,9 @@ export function estadoDeTorneo(roundDates: (string | null)[], roundsWithScores: 
 	return 'en curso';
 }
 
-/** Cuántas rondas ya pasaron (incluye la de hoy), 1-indexed. Toma la mayor entre lo que
- * dicen las fechas y las rondas que ya tienen alguna tarjeta cargada. Solo tiene sentido
- * si el torneo está en curso. */
-export function rondaActualDeTorneo(roundDates: (string | null)[], roundsWithScores: number[] = []): number {
-	const hoy = new Date();
-	hoy.setHours(0, 0, 0, 0);
-	const fechas = roundDates.filter((d): d is string => !!d).map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
-	const pasadas = fechas.filter(f => f <= hoy).length;
-	return Math.max(1, pasadas, roundsWithScores.length);
+/** Cuántas rondas propias ya se cargaron, para mostrar "Ronda X de Y" — es personal,
+ * como estadoDeTorneo: no mira lo que cargaron los demás participantes. */
+export function rondaActualDeTorneo(roundDates: (string | null)[], misRoundsPlayed: number = 0): number {
+	const total = roundDates.length || 1;
+	return Math.min(misRoundsPlayed, total);
 }

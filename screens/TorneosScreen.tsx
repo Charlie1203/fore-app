@@ -29,7 +29,7 @@ export function formatFechaTorneo(roundDates: (string | null)[]): string {
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
-function TorneoRow({ torneo, estado, onPress }: { torneo: TournamentDoc; estado: TorneoEstado; onPress: () => void }) {
+function TorneoRow({ torneo, estado, misRoundsPlayed, onPress }: { torneo: TournamentDoc; estado: TorneoEstado; misRoundsPlayed: number; onPress: () => void }) {
   const dotColor = estado === 'en curso' ? COLORS.lime : COLORS.dim;
   return (
     <TouchableOpacity style={styles.torneoRow} onPress={onPress}>
@@ -41,7 +41,7 @@ function TorneoRow({ torneo, estado, onPress }: { torneo: TournamentDoc; estado:
         </Text>
         {estado === 'en curso' && (
           <Text style={[styles.torneoMeta, { color: COLORS.lime, marginTop: 2 }]}>
-            Ronda {rondaActualDeTorneo(torneo.roundDates, torneo.roundsWithScores)}/{torneo.roundDates.length} en curso
+            Ronda {rondaActualDeTorneo(torneo.roundDates, misRoundsPlayed)}/{torneo.roundDates.length} en curso
           </Text>
         )}
       </View>
@@ -78,9 +78,9 @@ function ParticipantesAvatares({ torneoId, count }: { torneoId: string; count: n
   );
 }
 
-function TorneoFeaturedCard({ torneo, onPress }: { torneo: TournamentDoc; onPress: () => void }) {
+function TorneoFeaturedCard({ torneo, misRoundsPlayed, onPress }: { torneo: TournamentDoc; misRoundsPlayed: number; onPress: () => void }) {
   const total = torneo.roundDates.length || 1;
-  const actual = rondaActualDeTorneo(torneo.roundDates, torneo.roundsWithScores);
+  const actual = rondaActualDeTorneo(torneo.roundDates, misRoundsPlayed);
   const pct = Math.min(100, Math.round((actual / total) * 100));
 
   return (
@@ -121,7 +121,7 @@ function TorneoFeaturedCard({ torneo, onPress }: { torneo: TournamentDoc; onPres
   );
 }
 
-function TorneosEnCursoCarrusel({ torneos, onOpen }: { torneos: TournamentDoc[]; onOpen: (t: TournamentDoc) => void }) {
+function TorneosEnCursoCarrusel({ torneos, misRoundsPlayed, onOpen }: { torneos: TournamentDoc[]; misRoundsPlayed: Record<string, number>; onOpen: (t: TournamentDoc) => void }) {
   const [index, setIndex] = useState(0);
 
   const onScroll = (e: any) => {
@@ -141,7 +141,7 @@ function TorneosEnCursoCarrusel({ torneos, onOpen }: { torneos: TournamentDoc[];
         onMomentumScrollEnd={onScroll}
       >
         {torneos.map(t => (
-          <TorneoFeaturedCard key={t.id} torneo={t} onPress={() => onOpen(t)} />
+          <TorneoFeaturedCard key={t.id} torneo={t} misRoundsPlayed={misRoundsPlayed[t.id] ?? 0} onPress={() => onOpen(t)} />
         ))}
       </ScrollView>
       {torneos.length > 1 && (
@@ -214,23 +214,23 @@ export default function TorneosScreen() {
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-          {enCurso.length > 0 && <TorneosEnCursoCarrusel torneos={enCurso} onOpen={abrir} />}
+          {enCurso.length > 0 && <TorneosEnCursoCarrusel torneos={enCurso} misRoundsPlayed={misRoundsPlayed} onOpen={abrir} />}
           {enCurso.length > 0 && (
             <>
               <Text style={styles.sectionTitle}>En curso</Text>
-              {enCurso.map(t => <TorneoRow key={t.id} torneo={t} estado="en curso" onPress={() => abrir(t)} />)}
+              {enCurso.map(t => <TorneoRow key={t.id} torneo={t} estado="en curso" misRoundsPlayed={misRoundsPlayed[t.id] ?? 0} onPress={() => abrir(t)} />)}
             </>
           )}
           {proximos.length > 0 && (
             <>
               <Text style={styles.sectionTitle}>Próximos</Text>
-              {proximos.map(t => <TorneoRow key={t.id} torneo={t} estado="próximo" onPress={() => abrir(t)} />)}
+              {proximos.map(t => <TorneoRow key={t.id} torneo={t} estado="próximo" misRoundsPlayed={misRoundsPlayed[t.id] ?? 0} onPress={() => abrir(t)} />)}
             </>
           )}
           {finalizados.length > 0 && (
             <>
               <Text style={styles.sectionTitle}>Finalizados</Text>
-              {finalizados.map(t => <TorneoRow key={t.id} torneo={t} estado="finalizado" onPress={() => abrir(t)} />)}
+              {finalizados.map(t => <TorneoRow key={t.id} torneo={t} estado="finalizado" misRoundsPlayed={misRoundsPlayed[t.id] ?? 0} onPress={() => abrir(t)} />)}
             </>
           )}
         </ScrollView>
