@@ -63,6 +63,7 @@ type TorneoSettingsMenu = { onEdit?: () => void; onFinalize?: () => void; onDele
 function DetailNav({ torneo, onBack, badge, settingsMenu, busy }: { torneo: TournamentDoc; onBack: () => void; badge: React.ReactNode; settingsMenu?: TorneoSettingsMenu; busy?: boolean }) {
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
+  const fecha = formatFechaTorneo(torneo.roundDates);
   return (
     <View style={[styles.detailNav, { paddingTop: insets.top + 10 }]}>
       <TouchableOpacity onPress={onBack} style={{ padding: 2 }}>
@@ -70,7 +71,7 @@ function DetailNav({ torneo, onBack, badge, settingsMenu, busy }: { torneo: Tour
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
         <Text style={styles.detailNavTitle} numberOfLines={1}>{torneo.name}</Text>
-        <Text style={styles.detailNavSub}>{torneo.modality} · {formatFechaTorneo(torneo.roundDates)}{torneo.groupName ? ` · ${torneo.groupName}` : ''}</Text>
+        <Text style={styles.detailNavSub}>{torneo.modality}{fecha !== 'A definir' ? ` · ${fecha}` : ''}{torneo.groupName ? ` · ${torneo.groupName}` : ''}</Text>
       </View>
       {badge}
       {settingsMenu && (

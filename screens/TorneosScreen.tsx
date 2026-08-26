@@ -31,13 +31,14 @@ export function formatFechaTorneo(roundDates: (string | null)[]): string {
 
 function TorneoRow({ torneo, estado, misRoundsPlayed, onPress }: { torneo: TournamentDoc; estado: TorneoEstado; misRoundsPlayed: number; onPress: () => void }) {
   const dotColor = estado === 'en curso' ? COLORS.lime : COLORS.dim;
+  const fecha = formatFechaTorneo(torneo.roundDates);
   return (
     <TouchableOpacity style={styles.torneoRow} onPress={onPress}>
       <View style={[styles.dot, { backgroundColor: dotColor }]} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={styles.torneoNombre} numberOfLines={1}>{torneo.name}</Text>
         <Text style={styles.torneoMeta} numberOfLines={1}>
-          {torneo.modality} · {formatFechaTorneo(torneo.roundDates)}{torneo.groupName ? ` · ${torneo.groupName}` : ' · Abierto'}
+          {torneo.modality}{fecha !== 'A definir' ? ` · ${fecha}` : ''}{torneo.groupName ? ` · ${torneo.groupName}` : ' · Abierto'}
         </Text>
         {estado === 'en curso' && (
           <Text style={[styles.torneoMeta, { color: COLORS.lime, marginTop: 2 }]}>

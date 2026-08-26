@@ -719,7 +719,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
                   <View style={[styles.torneoEstadoDot, estado === 'próximo' ? styles.torneoEstadoDotNext : styles.torneoEstadoDotDone]} />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.torneoNombre} numberOfLines={1}>{t.name}</Text>
-                    <Text style={styles.torneoMeta} numberOfLines={1}>{t.modality} · {formatFechaTorneo(t.roundDates)}</Text>
+                    <Text style={styles.torneoMeta} numberOfLines={1}>{t.modality}{formatFechaTorneo(t.roundDates) !== 'A definir' ? ` · ${formatFechaTorneo(t.roundDates)}` : ''}</Text>
                   </View>
                   {soyParticipante || estado === 'finalizado' ? (
                     <View style={estado === 'próximo' ? styles.torneoBadgeNext : styles.torneoBadgeDone}>
