@@ -558,7 +558,7 @@ export default function UploadScreen() {
       }
 
       reset();
-      navigation.navigate('Inicio', { showSuccess: Date.now() });
+      navigation.navigate('Inicio', shareOnFeed ? { showSuccess: Date.now() } : {});
     } catch (err) {
       console.error('guardarRonda error', err);
       Alert.alert('Error', 'No se pudo guardar la vuelta. Intentá de nuevo.');
