@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,7 +18,10 @@ function initialsOf(name: string): string {
   return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
 }
 
-function Avatar({ initials, size = 42 }: { initials: string; size?: number }) {
+function Avatar({ initials, photoURL, size = 42 }: { initials: string; photoURL?: string | null; size?: number }) {
+  if (photoURL) {
+    return <Image source={{ uri: photoURL }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  }
   return (
     <View style={{ backgroundColor: COLORS.lime, width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ color: '#0f0f0f', fontSize: size * 0.36, fontWeight: '700' }}>{initials}</Text>
@@ -117,7 +120,7 @@ export default function InvitarJugadoresScreen() {
           const initials = initialsOf(u.displayName);
           return (
             <TouchableOpacity key={u.uid} style={[styles.row, i < filtrados.length - 1 && styles.rowBorder]} onPress={() => toggle(u.uid)}>
-              <Avatar initials={initials} />
+              <Avatar initials={initials} photoURL={u.photoURL} />
               <View style={styles.rowInfo}>
                 <Text style={styles.rowName} numberOfLines={1}>{u.displayName}</Text>
                 <Text style={styles.rowSub} numberOfLines={1}>@{u.username}{u.handicap != null ? ` · HCP ${u.handicap}` : ''}</Text>

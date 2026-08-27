@@ -8,7 +8,7 @@ import Svg, { Circle, Path, Ellipse, Line, Polygon } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase/config';
-import { collection, query, where, orderBy, onSnapshot, doc, setDoc, addDoc, updateDoc, serverTimestamp, getDocs, limit, increment } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, getDoc, setDoc, deleteDoc, addDoc, updateDoc, serverTimestamp, getDocs, limit, increment } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { joinGroup, removeMemberFromGroup, deleteGroup } from '../services/groups';
 import { estadoDeTorneo, joinTournament } from '../services/tournaments';
@@ -97,7 +97,6 @@ interface Post {
   asistentes?: number;
   voy?: boolean;
   likes: number;
-  liked: boolean;
   comentarios: number;
   pinned?: boolean;
 }
@@ -215,12 +214,44 @@ function CommentsSheet({ visible, onClose, count, groupId, postId }: { visible: 
 
 // ─── Post Cards ───────────────────────────────────────────────────────────────
 
-function PostActions({ post, onLike, onComment }: { post: Post; onLike: () => void; onComment: () => void }) {
+function PostActions({ groupId, post, onComment }: { groupId: string; post: Post; onComment: () => void }) {
+  const { firebaseUser } = useAuth();
+  const [isLiked, setIsLiked] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    getDoc(doc(db, 'groups', groupId, 'posts', post.id, 'likes', firebaseUser.uid)).then(snap => setIsLiked(snap.exists()));
+  }, [groupId, post.id, firebaseUser?.uid]);
+
+  const toggleLike = async () => {
+    if (!firebaseUser || busy) return;
+    // Optimista: el ícono cambia al toque, no espera la ida y vuelta al servidor.
+    const wasLiked = isLiked;
+    setIsLiked(!wasLiked);
+    setBusy(true);
+    const likeRef = doc(db, 'groups', groupId, 'posts', post.id, 'likes', firebaseUser.uid);
+    const postRef = doc(db, 'groups', groupId, 'posts', post.id);
+    try {
+      if (wasLiked) {
+        await deleteDoc(likeRef);
+        await updateDoc(postRef, { likesCount: increment(-1) });
+      } else {
+        await setDoc(likeRef, { uid: firebaseUser.uid, createdAt: serverTimestamp() });
+        await updateDoc(postRef, { likesCount: increment(1) });
+      }
+    } catch {
+      setIsLiked(wasLiked);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <View style={styles.postActions}>
-      <TouchableOpacity style={styles.postAction} onPress={onLike}>
-        <GolfFlagIcon color={post.liked ? COLORS.lime : COLORS.dim} size={17} />
-        {post.likes > 0 && <Text style={[styles.postActionText, post.liked && { color: COLORS.lime }]}>{post.likes}</Text>}
+      <TouchableOpacity style={styles.postAction} onPress={toggleLike} disabled={busy}>
+        <GolfFlagIcon color={isLiked ? COLORS.lime : COLORS.dim} size={17} />
+        {post.likes > 0 && <Text style={[styles.postActionText, isLiked && { color: COLORS.lime }]}>{post.likes}</Text>}
       </TouchableOpacity>
       <TouchableOpacity style={styles.postAction} onPress={onComment}>
         <GolfBallIcon color={COLORS.dim} size={16} />
@@ -254,17 +285,17 @@ function PostHeader({ post }: { post: Post }) {
   );
 }
 
-function TextPost({ post, onLike, onComment }: { post: Post; onLike: () => void; onComment: () => void }) {
+function TextPost({ groupId, post, onComment }: { groupId: string; post: Post; onComment: () => void }) {
   return (
     <View style={[styles.postCard, post.pinned && styles.postCardPinned]}>
       <PostHeader post={post} />
       <Text style={styles.postTexto}>{post.texto}</Text>
-      <PostActions post={post} onLike={onLike} onComment={onComment} />
+      <PostActions groupId={groupId} post={post} onComment={onComment} />
     </View>
   );
 }
 
-function FotosPost({ post, onLike, onComment }: { post: Post; onLike: () => void; onComment: () => void }) {
+function FotosPost({ groupId, post, onComment }: { groupId: string; post: Post; onComment: () => void }) {
   const [page, setPage] = useState(0);
   const fotos = post.fotos || [];
   return (
@@ -286,7 +317,7 @@ function FotosPost({ post, onLike, onComment }: { post: Post; onLike: () => void
           </View>
         )}
       </View>
-      <PostActions post={post} onLike={onLike} onComment={onComment} />
+      <PostActions groupId={groupId} post={post} onComment={onComment} />
     </View>
   );
 }
@@ -454,7 +485,6 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
   const [posts, setPosts] = useState<GroupPostDoc[]>([]);
   const [members, setMembers] = useState<GroupMemberDoc[]>([]);
   const [torneos, setTorneos] = useState<TournamentDoc[]>([]);
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [commentsPost, setCommentsPost] = useState<Post | null>(null);
   const [joining, setJoining] = useState(false);
   const [joiningTorneoId, setJoiningTorneoId] = useState<string | null>(null);
@@ -519,15 +549,6 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
   const handleTabPress = (i: number) => {
     setTab(i); tabRef.current = i;
     pagerRef.current?.setPage(i);
-  };
-
-  // Like local (visual) por ahora — persistirlo llega con su propia subcolección más adelante.
-  const toggleLike = (id: string) => {
-    setLikedIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
   };
 
   const handleJoin = async () => {
@@ -611,20 +632,18 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
     tiempo: formatTs(p.createdAt),
     texto: p.text ?? undefined,
     fotos: p.photos ?? undefined,
-    likes: p.likesCount + (likedIds.has(p.id) ? 1 : 0),
-    liked: likedIds.has(p.id),
+    likes: p.likesCount,
     comentarios: p.commentsCount,
     pinned: p.pinned,
   });
 
   const renderPost = (postDoc: GroupPostDoc) => {
     const post = toPost(postDoc);
-    const onLike = () => toggleLike(post.id);
     const onComment = () => setCommentsPost(post);
     switch (post.tipo) {
-      case 'fotos': return <FotosPost key={post.id} post={post} onLike={onLike} onComment={onComment} />;
+      case 'fotos': return <FotosPost key={post.id} groupId={group.id} post={post} onComment={onComment} />;
       case 'sistema': return <SistemaPost key={post.id} post={post} />;
-      default: return <TextPost key={post.id} post={post} onLike={onLike} onComment={onComment} />;
+      default: return <TextPost key={post.id} groupId={group.id} post={post} onComment={onComment} />;
     }
   };
 

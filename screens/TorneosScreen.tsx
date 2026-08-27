@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,11 +54,15 @@ function TorneoRow({ torneo, estado, misRoundsPlayed, onPress }: { torneo: Tourn
 // ─── Tarjeta destacada (en curso) ──────────────────────────────────────────────
 
 function ParticipantesAvatares({ torneoId, count }: { torneoId: string; count: number }) {
-  const [previos, setPrevios] = useState<{ uid: string; initials: string }[]>([]);
+  const [previos, setPrevios] = useState<{ uid: string; initials: string; photoURL: string | null }[]>([]);
 
   useEffect(() => {
     const q = query(collection(db, 'tournaments', torneoId, 'participants'), orderBy('joinedAt', 'asc'), limit(4));
-    return onSnapshot(q, snap => setPrevios(snap.docs.map(d => ({ uid: d.id, initials: (d.data() as any).initials ?? '?' }))));
+    return onSnapshot(q, snap => setPrevios(snap.docs.map(d => ({
+      uid: d.id,
+      initials: (d.data() as any).initials ?? '?',
+      photoURL: (d.data() as any).photoURL ?? null,
+    }))));
   }, [torneoId]);
 
   const extra = count - previos.length;
@@ -67,7 +71,10 @@ function ParticipantesAvatares({ torneoId, count }: { torneoId: string; count: n
     <View style={styles.avatarRow}>
       {previos.map((p, i) => (
         <View key={p.uid} style={[styles.avatarChip, i > 0 && { marginLeft: -10 }, { zIndex: 10 - i }]}>
-          <Text style={styles.avatarChipText}>{p.initials}</Text>
+          {p.photoURL
+            ? <Image source={{ uri: p.photoURL }} style={styles.avatarChipImg} />
+            : <Text style={styles.avatarChipText}>{p.initials}</Text>
+          }
         </View>
       ))}
       {extra > 0 && (
@@ -276,7 +283,8 @@ const styles = StyleSheet.create({
 
   featuredFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 },
   avatarRow: { flexDirection: 'row', alignItems: 'center' },
-  avatarChip: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.lime, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.card },
+  avatarChip: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.lime, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.card, overflow: 'hidden' },
+  avatarChipImg: { width: '100%', height: '100%' },
   avatarChipExtra: { backgroundColor: COLORS.dark2 },
   avatarChipText: { fontSize: 10, fontWeight: '700', color: '#0f0f0f' },
   avatarChipExtraText: { color: COLORS.white },

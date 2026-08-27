@@ -138,10 +138,10 @@ service cloud.firestore {
         allow read: if isGroupMember(groupId);
         allow create: if isGroupMember(groupId) && request.resource.data.authorId == request.auth.uid;
         // El autor o un admin puede editar/borrar el post entero; cualquier miembro puede
-        // tocar solo commentsCount (necesario para comentar posts ajenos).
+        // tocar solo commentsCount (comentar) o likesCount (likear posts ajenos).
         allow update: if isSignedIn() &&
           (resource.data.authorId == request.auth.uid || isGroupAdmin(groupId) ||
-            (isGroupMember(groupId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["commentsCount"])));
+            (isGroupMember(groupId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["commentsCount", "likesCount"])));
         allow delete: if isSignedIn() &&
           (resource.data.authorId == request.auth.uid || isGroupAdmin(groupId));
 
@@ -150,6 +150,12 @@ service cloud.firestore {
           allow create: if isGroupMember(groupId) && request.resource.data.authorId == request.auth.uid;
           allow delete: if isSignedIn() &&
             (resource.data.authorId == request.auth.uid || isGroupAdmin(groupId));
+          allow update: if false;
+        }
+
+        match /likes/{uid} {
+          allow read: if isGroupMember(groupId);
+          allow create, delete: if isGroupMember(groupId) && request.auth.uid == uid;
           allow update: if false;
         }
 
