@@ -86,6 +86,7 @@ interface Post {
   autorId?: string;
   autor?: string;
   initials?: string;
+  fotoURL?: string | null;
   bg?: string;
   color?: string;
   tiempo: string;
@@ -102,7 +103,10 @@ interface Post {
 }
 
 
-function Avatar({ initials, bg, color, size = 42 }: { initials: string; bg: string; color: string; size?: number }) {
+function Avatar({ initials, photoURL, bg, color, size = 42 }: { initials: string; photoURL?: string | null; bg: string; color: string; size?: number }) {
+  if (photoURL) {
+    return <Image source={{ uri: photoURL }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  }
   return (
     <View style={[styles.avatar, { backgroundColor: bg, width: size, height: size, borderRadius: size / 2 }]}>
       <Text style={[styles.avatarText, { color, fontSize: size * 0.32 }]}>{initials}</Text>
@@ -153,6 +157,7 @@ function CommentsSheet({ visible, onClose, count, groupId, postId }: { visible: 
         authorName,
         authorInitials,
         authorAvatarColor: '#0f0f0f',
+        authorPhotoURL: userDoc?.photoURL ?? null,
         text: value,
         createdAt: serverTimestamp(),
       });
@@ -175,7 +180,7 @@ function CommentsSheet({ visible, onClose, count, groupId, postId }: { visible: 
           {comments.length > 0 ? comments.map(c => (
             <View key={c.id} style={styles.commentRow}>
               <TouchableOpacity onPress={() => abrirPerfil(c)}>
-                <Avatar initials={c.authorInitials} bg={COLORS.lime} color="#0f0f0f" size={32} />
+                <Avatar initials={c.authorInitials} photoURL={c.authorPhotoURL} bg={COLORS.lime} color="#0f0f0f" size={32} />
               </TouchableOpacity>
               <View style={styles.commentBubble}>
                 <View style={styles.commentMeta}>
@@ -190,7 +195,7 @@ function CommentsSheet({ visible, onClose, count, groupId, postId }: { visible: 
           )) : <Text style={styles.commentsEmpty}>Sin comentarios todavía. ¡Sé el primero!</Text>}
         </ScrollView>
         <View style={[styles.commentInput, { paddingBottom: kbHeight > 0 ? kbHeight + 12 : 12 + insets.bottom }]}>
-          <Avatar initials={myInitials} bg={COLORS.lime} color="#0f0f0f" size={32} />
+          <Avatar initials={myInitials} photoURL={userDoc?.photoURL} bg={COLORS.lime} color="#0f0f0f" size={32} />
           <TextInput
             style={styles.commentTextInput}
             placeholder="Comentar..."
@@ -268,7 +273,7 @@ function PostHeader({ post }: { post: Post }) {
   const abrirPerfil = () => navigation.navigate('PerfilUsuario', { viewUser: { uid: post.autorId!, name: post.autor, initials: post.initials, bg: post.bg, color: post.color } });
   return (
     <TouchableOpacity style={styles.postHeader} activeOpacity={esPersona ? 0.7 : 1} onPress={esPersona ? abrirPerfil : undefined}>
-      <Avatar initials={post.initials!} bg={post.bg!} color={post.color!} size={36} />
+      <Avatar initials={post.initials!} photoURL={post.fotoURL} bg={post.bg!} color={post.color!} size={36} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={styles.postAutor} numberOfLines={1}>{post.autor}</Text>
@@ -338,6 +343,8 @@ function PostComposer({ visible, onClose, onPublish }: {
   onClose: () => void;
   onPublish: (text: string, photos: string[]) => Promise<void>;
 }) {
+  const { userDoc } = useAuth();
+  const myInitials = (userDoc?.displayName ?? '??').split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   const [text, setText] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -401,7 +408,7 @@ function PostComposer({ visible, onClose, onPublish }: {
           </View>
 
           <View style={styles.composerBody}>
-            <Avatar initials="JU" bg="#2a1a3a" color="#b070e0" size={38} />
+            <Avatar initials={myInitials} photoURL={userDoc?.photoURL} bg="#2a1a3a" color="#b070e0" size={38} />
             <TextInput
               style={styles.composerInput}
               placeholder="¿Qué pasó en la cancha?"
@@ -603,6 +610,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
       authorId: firebaseUser.uid,
       authorName: userDoc.displayName,
       authorInitials,
+      authorPhotoURL: userDoc.photoURL ?? null,
       kind: photoUrls.length > 0 ? 'fotos' : 'texto',
       text: text || null,
       photos: photoUrls.length > 0 ? photoUrls : null,
@@ -627,6 +635,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
     autorId: p.authorId,
     autor: p.authorName,
     initials: p.authorInitials,
+    fotoURL: p.authorPhotoURL,
     bg: '#1a2a0a',
     color: COLORS.lime,
     tiempo: formatTs(p.createdAt),
@@ -789,7 +798,7 @@ function GroupDetail({ group, isMember, onBack }: { group: GroupDoc; isMember: b
                         : navigation.navigate('PerfilUsuario', { viewUser: { uid: m.uid, name: m.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: m.handicap ?? undefined } })
                       }
                     >
-                      <Avatar initials={initials} bg={COLORS.lime} color="#0f0f0f" size={46} />
+                      <Avatar initials={initials} photoURL={m.photoURL} bg={COLORS.lime} color="#0f0f0f" size={46} />
                       <View style={styles.rowInfo}>
                         <View style={styles.rowNameRow}>
                           <Text style={styles.rowName} numberOfLines={1}>{m.displayName}{esYo ? ' (vos)' : ''}</Text>
@@ -883,7 +892,7 @@ function PlayerRow({ user }: { user: UserDoc }) {
         style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, gap: 12 }}
         onPress={() => navigation.navigate('PerfilUsuario', { viewUser: { uid: user.uid, name: user.displayName, initials, bg: COLORS.lime, color: '#0f0f0f', handicap: user.handicap ?? undefined } })}
       >
-        <Avatar initials={initials} bg={COLORS.lime} color="#0f0f0f" size={46} />
+        <Avatar initials={initials} photoURL={user.photoURL} bg={COLORS.lime} color="#0f0f0f" size={46} />
         <View style={styles.rowInfo}>
           <Text style={styles.rowName} numberOfLines={1}>{user.displayName}</Text>
           <Text style={styles.rowSub} numberOfLines={1}>@{user.username}{user.handicap != null ? ` · HCP ${user.handicap}` : ''}</Text>

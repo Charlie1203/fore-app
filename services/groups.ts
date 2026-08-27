@@ -21,6 +21,7 @@ export async function createGroup(name: string, user: UserDoc): Promise<string> 
 	await setDoc(doc(db, 'groups', groupRef.id, 'members', user.uid), {
 		uid: user.uid,
 		displayName: user.displayName,
+		photoURL: user.photoURL ?? null,
 		handicap: user.handicap ?? null,
 		role: 'admin',
 		joinedAt: serverTimestamp(),
@@ -33,6 +34,7 @@ export async function joinGroup(groupId: string, user: UserDoc): Promise<void> {
 	await setDoc(doc(db, 'groups', groupId, 'members', user.uid), {
 		uid: user.uid,
 		displayName: user.displayName,
+		photoURL: user.photoURL ?? null,
 		handicap: user.handicap ?? null,
 		role: 'member',
 		joinedAt: serverTimestamp(),
@@ -48,12 +50,13 @@ export async function joinGroup(groupId: string, user: UserDoc): Promise<void> {
 export async function addMemberToGroup(
 	groupId: string,
 	groupName: string,
-	member: Pick<UserDoc, 'uid' | 'displayName' | 'handicap'>,
+	member: Pick<UserDoc, 'uid' | 'displayName' | 'handicap' | 'photoURL'>,
 	addedByName: string,
 ): Promise<void> {
 	await setDoc(doc(db, 'groups', groupId, 'members', member.uid), {
 		uid: member.uid,
 		displayName: member.displayName,
+		photoURL: member.photoURL ?? null,
 		handicap: member.handicap ?? null,
 		role: 'member',
 		joinedAt: serverTimestamp(),

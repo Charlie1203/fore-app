@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,7 +67,7 @@ export default function AgregarMiembrosScreen() {
     try {
       const elegidos = usuarios.filter(u => seleccionados.includes(u.uid));
       await Promise.all(elegidos.map(u =>
-        addMemberToGroup(groupId, groupName, { uid: u.uid, displayName: u.displayName, handicap: u.handicap }, userDoc.displayName)
+        addMemberToGroup(groupId, groupName, { uid: u.uid, displayName: u.displayName, handicap: u.handicap, photoURL: u.photoURL }, userDoc.displayName)
       ));
       Alert.alert(
         '¡Listo!',
@@ -120,9 +120,13 @@ export default function AgregarMiembrosScreen() {
           const initials = initialsOf(u.displayName);
           return (
             <TouchableOpacity key={u.uid} style={[styles.row, i < candidatos.length - 1 && styles.rowBorder]} onPress={() => toggle(u.uid)}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initials}</Text>
-              </View>
+              {u.photoURL ? (
+                <Image source={{ uri: u.photoURL }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{initials}</Text>
+                </View>
+              )}
               <View style={styles.rowInfo}>
                 <Text style={styles.rowName} numberOfLines={1}>{u.displayName}</Text>
                 <Text style={styles.rowSub} numberOfLines={1}>@{u.username}{u.handicap != null ? ` · HCP ${u.handicap}` : ''}</Text>

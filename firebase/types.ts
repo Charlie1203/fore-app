@@ -109,6 +109,7 @@ export interface CommentDoc {
 	authorName: string;
 	authorInitials: string;
 	authorAvatarColor: string;
+	authorPhotoURL: string | null;
 	text: string;
 	createdAt: Timestamp;
 }
@@ -148,6 +149,7 @@ export interface GroupDoc {
 export interface GroupMemberDoc {
 	uid: string;
 	displayName: string;
+	photoURL: string | null;
 	handicap: number | null;
 	role: 'admin' | 'member';
 	joinedAt: Timestamp;
@@ -161,6 +163,7 @@ export interface GroupPostDoc {
 	authorId: string;
 	authorName: string;
 	authorInitials: string;
+	authorPhotoURL: string | null;
 	kind: GroupPostKind;
 	text: string | null;
 	photos: string[] | null;
